@@ -61,7 +61,7 @@ const fragments = files.map((file, order) => {
   if (code.includes(MARKER))
     throw new Error(`${file} : contient le séparateur réservé ${MARKER}`);
   if (!code.endsWith(";") && !code.endsWith("}")) code += ";";
-  code = uncensorBlockCode(code);
+  code = uncensorBlockCode(code, !/^0|^[12]/.test(file));
   return { file, order, code, size: code.length };
 });
 
@@ -97,27 +97,34 @@ for (const unit of units)
     );
 
 // ------------------------------------------------- empaquetage best-fit ------
-// Best-fit decreasing : donne (quasi) le nombre minimal de Code Blocks.
-const bins = [];
-for (const unit of [...units].sort((a, b) => b.size - a.size || a.order - b.order)) {
-  let best = null;
-  for (const bin of bins) {
-    const extra = bin.units.length ? SEPARATOR.length : 0;
-    if (bin.size + extra + unit.size <= MAX && (!best || bin.size > best.size)) best = bin;
+// Best-fit decreasing par palier (000..299 puis 300+) :
+// conserve `pack-01..05` identiques et ajoute les nouvelles extensions dans `pack-06+`.
+function packUnits(unitList) {
+  const localBins = [];
+  for (const unit of [...unitList].sort((a, b) => b.size - a.size || a.order - b.order)) {
+    let best = null;
+    for (const bin of localBins) {
+      const extra = bin.units.length ? SEPARATOR.length : 0;
+      if (bin.size + extra + unit.size <= MAX && (!best || bin.size > best.size)) best = bin;
+    }
+    if (!best) {
+      best = { size: 0, units: [] };
+      localBins.push(best);
+    }
+    best.size += (best.units.length ? SEPARATOR.length : 0) + unit.size;
+    best.units.push(unit);
   }
-  if (!best) {
-    best = { size: 0, units: [] };
-    bins.push(best);
-  }
-  best.size += (best.units.length ? SEPARATOR.length : 0) + unit.size;
-  best.units.push(unit);
+  for (const bin of localBins) bin.units.sort((a, b) => a.order - b.order);
+  localBins.sort(
+    (a, b) =>
+      Math.min(...a.units.map((u) => u.order)) - Math.min(...b.units.map((u) => u.order)),
+  );
+  return localBins;
 }
-// Ordre d'évaluation = ordre des numéros de fichiers sources (stable, reproductible).
-for (const bin of bins) bin.units.sort((a, b) => a.order - b.order);
-bins.sort(
-  (a, b) =>
-    Math.min(...a.units.map((u) => u.order)) - Math.min(...b.units.map((u) => u.order)),
-);
+
+const baseUnits = units.filter((u) => /^0|^[12]/.test(u.items[0].file));
+const extraUnits = units.filter((u) => !/^0|^[12]/.test(u.items[0].file));
+const bins = [...packUnits(baseUnits), ...packUnits(extraUnits)];
 
 // --------------------------------------------------------------- sortie -----
 fs.mkdirSync(OUT, { recursive: true });

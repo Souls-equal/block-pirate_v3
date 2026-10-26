@@ -356,14 +356,22 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
   if (!u || !u.name) return !1;
   const p = n[s];
   if (!p) return !1;
-  const y = (function (t, e) {
+  const customName = u.attributes && u.attributes.customDisplayName;
+  const y = (function (t, e, cName) {
+    if (cName) {
+      for (const o in t) {
+        if ("string" != typeof o || 0 !== o.indexOf("attack")) continue;
+        const r = t[o];
+        if (r && r.name === cName && r.clicked === e) return r;
+      }
+    }
     for (const o in t) {
       if ("string" != typeof o || 0 !== o.indexOf("attack")) continue;
       const r = t[o];
       if (r && r.clicked === e) return r;
     }
     return null;
-  })(p, u.name);
+  })(p, u.name, customName);
   if (!y) {
     const e = t + ":" + u.name,
       o = Date.now();

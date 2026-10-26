@@ -1,17 +1,17 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-26T16:33:16.726Z",
+  "generatedAt": "2026-10-26T17:51:05.931Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
     "y": 100000,
     "z": 100002
   },
-  "sourceFiles": 32,
-  "sourceChars": 284378,
-  "packedChars": 149659,
-  "compression": "47 %",
-  "packCount": 5,
+  "sourceFiles": 36,
+  "sourceChars": 396030,
+  "packedChars": 200225,
+  "compression": "49 %",
+  "packCount": 7,
   "packs": [
     {
       "index": 1,
@@ -98,6 +98,32 @@
         "251-control-domain.js",
         "252-control-slash.js",
         "253-control-shambles.js"
+      ]
+    },
+    {
+      "index": 6,
+      "file": "pack-06.js",
+      "z": 100007,
+      "chars": 24167,
+      "payloadChars": 24134,
+      "hash": "944b77a8",
+      "modules": 2,
+      "sources": [
+        "300-common-uncommon-plus.js",
+        "330-mythical-apex-plus.js"
+      ]
+    },
+    {
+      "index": 7,
+      "file": "pack-07.js",
+      "z": 100008,
+      "chars": 26399,
+      "payloadChars": 26366,
+      "hash": "40e4ec6f",
+      "modules": 2,
+      "sources": [
+        "310-rare-legendary-plus.js",
+        "320-legendary-mythical-plus.js"
       ]
     }
   ]

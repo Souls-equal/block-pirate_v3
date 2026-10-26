@@ -4,24 +4,25 @@ Code source du jeu (One Piece / voxel) : un « moteur » en modules ES sous `src
 et les capacités des fruits empaquetées sous `code-blocks/`.
 
 > **En une phrase** : le World Code garde son **format multi-fichiers lisible** dans `src/`
-> (seuls `src/fruit/func-abilities.js` et `src/fruit/index.js` changent en jeu), et les
-> 32 capacités des fruits sont regroupées en **5 Code Blocks** (`code-blocks/pack-01.js` … `pack-05.js`,
-> 150 k au total au lieu de 32 blocs / 272 k). Et Control + Gravity remarchent.
+> (seuls `src/fruit/abilities.js`, `src/fruit/func-abilities.js` et `src/fruit/index.js` changent en jeu), et les
+> 36 modules de capacités des 41 fruits sont regroupés en **7 Code Blocks** (`code-blocks/pack-01.js` … `pack-07.js`,
+> ~200 k au total pour 196 handlers, sans aucun motif censuré par Bloxd.io).
 
 ---
 
 ## Démarrage rapide (copier-coller dans Bloxd.io)
 
-Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/abilities.js`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à remplacer :
+Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à mettre à jour :
 
 1. Dans le **World Code** (dossier `fruit/`) :
-   - **`src/fruit/func-abilities.js`** *(nouveau chargeur BP3 lisible et autonome — aucun nouveau fichier à créer)*
-   - **`src/fruit/index.js`** *(rembourse le cooldown si un bloc manque, et reformaté en multi-lignes lisible)*
-2. Dans le **monde** (les **5 Code Blocks** à `x=100000, y=100000, z=100002 … 100006`) :
-   - Colle le contenu entier de **`code-blocks/pack-01.js` … `pack-05.js`**
-     (détail dans [`code-blocks/README.md`](code-blocks/README.md)).
+   - **`src/fruit/abilities.js`** *(153 binds d'habilités et dotation complète des 41 fruits par rareté : Common = 3, Uncommon = 4, Rare = 4, Legendary = 5, Mythical = 5)*
+   - **`src/fruit/func-abilities.js`** *(pont BP3 lisible et autonome avec les 196 shims d'habilités)*
+   - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
+2. Dans le **monde** (les **7 Code Blocks** à `x=100000, y=100000, z=100002 … 100008`) :
+   - Si tu avais déjà collé `pack-01.js` … `pack-05.js` (`z=100002 … 100006`), leur code est resté **100 % identique** : tu peux simplement ajouter **`code-blocks/pack-06.js`** en `z=100007` et **`code-blocks/pack-07.js`** en `z=100008` (ou recoller les 7 packs `pack-01.js` … `pack-07.js` de `z=100002` à `z=100008`).
+   - Détail dans [`code-blocks/README.md`](code-blocks/README.md).
 3. `FA.logStatus()` dans le World Code doit répondre
-   `5 pack(s), 96 handlers, 0 manquant(s), 0 erreur(s)`.
+   `7 pack(s), 197 handlers, 0 manquant(s), 0 erreur(s)`.
 
 *(Si tu modifies les sources de `src/blocks/` plus tard : `npm install && npm run build:blocks && npm run check`.)*
 
