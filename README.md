@@ -89,6 +89,12 @@ Quatre causes cumulées, toutes invisibles dans les logs :
   (`g.delete(d)` dans le `catch`) au lieu de le consommer pour rien.
 - ✅ **Trous et blocs déplacés tolérés** : le chargeur scanne 16 positions et
   identifie chaque pack par son en-tête `BP3:<index>/<total>`, pas par sa place.
+- ✅ **Chunk froid préchauffé.** Les Code Blocks sont en coordonnées lointaines
+  (`100000, 100000`) : tant qu'aucun `api.getBlock` n'y touche, Bloxd.io ne
+  charge pas le chunk et `getBlockData` renvoie vide. Le chargeur appelle
+  `warmup()` (un `getBlock` sur les 16 positions) **dès sa création**, puis
+  décale la première lecture de 2 ticks ; chaque tentative ré-échauffe le chunk
+  et les 2 premiers retries ont lieu au bout de 2 ticks (puis 10).
 
 ---
 
@@ -174,8 +180,9 @@ même préfixe de famille (`control-`, `gravity-`) et ajoute la famille dans
 ```js
 FA.logStatus();     // résumé lisible : packs, modules, handlers, erreurs
 FA.status();        // objet : { ready, packCount, missing[], errors[], packs[] }
-FA.reload();        // relit les Code Blocks
+FA.reload();        // relit les Code Blocks (ré-échauffe le chunk avant)
 FA.reload(true);    // idem en forçant la réévaluation
+FA.prewarm();       // force le chargement du chunk des Code Blocks (16 getBlock)
 ```
 
 Messages typiques :
