@@ -1,8 +1,8 @@
 //utils/haki.js
-import { getRandomPosition, spawnBoss } from "./boss.js"
-import { point, TEX } from "./fx.js";
-import { posOf } from "./lifeform.js";
-import { getTotalMoney, payMoney } from "./data.js";
+import { getRandomPosition, spawnBoss } from "./boss";
+import { point, TEX } from "./fx";
+import { posOf } from "./lifeform";
+import { getTotalMoney, payMoney } from "./data";
 
 const HK_CLICK = "Small Black Pod";
 const HK_TOLL = "Black Carpet", HK_PRICE = 14000;

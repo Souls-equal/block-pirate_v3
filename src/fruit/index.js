@@ -2,7 +2,7 @@ import { setInterval as t, setTimeout as e } from "../utils/timer";
 let o = function () {},
   r = function () {};
 try {
-  const L = require("./customItem");
+  const L = require("../gameplay/customItem");
   (L.registerCustomBlock && (o = L.registerCustomBlock), L.registerCustomItem && (r = L.registerCustomItem));
 } catch (U) {
   try {

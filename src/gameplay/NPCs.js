@@ -4,7 +4,7 @@ import { startQuest } from "./quest";
 import { buyItem } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
 import { getPlayerTeam } from "../core/team";
-import { rollFruit } from "../fruit";
+import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 export function attackNPC(playerId, mobId) {
