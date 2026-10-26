@@ -4,7 +4,7 @@ Code source du jeu (One Piece / voxel) : un « moteur » en modules ES sous `src
 et les capacités des fruits empaquetées sous `code-blocks/`.
 
 > **En une phrase** : les sources restent **lisibles** dans `src/`, le build produit
-> **1 World Code minifié** (`dist/world.js`, 174 k / 512 k) et **5 Code Blocks**
+> **1 World Code minifié** (`world.js`, 174 k / 512 k) et **5 Code Blocks**
 > (150 k au total au lieu de 32 blocs / 272 k). Et Control + Gravity remarchent.
 
 ---
@@ -19,7 +19,7 @@ npm run check               # imports + handlers + intégrité des packs + simul
 
 Puis, dans le jeu :
 
-1. Colle `dist/world.js` dans le **World Code**.
+1. Colle `world.js` (à la racine du dépôt) dans le **World Code**.
 2. Colle le contenu entier de `code-blocks/pack-01.js` … `pack-05.js` dans
    **5 Code Blocks** à `x=100000, y=100000, z=100002 … 100006`
    (le détail est dans [`code-blocks/README.md`](code-blocks/README.md)).
