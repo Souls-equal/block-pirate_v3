@@ -78,7 +78,7 @@ fs.writeFileSync(outFile, code, "utf8");
 
 if (/(^|\n)\s*(import|export)\b/.test(code))
   throw new Error("Le bundle contient encore des import/export : le jeu ne le lira pas.");
-for (const entry of ["onPlayerClick", "onPlayerJoin", "tick", "onClose"]) {
+for (const entry of ["onPlayerClick", "onPlayerJoin", "onEntityDeleted", "tick", "onClose"]) {
   if (!new RegExp("(^|[,;{}\n])" + entry + "\\s*=").test(code))
     throw new Error(`Point d'entree ${entry} perdu par la minification !`);
 }

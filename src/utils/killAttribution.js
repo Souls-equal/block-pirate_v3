@@ -4,9 +4,10 @@ const HITS = {};
 const KILL_TTL_MS = 120000;
 const CLAIM_TTL_MS = 20000;
 /* Un kill déjà crédité reste verrouillé quelques secondes : le moteur envoie
-   plusieurs events pour une même mort (kill + despawn, et parfois les deux
-   chemins de crédit côté script). Sans ce verrou, on paie deux fois. */
-const CREDIT_HOLD_MS = 5000;
+   plusieurs events pour une même mort (kill + despawn + onEntityDeleted, et
+   parfois les deux chemins de crédit côté script). Sans ce verrou, on paie
+   deux fois. */
+const CREDIT_HOLD_MS = 15000;
 
 const CLAIMED = {};
 

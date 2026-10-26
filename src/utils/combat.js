@@ -13,6 +13,7 @@ import {
     isAliveId,
     isAliveIdFresh,
     isMobAlive,
+    isMobEntityType,
     isPlayerAlive,
     isStillAlive,
     posOf,
@@ -88,8 +89,15 @@ export function unmark(targetId) { delete marks[targetId]; }
 
 /* SANTÉ */
 function pushHealth(id, amount, who, broadcast) {
-    try { return !!api.applyHealthChange(id, amount, who, broadcast); }
-    catch (e) { return false; }
+    try {
+        if (api.applyHealthChange(id, amount, who, broadcast)) return true;
+    } catch (e) {}
+    if (who && typeof who === "object" && who.lifeformId && who.withItem !== undefined) {
+        try {
+            if (api.applyHealthChange(id, amount, { lifeformId: who.lifeformId }, broadcast)) return true;
+        } catch (e2) {}
+    }
+    return false;
 }
 
 export function heal(id, amount) {
@@ -112,9 +120,12 @@ export function damage(target, rawAmount, caster, itemName) {
     try {
         if (!target || !caster || target === caster) return false;
 
-        // Toujours assurer mobData même si le cache alive est en retard
+        // Toujours assurer mobData même si le cache alive est en retard.
+        // Note: api.getEntityType(id) renvoie "Draugr Zombie", "Gorilla", etc. (jamais "MOB").
         const tTypeEarly = safeEntityType(target);
-        if (tTypeEarly === "MOB") {
+        if (tTypeEarly === "NPC") return false;
+        const isMobEarly = isMobAlive(target) || isMobEntityType(tTypeEarly);
+        if (isMobEarly) {
             try { noteMobSeen(target); } catch (e) {}
         }
 
@@ -124,27 +135,26 @@ export function damage(target, rawAmount, caster, itemName) {
         if (!alive) {
             const h = safeHealth(target);
             if (h === null || h <= 0) {
-                // si on ne peut même pas lire la vie, on tente quand même si c'est un MOB
+                // si on ne peut même pas lire la vie, on tente quand même si c'est un mob
                 // (le cache peut être vide juste après un spawn)
-                if (tTypeEarly !== "MOB") return false;
+                if (!isMobEarly) return false;
             }
         }
 
         const type = safeEntityType(target);
         if (type === "NPC") return false;
-        if (type === null) {
+        if (type === null && !isMobEarly) {
             // si on n'arrive pas à lire le type mais qu'on a une vie, on continue
             const h = safeHealth(target);
             if (h === null) return false;
         }
+        const isMob = isMobEarly || isMobEntityType(type);
 
         // Résout le vrai tueur (golem -> owner)
         let effectiveCaster = getEffectiveKiller(caster) || caster;
 
         // si le caster effectif est invalide, on garde l'original pour ne pas perdre le coup
         if (!isAliveId(effectiveCaster) && !isAliveId(caster)) {
-            // le caster peut être un joueur déco entre temps, mais on tente quand même
-            // avec l'original si l'effectif est mort
             if (isAliveId(caster)) effectiveCaster = caster;
         }
 
@@ -158,16 +168,16 @@ export function damage(target, rawAmount, caster, itemName) {
             if (until && api.now() < until) amt = Math.floor(amt * 1.3);
         } catch (e0) {}
 
-        const item = itemName || "Ability";
+        const item = typeof itemName === "string" && itemName.length ? itemName : "Ability";
         const victimName = safeEntityName(target);
         const casterName = safeEntityName(effectiveCaster);
         const hpBefore = safeHealth(target);
 
-        if (type === "MOB" || tTypeEarly === "MOB") {
+        if (isMob) {
             try { noteMobSeen(target); } catch (e) {}
         }
 
-        try { recordDamager(target, effectiveCaster, itemName); } catch (e1) {}
+        try { recordDamager(target, effectiveCaster, item); } catch (e1) {}
 
         let credited = false;
         try {
@@ -202,7 +212,7 @@ export function damage(target, rawAmount, caster, itemName) {
             try { noteUncreditedKill(target, effectiveCaster, item, victimName, casterName); } catch (e) {}
         }
 
-        if (fatal && (type === "MOB" || tTypeEarly === "MOB")) {
+        if (fatal && (isMob || (type !== "Player" && tTypeEarly !== "Player" && !isPlayerAlive(target)))) {
             try { creditKill(effectiveCaster, target, victimName); } catch (e2) {}
         }
         return true;
@@ -441,7 +451,7 @@ export function teleport(id, x, y, z) {
 }
 
 export {
-    isAliveId, isStillAlive, isPlayerAlive, isMobAlive,
+    isAliveId, isStillAlive, isPlayerAlive, isMobAlive, isMobEntityType,
     posOf, safePosition, safeEntityName, safeEntityType, safeHealth,
     facing, chest, eye, targetBlock,
 };
@@ -486,7 +496,7 @@ export function applyEffect(targetId, effectId, duration, opts = {}) {
     if (type === null) return false;
     if (type === "NPC") return false;
 
-    if (type === "MOB") {
+    if (isMobEntityType(type) || isMobAlive(targetId)) {
         const effectOpts = { inbuiltLevel };
         if (displayName) effectOpts.displayName = displayName;
         if (icon) effectOpts.icon = icon;
