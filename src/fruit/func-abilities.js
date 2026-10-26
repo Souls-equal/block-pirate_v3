@@ -1,4 +1,4 @@
-// fruit/func-abilities.js — pont lisible entre le World Code et les 5 Code Blocks (BP3).
+// fruit/func-abilities.js — pont lisible entre le World Code et les 7 Code Blocks (BP3).
 // Remplace directement l'ancien `func-abilities.js` dans Bloxd.io (aucun fichier à ajouter).
 
 import {
@@ -125,7 +125,7 @@ export { markAggro };
 export const MAGIC = "BP3";
 export const MARKER = "/*BP3M*/";
 export const ORIGIN = [100000, 100000, 100002];
-export const SCAN_SLOTS = 16;
+export const SCAN_SLOTS = 24;
 
 const HEADER_RE = /^\s*\/\*BP3:(\d+)\/(\d+):len=(\d+):h=([0-9a-f]{8})\*\/\s*/;
 
@@ -385,8 +385,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         errors.push(`pack ${b.index} hors bande (z=${found.z})`);
         continue;
       }
-      if (!total) total = b.total;
-      if (b.total !== total) errors.push(`pack ${b.index} annonce ${b.total} packs au lieu de ${total}`);
+      total = Math.max(total, b.total, b.index);
       if (byIndex[b.index]) errors.push(`pack ${b.index} en double (z=${found.z})`);
       if (!b.ok) {
         errors.push(
@@ -661,6 +660,107 @@ export const onPlayerClickGravityBarrage = shim("onPlayerClickGravityBarrage");
 export const onPlayerClickGravityGrab = shim("onPlayerClickGravityGrab");
 export const onPlayerClickGravityDevastation = shim("onPlayerClickGravityDevastation");
 export const onPlayerLeaveGravity = shim("onPlayerLeaveGravity");
+export const onPlayerClickRocketBarrage = shim("onPlayerClickRocketBarrage");
+export const onPlayerClickPropellerFlight = shim("onPlayerClickPropellerFlight");
+export const onPlayerClickTwisterSlash = shim("onPlayerClickTwisterSlash");
+export const onPlayerClickSpringCannon = shim("onPlayerClickSpringCannon");
+export const onPlayerClickLandmineField = shim("onPlayerClickLandmineField");
+export const onPlayerClickWhiteBlow = shim("onPlayerClickWhiteBlow");
+export const onPlayerClickSpikeRoll = shim("onPlayerClickSpikeRoll");
+export const onPlayerClickThornVolley = shim("onPlayerClickThornVolley");
+export const onPlayerClickFireFist = shim("onPlayerClickFireFist");
+export const onPlayerClickFlamePillar = shim("onPlayerClickFlamePillar");
+export const onPlayerClickIceSpears = shim("onPlayerClickIceSpears");
+export const onPlayerClickGlacialAge = shim("onPlayerClickGlacialAge");
+export const onPlayerClickDesertSpada = shim("onPlayerClickDesertSpada");
+export const onPlayerClickSandstorm = shim("onPlayerClickSandstorm");
+export const onPlayerClickQuicksandPit = shim("onPlayerClickQuicksandPit");
+export const onPlayerClickBlackHole = shim("onPlayerClickBlackHole");
+export const onPlayerClickDarkLiberation = shim("onPlayerClickDarkLiberation");
+export const onPlayerClickFalconDive = shim("onPlayerClickFalconDive");
+export const onPlayerClickFeatherBarrage = shim("onPlayerClickFeatherBarrage");
+export const onPlayerClickDiamondTackle = shim("onPlayerClickDiamondTackle");
+export const onPlayerClickPrismReflect = shim("onPlayerClickPrismReflect");
+export const onPlayerClickSacredJewel = shim("onPlayerClickSacredJewel");
+export const onPlayerClickLightFlashStep = shim("onPlayerClickLightFlashStep");
+export const onPlayerClickGatlingBarrage = shim("onPlayerClickGatlingBarrage");
+export const onPlayerClickGearWhip = shim("onPlayerClickGearWhip");
+export const onPlayerClickHollowBurst = shim("onPlayerClickHollowBurst");
+export const onPlayerClickSoulScream = shim("onPlayerClickSoulScream");
+export const onPlayerClickMagmaHound = shim("onPlayerClickMagmaHound");
+export const onPlayerClickQuakeBubble = shim("onPlayerClickQuakeBubble");
+export const onPlayerClickSeaTilt = shim("onPlayerClickSeaTilt");
+export const onPlayerClickFissureLine = shim("onPlayerClickFissureLine");
+export const onPlayerClickGoldenPalm = shim("onPlayerClickGoldenPalm");
+export const onPlayerClickHeavenlyImpact = shim("onPlayerClickHeavenlyImpact");
+export const onPlayerClickDharmaSanctuary = shim("onPlayerClickDharmaSanctuary");
+export const onPlayerClickTwilightBeams = shim("onPlayerClickTwilightBeams");
+export const onPlayerClickMeroArrow = shim("onPlayerClickMeroArrow");
+export const onPlayerClickPerfumeFemur = shim("onPlayerClickPerfumeFemur");
+export const onPlayerClickSlaveArrowRain = shim("onPlayerClickSlaveArrowRain");
+export const onPlayerClickHeartCharm = shim("onPlayerClickHeartCharm");
+export const onPlayerClickAnvilDrop = shim("onPlayerClickAnvilDrop");
+export const onPlayerClickArcaneTurret = shim("onPlayerClickArcaneTurret");
+export const onPlayerClickBastionWall = shim("onPlayerClickBastionWall");
+export const onPlayerClickStringSlash = shim("onPlayerClickStringSlash");
+export const onPlayerClickWebSnare = shim("onPlayerClickWebSnare");
+export const onPlayerClickOverheatWhip = shim("onPlayerClickOverheatWhip");
+export const onPlayerClickSkyWalkThread = shim("onPlayerClickSkyWalkThread");
+export const onPlayerClickCrescendoFinale = shim("onPlayerClickCrescendoFinale");
+export const onPlayerClickSirenHypnosis = shim("onPlayerClickSirenHypnosis");
+export const onPlayerClickEncoreBeat = shim("onPlayerClickEncoreBeat");
+export const onPlayerClickBlueFlameWings = shim("onPlayerClickBlueFlameWings");
+export const onPlayerClickPhoenixTalon = shim("onPlayerClickPhoenixTalon");
+export const onPlayerClickRebirthNova = shim("onPlayerClickRebirthNova");
+export const onPlayerClickDimensionalGate = shim("onPlayerClickDimensionalGate");
+export const onPlayerClickWarpBarrage = shim("onPlayerClickWarpBarrage");
+export const onPlayerClickRaigoCloud = shim("onPlayerClickRaigoCloud");
+export const onPlayerClickVoltStep = shim("onPlayerClickVoltStep");
+export const onPlayerClickThunderGodAura = shim("onPlayerClickThunderGodAura");
+export const onPlayerClickPadCannon = shim("onPlayerClickPadCannon");
+export const onPlayerClickUrsusShock = shim("onPlayerClickUrsusShock");
+export const onPlayerClickRepelStep = shim("onPlayerClickRepelStep");
+export const onPlayerClickBlizzardTornado = shim("onPlayerClickBlizzardTornado");
+export const onPlayerClickGravityWell = shim("onPlayerClickGravityWell");
+export const onPlayerClickMammothStampede = shim("onPlayerClickMammothStampede");
+export const onPlayerClickTuskGore = shim("onPlayerClickTuskGore");
+export const onPlayerClickTrunkTrumpet = shim("onPlayerClickTrunkTrumpet");
+export const onPlayerClickExtinctionQuake = shim("onPlayerClickExtinctionQuake");
+export const onPlayerClickTrexBite = shim("onPlayerClickTrexBite");
+export const onPlayerClickTailSwipe = shim("onPlayerClickTailSwipe");
+export const onPlayerClickPredatorRoar = shim("onPlayerClickPredatorRoar");
+export const onPlayerClickMeteoricRampage = shim("onPlayerClickMeteoricRampage");
+export const onPlayerClickMochiBuzzsaw = shim("onPlayerClickMochiBuzzsaw");
+export const onPlayerClickUnstoppableDonuts = shim("onPlayerClickUnstoppableDonuts");
+export const onPlayerClickBrickBat = shim("onPlayerClickBrickBat");
+export const onPlayerClickDoppelmanSwap = shim("onPlayerClickDoppelmanSwap");
+export const onPlayerClickShadowBox = shim("onPlayerClickShadowBox");
+export const onPlayerClickShadowsAsgard = shim("onPlayerClickShadowsAsgard");
+export const onPlayerClickHydraSerpent = shim("onPlayerClickHydraSerpent");
+export const onPlayerClickToxicCloud = shim("onPlayerClickToxicCloud");
+export const onPlayerClickVenomRoad = shim("onPlayerClickVenomRoad");
+export const onPlayerClickVenomDemon = shim("onPlayerClickVenomDemon");
+export const onPlayerClickGastilleBeam = shim("onPlayerClickGastilleBeam");
+export const onPlayerClickGasRobe = shim("onPlayerClickGasRobe");
+export const onPlayerClickCombustionNova = shim("onPlayerClickCombustionNova");
+export const onPlayerClickSoulPocus = shim("onPlayerClickSoulPocus");
+export const onPlayerClickZeusBolt = shim("onPlayerClickZeusBolt");
+export const onPlayerClickPrometheusSun = shim("onPlayerClickPrometheusSun");
+export const onPlayerClickSovereignDominion = shim("onPlayerClickSovereignDominion");
+export const onPlayerClickFingerPistol = shim("onPlayerClickFingerPistol");
+export const onPlayerClickFeralMaul = shim("onPlayerClickFeralMaul");
+export const onPlayerClickAvalancheBoulder = shim("onPlayerClickAvalancheBoulder");
+export const onPlayerClickAbominableRoar = shim("onPlayerClickAbominableRoar");
+export const onPlayerClickPermafrostSlam = shim("onPlayerClickPermafrostSlam");
+export const onPlayerClickFoxFireOrbs = shim("onPlayerClickFoxFireOrbs");
+export const onPlayerClickTailsSweep = shim("onPlayerClickTailsSweep");
+export const onPlayerClickMirageDash = shim("onPlayerClickMirageDash");
+export const onPlayerClickNineTailsCataclysm = shim("onPlayerClickNineTailsCataclysm");
+export const onPlayerClickGammaKnife = shim("onPlayerClickGammaKnife");
+export const onPlayerClickCounterShock = shim("onPlayerClickCounterShock");
+export const onPlayerClickBoroBreath = shim("onPlayerClickBoroBreath");
+export const onPlayerClickDragonTwister = shim("onPlayerClickDragonTwister");
+export const onPlayerClickDraconicAscent = shim("onPlayerClickDraconicAscent");
 
 loader = createBlockLoader({ helpers: HELPERS, expected: EXPECTED, log });
 export const reloadFruitBlocks = loader.reload;

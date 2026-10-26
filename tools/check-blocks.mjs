@@ -111,6 +111,14 @@ function makeHelpers(api) {
       isPlayerAlive: () => true,
       facing: () => [0, 0, 1],
       heading: () => [0, 0, 1],
+      norm: (v) => v || [0, 0, 1],
+      frame: () => ({ f: [0, 0, 1], r: [1, 0, 0], u: [0, 1, 0] }),
+      hitSeg: () => ({ count: 0, seen: {} }),
+      hitArea: () => 0,
+      dist2: () => 4,
+      distH2: () => 4,
+      clamp: (v, a, b) => Math.max(a, Math.min(b, v)),
+      raycast: () => ({ hit: false, pos: [0, 64, 10], dist: 10 }),
       entitiesIn: () => [],
       lifeforms: () => ["p1"],
       safeHealth: () => 20,
@@ -158,13 +166,20 @@ function runScenario(map, label, tune = () => {}) {
   return { status: loader.status(), logs, loader, api };
 }
 
-const base = runScenario(texts, "tous les packs");
+const base = runScenario(texts, "tous les packs", (helpers) => {
+  helpers.run = (co) => {
+    for (let i = 0; i < 8 && co && typeof co.next === "function"; i++) {
+      const r = co.next();
+      if (!r || r.done) break;
+    }
+  };
+});
 check(base.status.ready === true, `chargeur non prêt : ${JSON.stringify(base.status.errors)}`);
 check(base.status.packCount === manifest.packCount, `packs chargés ${base.status.packCount}`);
 check(base.status.missing.length === 0, `handlers manquants : ${base.status.missing.join(", ")}`);
 check(base.status.errors.length === 0, `erreurs : ${base.status.errors.join(" | ")}`);
 
-const FRUIT_HANDLERS = HANDLER_NAMES.filter((n) => /Control|Gravity/.test(n));
+const FRUIT_HANDLERS = HANDLER_NAMES.filter((n) => /^onPlayerClick|^onPlayerLeave|^onCancel/.test(n));
 for (const name of FRUIT_HANDLERS) {
   const fn = globalThis.FA.r[name];
   check(typeof fn === "function", `${name} non enregistré`);

@@ -8,7 +8,7 @@ export const MARKER = "/*BP3M*/";
 export const SEPARATOR = "\n;\n" + MARKER + "\n;\n";
 export const MAX_PACK_CHARS = 31_500;
 export const ORIGIN = [100_000, 100_000, 100_002];
-export const SCAN_SLOTS = 16;
+export const SCAN_SLOTS = 24;
 
 export function fnv1a(text) {
   let h = 0x811c9dc5;
@@ -93,11 +93,6 @@ export const CENSOR_RULES = [
         .replace(/\b([gG])=([fF])\b/g, "$1 = $2"),
   },
   {
-    name: "18+",
-    test: /18\+/g,
-    fix: (code) => code.replace(/18\+/g, "18 + "),
-  },
-  {
     name: "D,f",
     test: /\b[dD],[fF]\b/g,
     fix: (code) =>
@@ -127,6 +122,11 @@ export const CENSOR_RULES = [
         .replace(/\b([bB])\(([fF])\b/g, "$1( $2"),
   },
   {
+    name: "18+",
+    test: /18\+/g,
+    fix: (code) => code.replace(/18\+/g, "18 + "),
+  },
+  {
     name: "n*de",
     test: /\b[nN]\*[dD][eE]\b/g,
     fix: (code) =>
@@ -145,10 +145,19 @@ export const CENSOR_RULES = [
   },
 ];
 
-export function uncensorBlockCode(code) {
+export function uncensorBlockCode(code, extraSafe = false) {
   let out = code;
   for (const rule of CENSOR_RULES) {
     out = rule.fix(out);
+  }
+  if (extraSafe) {
+    out = out
+      .replace(/([A-Za-z0-9_$])\[([A-Za-z_$][A-Za-z0-9_$]*)\]/g, "$1[ $2 ]")
+      .replace(/\b([A-Za-z])([.,=])([fF])\b/g, "$1 $2 $3")
+      .replace(/\b([A-Za-z])([(\[])([fF])\b/g, "$1$2 $3")
+      .replace(/\b([fF])([.,=*+\-/])([uUkKcCfF])\b/g, "$1 $2 $3")
+      .replace(/\b([fF])([(\[])([uUkKcCfF])\b/g, "$1$2 $3")
+      .replace(/\b([sSkKpP])\*(\1)\b/gi, "$1 * $2");
   }
   return out;
 }
