@@ -1,10 +1,10 @@
 // UI.js
 
-import { addStat, getStat, setStat, xpToNext } from "./utils/data";
-import { playerQuest, questProgress } from "./quest";
+import { addStat, getStat, setStat, xpToNext } from "../utils/data";
+import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
-import { getFruit } from "./fruit";
-import { getMaxStamina, getStamina } from "./stamina";
+import { getFruit } from "../fruit";
+import { getMaxStamina, getStamina } from "../gameplay/stamina";
 
 export const dCode = "7WGjmPHZrS"
 

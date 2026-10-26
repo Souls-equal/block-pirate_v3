@@ -1,6 +1,6 @@
 // stats.js
 
-import { addStat, getStat, reconcileSP, setStat } from "./utils/data";
+import { addStat, getStat, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 
 /* BASE VALUES */

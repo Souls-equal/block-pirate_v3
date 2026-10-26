@@ -1,6 +1,6 @@
 // customItem.js
 
-import { FRUITS_BY_RARITY } from "./fruit"
+import { FRUITS_BY_RARITY } from "../fruit"
 
 /* ARMES À FEU */
 

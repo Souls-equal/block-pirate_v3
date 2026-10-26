@@ -1,8 +1,8 @@
 // utils/data.js
 
-import { updateSidebar } from "../UI";
-import { checkQuestValidity, quests } from "../quest";
-import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../stats";
+import { updateSidebar } from "../core/UI";
+import { checkQuestValidity, quests } from "../gameplay/quest";
+import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../gameplay/stats";
 import { clearFruit } from "../fruit"
 
 resetPlayer = (id) => {

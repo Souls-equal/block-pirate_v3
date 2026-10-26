@@ -1,7 +1,7 @@
 //spawning.js
 
-import { updateSidebar } from "./UI";
-import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "./utils/data";
+import { updateSidebar } from "../core/UI";
+import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},

@@ -1,7 +1,7 @@
 // team.js
 
-import { convertWeaponAttributes, scanAllItems, writeItem } from "./customItem";
-import { deleteStat, getStat, setStat } from "./utils/data";
+import { convertWeaponAttributes, scanAllItems, writeItem } from "../gameplay/customItem";
+import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";

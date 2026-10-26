@@ -1,6 +1,6 @@
 import { hasPermission, isOwner, getPermissionLevel, PERMISSION_LEVELS } from "./ranks";
-import { FRUITS_BY_RARITY, FRUIT_RARITIES, getFruitInfo, getRarityColor, getRarityEnchantTier } from "./fruit";
-import { FRUIT_ABILITIES } from "./fruit/abilities";
+import { FRUITS_BY_RARITY, FRUIT_RARITIES, getFruitInfo, getRarityColor, getRarityEnchantTier } from "../fruit";
+import { FRUIT_ABILITIES } from "../fruit/abilities";
 import { updateNameTag } from "./team";
 import { refreshLeaderboardPlayer } from "./UI";
 

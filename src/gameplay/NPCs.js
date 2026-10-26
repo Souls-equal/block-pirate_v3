@@ -1,12 +1,12 @@
 // NPCs.js
-import { buyArmamentHaki } from "./utils/haki"
+import { buyArmamentHaki } from "../utils/haki"
 import { startQuest } from "./quest";
-import { buyItem } from "./utils/data";
-import { setInterval, setTimeout } from "./utils/timer";
-import { getPlayerTeam } from "./team";
-import { rollFruit } from "./fruit";
-import { markAggro } from "./fruit/func-abilities";
-import { safeEntityName, safeEntityType } from "./utils/lifeform";
+import { buyItem } from "../utils/data";
+import { setInterval, setTimeout } from "../utils/timer";
+import { getPlayerTeam } from "../core/team";
+import { rollFruit } from "../fruit";
+import { markAggro } from "../fruit/func-abilities";
+import { safeEntityName, safeEntityType } from "../utils/lifeform";
 export function attackNPC(playerId, mobId) {
 
     const name = safeEntityName(mobId);
