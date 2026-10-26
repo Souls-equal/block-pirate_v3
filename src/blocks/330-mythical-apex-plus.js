@@ -35,7 +35,6 @@
     } = C,
     sound = F;
 
-  const BODY_NODES = ["TorsoNode", "HeadMesh", "ArmLeftMesh", "ArmRightMesh", "LegLeftMesh", "LegRightMesh"];
   const mythicForms = FA.m || (FA.m = {});
 
   function flatDir(pid) {
@@ -59,19 +58,6 @@
     } catch (e) {}
   }
 
-  function attachNode(pid, node, blockName, size, offset, rot) {
-    try {
-      api.updateEntityNodeMeshAttachment(
-        pid,
-        node,
-        "BloxdBlock",
-        { blockName: blockName, size: size, meshOffset: [0, 0, 0] },
-        offset || [0, 0, 0],
-        rot || [0, 0, 0],
-      );
-    } catch (e) {}
-  }
-
   function setScale(pid, s) {
     try {
       api.setLifeformScale(pid, s);
@@ -83,11 +69,6 @@
     if (prev) prev.tok = -1;
     delete mythicForms[pid];
     setScale(pid, 1);
-    for (let i = 0; i < BODY_NODES.length; i++) {
-      try {
-        api.updateEntityNodeMeshAttachment(pid, BODY_NODES[i], null);
-      } catch (e) {}
-    }
   }
 
   function startMythicForm(pid, cfg) {
@@ -99,11 +80,24 @@
     if (cfg.scale) setScale(pid, cfg.scale);
     if (cfg.title) banner(pid, cfg.title, cfg.bannerColor);
     shake(pid, cfg.shake || 0.42, 380);
-    if (cfg.parts) {
-      for (let i = 0; i < cfg.parts.length; i++) {
-        const pt = cfg.parts[i];
-        attachNode(pid, pt[0], pt[1], pt[2], pt[3], pt[4]);
-      }
+    const cols = cfg.colors || [
+      [[255, 215, 80], [255, 120, 40]],
+      [[180, 70, 20, 0], [255, 240, 150, 0]],
+    ];
+    const p0 = posOf(pid);
+    if (p0) {
+      boom([p0[0], p0[1] + 1.1, p0[2]], 2.2, {
+        tex: TEX.soul,
+        count: 24,
+        colors: cols,
+      });
+      column(p0, 3.2, {
+        steps: 6,
+        tex: TEX.glint,
+        life: [0.22, 0.45],
+        size: [0.32, 0.64],
+        colors: cols,
+      });
     }
     let step = 0;
     const maxSteps = cfg.steps || 14;
@@ -116,6 +110,16 @@
           return { done: true };
         }
         step++;
+        point([p[0], p[1] + 1.15, p[2]], {
+          r: 0.65,
+          tex: TEX.soul,
+          count: 4,
+          life: [0.2, 0.42],
+          power: [0.2, 0.85],
+          size: [0.28, 0.54],
+          gravity: [0, 1.2, 0],
+          colors: cols,
+        });
         if (cfg.onAura) {
           try {
             cfg.onAura(p, step);
@@ -316,15 +320,6 @@
   }
 
   // ----------------------------------------------------- MYTHICAL : VENOM ---
-  const VENOM_PARTS = [
-    ["TorsoNode", "Purple Concrete", [0.7, 0.92, 0.6], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Red Concrete", [0.6, 0.3, 0.55], [0, 0.32, 0], [0, 0.78, 0]],
-    ["ArmLeftMesh", "Purple Concrete", [0.4, 0.82, 0.4], [0, -0.12, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Purple Concrete", [0.4, 0.82, 0.4], [0, -0.12, 0], [0, 0, 0]],
-    ["LegLeftMesh", "Purple Concrete", [0.36, 0.75, 0.36], [0, -0.1, 0], [0, 0, 0]],
-    ["LegRightMesh", "Purple Concrete", [0.36, 0.75, 0.36], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Hydra Strike : 3 têtes d'hydre de venin violet/vert qui fondent sur l'avant et explosent.
   function onPlayerClickHydraSerpent(pid, itemName) {
     const p = posOf(pid);
@@ -472,7 +467,10 @@
       scale: 1.48,
       title: "VENOM DEMON: KINJITE",
       bannerColor: "#d946ef",
-      parts: VENOM_PARTS,
+      colors: [
+        [[235, 30, 120], [150, 20, 220]],
+        [[80, 0, 110, 0], [220, 20, 100, 0]],
+      ],
       steps: 15,
       onAura: function (ap, st) {
         ring(
@@ -519,13 +517,6 @@
   }
 
   // ------------------------------------------------------- MYTHICAL : GAS ---
-  const GAS_PARTS = [
-    ["TorsoNode", "Purple Glass", [0.72, 0.92, 0.62], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Light Blue Glass", [0.58, 0.58, 0.58], [0, 0.12, 0], [0, 0.78, 0]],
-    ["ArmLeftMesh", "Purple Glass", [0.4, 0.78, 0.4], [0, -0.1, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Light Blue Glass", [0.4, 0.78, 0.4], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Gastille Laser : rayon de gaz enflammé bleu-violet entouré d'anneaux de plasma.
   function onPlayerClickGastilleBeam(pid, itemName) {
     const p = posOf(pid);
@@ -582,7 +573,10 @@
       scale: 1.32,
       title: "SHINOKUNI GAS REALM",
       bannerColor: "#67e8f9",
-      parts: GAS_PARTS,
+      colors: [
+        [[140, 230, 255], [195, 110, 255]],
+        [[70, 160, 220, 0], [140, 60, 210, 0]],
+      ],
       steps: 12,
       onAura: function (ap, st) {
         ring(
@@ -644,12 +638,6 @@
   }
 
   // ---------------------------------------------------- MYTHICAL : SPIRIT ---
-  const SPIRIT_PARTS = [
-    ["HeadMesh", "Gold Block", [0.55, 0.22, 0.55], [0, 0.36, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Orange Concrete", [0.45, 0.45, 0.45], [0, -0.3, 0], [0, 0, 0]],
-    ["ArmLeftMesh", "Light Blue Concrete", [0.45, 0.45, 0.45], [0, -0.3, 0], [0, 0, 0]],
-  ];
-
   // Soul Pocus : éveil de la Souveraine des Âmes (Zeus & Prometheus en orbite) + récolte d'âmes.
   function onPlayerClickSoulPocus(pid, itemName) {
     const p = posOf(pid);
@@ -662,7 +650,10 @@
       scale: 1.28,
       title: "SOUL SOVEREIGN: ZEUS & PROMETHEUS",
       bannerColor: "#f472b6",
-      parts: SPIRIT_PARTS,
+      colors: [
+        [[255, 125, 225], [120, 245, 255]],
+        [[180, 60, 220, 0], [90, 200, 240, 0]],
+      ],
       steps: 14,
       onAura: function (ap, st) {
         const a = st * 0.65;
@@ -826,12 +817,6 @@
   }
 
   // ----------------------------------------------------- MYTHICAL : TIGER ---
-  const BYAKKO_PARTS = [
-    ["HeadMesh", "Gold Block", [0.58, 0.24, 0.58], [0, 0.34, 0], [0, 0, 0]],
-    ["ArmLeftMesh", "Snow", [0.42, 0.78, 0.42], [0, -0.15, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Snow", [0.42, 0.78, 0.42], [0, -0.15, 0], [0, 0, 0]],
-  ];
-
   // Tempest Finger Barrage : 3 salves d'ondes d'air comprimé dorées/blanches.
   function onPlayerClickFingerPistol(pid, itemName) {
     if (!isAliveId(pid)) return false;
@@ -885,7 +870,10 @@
       scale: 1.25,
       title: "BYAKKO WHITE TIGER",
       bannerColor: "#fde047",
-      parts: BYAKKO_PARTS,
+      colors: [
+        [[255, 245, 180], [255, 150, 40]],
+        [[190, 90, 15, 0], [255, 250, 210, 0]],
+      ],
       steps: 10,
       onAura: function (ap, st) {
         ring(
@@ -933,15 +921,6 @@
   }
 
   // ------------------------------------------------------ MYTHICAL : YETI ---
-  const YETI_PARTS = [
-    ["TorsoNode", "Snow", [0.74, 0.94, 0.66], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Ice", [0.62, 0.58, 0.62], [0, 0.14, 0], [0, 0, 0]],
-    ["ArmLeftMesh", "Snow", [0.44, 0.85, 0.44], [0, -0.12, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Snow", [0.44, 0.85, 0.44], [0, -0.12, 0], [0, 0, 0]],
-    ["LegLeftMesh", "Ice", [0.4, 0.78, 0.4], [0, -0.1, 0], [0, 0, 0]],
-    ["LegRightMesh", "Ice", [0.4, 0.78, 0.4], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Glacier Throw : arrache un monolithe de glace et le fracasse en 4 piliers gelés.
   function onPlayerClickAvalancheBoulder(pid, itemName) {
     const p = posOf(pid);
@@ -1000,7 +979,10 @@
       scale: 1.46,
       title: "ABOMINABLE FROST TITAN",
       bannerColor: "#bae6fd",
-      parts: YETI_PARTS,
+      colors: [
+        [[225, 252, 255], [105, 200, 255]],
+        [[60, 145, 225, 0], [220, 250, 255, 0]],
+      ],
       steps: 14,
       onAura: function (ap, st) {
         ring(
@@ -1074,13 +1056,6 @@
   }
 
   // --------------------------------------------------- MYTHICAL : KITSUNE ---
-  const KITSUNE_PARTS = [
-    ["TorsoNode", "Light Blue Concrete", [0.68, 0.35, 0.85], [0, -0.1, -0.35], [-0.35, 0, 0]],
-    ["HeadMesh", "Snow", [0.58, 0.25, 0.58], [0, 0.34, 0], [0, 0.78, 0]],
-    ["ArmLeftMesh", "Light Blue Concrete", [0.36, 0.72, 0.36], [0, -0.1, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Light Blue Concrete", [0.36, 0.72, 0.36], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Nine-Tails Foxfire : couronne de 5 feux follets azur/magenta tirés sur la visée.
   function onPlayerClickFoxFireOrbs(pid, itemName) {
     const p = posOf(pid);
@@ -1139,7 +1114,10 @@
       scale: 1.24,
       title: "CELESTIAL NINE-TAILS KITSUNE",
       bannerColor: "#38bdf8",
-      parts: KITSUNE_PARTS,
+      colors: [
+        [[75, 230, 255], [255, 115, 230]],
+        [[25, 130, 235, 0], [210, 50, 180, 0]],
+      ],
       steps: 14,
       onAura: function (ap, st) {
         ring(
@@ -1322,15 +1300,6 @@
   }
 
   // ---------------------------------------------------- MYTHICAL : DRAGON ---
-  const DRAGON_PARTS = [
-    ["TorsoNode", "Red Concrete", [0.72, 0.92, 0.65], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Gold Block", [0.65, 0.3, 0.55], [0, 0.36, 0], [0.2, 0.78, 0]],
-    ["ArmLeftMesh", "Orange Concrete", [0.42, 0.82, 0.42], [0, -0.1, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Orange Concrete", [0.42, 0.82, 0.42], [0, -0.1, 0], [0, 0, 0]],
-    ["LegLeftMesh", "Red Concrete", [0.38, 0.78, 0.38], [0, -0.1, 0], [0, 0, 0]],
-    ["LegRightMesh", "Red Concrete", [0.38, 0.78, 0.38], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Blast Breath : torrent colossal de feu draconique doré/écarlate entouré de 4 anneaux de flammes.
   function onPlayerClickBoroBreath(pid, itemName) {
     const p = posOf(pid);
@@ -1431,7 +1400,10 @@
       scale: 1.48,
       title: "EMPEROR DRAGON ASCENSION",
       bannerColor: "#f97316",
-      parts: DRAGON_PARTS,
+      colors: [
+        [[255, 225, 85], [255, 50, 20]],
+        [[180, 15, 0, 0], [255, 130, 30, 0]],
+      ],
       steps: 15,
       onAura: function (ap, st) {
         ring(
