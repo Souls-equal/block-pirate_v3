@@ -1,55 +1,42 @@
-# code-blocks/ — blocs de fruits du monde
+# code-blocks/ — packs générés (NE PAS ÉDITER À LA MAIN)
 
-Chaque fichier correspond à **un Code Block** du monde, à coller tel quel
-(« 1 fruit = 1 Code Block »). Le nom de fichier encode la coordonnée Z du bloc :
-`z<z>-<fruit>.js`.
+Généré par `npm run build:blocks`. Sources lisibles : `src/blocks/`.
 
-## Comment le moteur lit ces blocs
+**32 fichiers sources → 5 Code Blocks** (284 378 → 149 508 caractères, -47 %).
 
-D'après le chargeur (`src/fruit/func-abilities.js`), les blocs sont lus aux positions :
+Colle **le contenu entier** de chaque `pack-XX.js` dans UN Code Block du monde,
+à x=100000, y=100000, z indiqué ci-dessous (blocs consécutifs).
+L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.
 
-- `x = 100000`, `y = 100000`
-- `z = 100002 + 2 × i` (`i` = index du bloc, 0 → 100002, 1 → 100004, …)
-- maximum 256 blocs, et 16 000 caractères par bloc (au-delà, le bloc est ignoré)
+| Pack | z | Caractères | Fruits / modules |
+| --- | --- | --- | --- |
+| `pack-01.js` | `100002` | 27 213 | spring, ice, quakes, light, rocket, paintballs, smoke, rubber, diamond, gas |
+| `pack-02.js` | `100003` | 30 084 | flame, blade, ghost, creation, magma |
+| `pack-03.js` | `100004` | 31 377 | lightning, dark, dought, portal, pain, song, tiger mark |
+| `pack-04.js` | `100005` | 30 231 | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
+| `pack-05.js` | `100006` | 30 603 | tiger form, control state, control domain, control slash, control shambles |
 
-**L'ordre compte** : les blocs sont évalués dans l'ordre croissant de `z`, et certains
-blocs dépendent de l'état laissé par les précédents (`globalThis.__CT__` pour Control,
-`globalThis.__GV__` pour Gravity). Le tri alphabétique des fichiers respecte cet ordre.
+## Modifier un fruit
 
-Ne pas modifier la première ni la dernière ligne d'un fichier (elles ferment le
-`(FA => { … })(globalThis.FA)` attendu par le chargeur).
+1. Édite le fichier lisible dans `src/blocks/` (jamais le pack).
+2. `npm run build:blocks` — le nombre de packs et leur contenu sont recalculés.
+3. Regarde le tableau ci-dessus : il te dit **exactement** quel Code Block
+   recopier (les autres n'ont pas besoin d'être touchés).
+4. Dans le jeu, `FA.reload()` (ou un redémarrage) recharge tout.
 
-| z | Fichier | Contenu |
-| --- | --- | --- |
-| `100002` | `z100002-spring.js` | SPRING (Domain of Speed + Wind Blade) |
-| `100004` | `z100004-flame.js` | FLAME (Crimson Beam + Meteor Shower) |
-| `100006` | `z100006-lightning.js` | LIGHTNING (Chain Lightning + Thunder Strike) |
-| `100008` | `z100008-dark.js` | DARK (Void Vortex + Void Anchor) |
-| `100010` | `z100010-ice.js` | ICE (Geyser Burst) |
-| `100012` | `z100012-blizzard.js` | BLIZZARD (Frostfall + Shatterfrost) |
-| `100014` | `z100014-quakes.js` | QUAKES (Seismic Stomp) |
-| `100016` | `z100016-light.js` | LIGHT (Shot) |
-| `100018` | `z100018-rocket.js` | ROCKET (Rocket Launch + Jump Beacon) |
-| `100020` | `z100020-blade.js` | BLADE (attaques) + nettoyage paint |
-| `100022` | `z100022-paintballs.js` | PAINTBALLS (plomberie partagée : throwers + impacts) |
-| `100024` | `z100024-dought.js` | DOUGHT (Full Punch + Concrete Wheel + Growing Ray) |
-| `100026` | `z100026-portal.js` | PORTAL (Portal Step + Portal Rift) |
-| `100028` | `z100028-smoke.js` | SMOKE (Choking Fog + Smoke Shroud) |
-| `100030` | `z100030-rubber.js` | RUBBER (Elastic Punch) |
-| `100032` | `z100032-diamond.js` | DIAMOND (Crystal Recovery) |
-| `100034` | `z100034-ghost.js` | GHOST (Bouclier immunité + Phasing + Spectral Prison) |
-| `100036` | `z100036-pain.js` | PAIN (Pulse of Pain) |
-| `100038` | `z100038-gas.js` | GAS (Tomato Tether) |
-| `100040` | `z100040-song.js` | SONG (Dissonant Wave + Petal Refrain) |
-| `100042` | `z100042-tiger-mark.js` | TIGER (Predator Mark + Claw Rip) |
-| `100044` | `z100044-tiger-form.js` | TIGER (Tiger Form) |
-| `100046` | `z100046-creation.js` | CREATION (Manifest Golem) |
-| `100048` | `z100048-magma.js` | MAGMA (Magma Rings + Lava Jet + poches de lave) |
-| `100050` | `z100050-control-domain-1.js` | CONTROL 1/2 — état partagé (`__CT__`) |
-| `100052` | `z100052-control-domain-2.js` | CONTROL 2/2 — `onPlayerClickControlDomain` |
-| `100054` | `z100054-control-slash.js` | CONTROL (Control Slash) |
-| `100056` | `z100056-gravity-1.js` | GRAVITY 1/4 — état, constantes et ciblage |
-| `100058` | `z100058-gravity-2.js` | GRAVITY 2/4 — meshes, effets et dégâts de la salve |
-| `100060` | `z100060-gravity-3.js` | GRAVITY 3/4 — Barrage |
-| `100062` | `z100062-gravity-4.js` | GRAVITY 4/4 — Grab, Planet et Leave |
-| `100064` | `z100064-control-shambles.js` | CONTROL (Shambles + leave) |
+## Migration depuis les 32 anciens blocs
+
+- Les anciens blocs (`z1000XX-*.js`) ne sont plus lus : le chargeur ignore
+  tout Code Block sans en-tête `BP3`. Tu peux écraser les 5 positions ci-dessus.
+- Pour utiliser une bande vierge, mets au début du World Code :
+  `globalThis.FA_ORIGIN = [100000, 100000, 100102];` puis colle les packs
+  en z=100102..100106.
+- Control est entièrement dans un seul pack, Gravity dans un seul pack : c'est
+  ce qui corrige les deux fruits (plus d'état partagé entre Code Blocks).
+
+## Contrôle
+
+`npm run check` vérifie imports, handlers, intégrité des packs et simule le
+chargeur de bout en bout.
+`FA.logStatus()` / `FA.status()` dans le World Code affichent les packs chargés,
+les handlers manquants et les erreurs. `FA.reload(true)` force le rechargement.

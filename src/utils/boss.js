@@ -232,6 +232,10 @@ function cleanup() {
   boss = null;
 }
 
+// src/index.js importe `cleanup` et `clearAll` : sans ces exports le bundle
+// esbuild échoue (voir README « Points connus »). clearAll = nettoyage complet.
+export { cleanup, cleanup as clearAll };
+
 // spawn
 
 export function spawnBoss(position, playerId) {

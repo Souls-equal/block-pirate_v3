@@ -1,0 +1,104 @@
+{
+  "format": "BP3",
+  "generatedAt": "2026-10-26T14:16:45.368Z",
+  "maxPackChars": 31500,
+  "origin": {
+    "x": 100000,
+    "y": 100000,
+    "z": 100002
+  },
+  "sourceFiles": 32,
+  "sourceChars": 284378,
+  "packedChars": 149508,
+  "compression": "47 %",
+  "packCount": 5,
+  "packs": [
+    {
+      "index": 1,
+      "file": "pack-01.js",
+      "z": 100002,
+      "chars": 27213,
+      "payloadChars": 27180,
+      "hash": "c5d5e03b",
+      "modules": 10,
+      "sources": [
+        "010-spring.js",
+        "050-ice.js",
+        "070-quakes.js",
+        "080-light.js",
+        "090-rocket.js",
+        "110-paintballs.js",
+        "140-smoke.js",
+        "150-rubber.js",
+        "160-diamond.js",
+        "190-gas.js"
+      ]
+    },
+    {
+      "index": 2,
+      "file": "pack-02.js",
+      "z": 100003,
+      "chars": 30084,
+      "payloadChars": 30051,
+      "hash": "7ee2a0c5",
+      "modules": 5,
+      "sources": [
+        "020-flame.js",
+        "100-blade.js",
+        "170-ghost.js",
+        "230-creation.js",
+        "240-magma.js"
+      ]
+    },
+    {
+      "index": 3,
+      "file": "pack-03.js",
+      "z": 100004,
+      "chars": 31377,
+      "payloadChars": 31344,
+      "hash": "310d4eb8",
+      "modules": 7,
+      "sources": [
+        "030-lightning.js",
+        "040-dark.js",
+        "120-dought.js",
+        "130-portal.js",
+        "180-pain.js",
+        "200-song.js",
+        "210-tiger-mark.js"
+      ]
+    },
+    {
+      "index": 4,
+      "file": "pack-04.js",
+      "z": 100005,
+      "chars": 30231,
+      "payloadChars": 30198,
+      "hash": "714f052b",
+      "modules": 5,
+      "sources": [
+        "060-blizzard.js",
+        "260-gravity-state.js",
+        "261-gravity-fx.js",
+        "262-gravity-barrage.js",
+        "263-gravity-grab.js"
+      ]
+    },
+    {
+      "index": 5,
+      "file": "pack-05.js",
+      "z": 100006,
+      "chars": 30603,
+      "payloadChars": 30570,
+      "hash": "7c6da9b3",
+      "modules": 5,
+      "sources": [
+        "220-tiger-form.js",
+        "250-control-state.js",
+        "251-control-domain.js",
+        "252-control-slash.js",
+        "253-control-shambles.js"
+      ]
+    }
+  ]
+}

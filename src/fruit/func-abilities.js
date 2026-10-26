@@ -1,1 +1,151 @@
-import{damage as n,eff as e,entitiesIn as o,heal as t,hitArea as r,hitSeg as l,impulse as a,isAliveId as i,lifeforms as c,markUntil as u,pickTarget as p,posOf as s,safeHealth as y,safePosition as f,statLevel as P,unmark as d,strengthMult as v,claimSummon as k,freeSummon as C}from"../utils/combat";import{chest as h,facing as g,heading as m,isPlayerAlive as x,safeEntityName as S,safeEntityType as L,targetBlock as T}from"../utils/lifeform";import{boom as b,box as B,boxSpan as A,CAGE as G,circle as F,clamp as D,column as R,dist2 as E,distH2 as w,frame as O,GOLDEN as I,inBox as M,norm as N,point as _,ring as J,TAU as z,TEX as H,create as U,move as W,playParticle as j,remove as V,rotate as X,create as $,move as q,remove as K,rotate as Q,at as Y,create as Z,move as nn,playParticle as en,remove as on}from"../utils/fx";import{run as tn,setInterval as rn,setTimeout as ln,sleep as an}from"../utils/timer";import{blockAt as cn,clearIf as un,freeSpot as pn,isSolid as sn,raycast as yn,setBlock as fn,stuck as Pn}from"../utils/world";import*as dn from"../utils/fx";const vn=dn,kn=dn;export{markAggro}from"../utils/combat";const Cn=(globalThis.__FA_LOADER_GENERATION||0)+1;function hn(){return globalThis.__FA_LOADER_GENERATION===Cn}function gn(n){let e=globalThis.FA;if(e&&e.r&&e.r[n])return e.r[n];const o=globalThis.FA_BOOT;if("function"==typeof o){try{o()}catch(n){}if(e=globalThis.FA,e&&e.r&&e.r[n])return e.r[n]}}globalThis.__FA_LOADER_GENERATION=Cn;export function onPlayerClickSpring(){const n=gn("onPlayerClickSpring");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveSpring(){const n=gn("onPlayerLeaveSpring");return n?n.apply(null,arguments):void 0}export function onPlayerClickLaser(){const n=gn("onPlayerClickLaser");return n?n.apply(null,arguments):void 0}export function onPlayerClickLightning(){const n=gn("onPlayerClickLightning");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveLightning(){const n=gn("onPlayerLeaveLightning");return n?n.apply(null,arguments):void 0}export function onPlayerClickVortex(){const n=gn("onPlayerClickVortex");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveVortex(){const n=gn("onPlayerLeaveVortex");return n?n.apply(null,arguments):void 0}export function onPlayerClickAnchor(){const n=gn("onPlayerClickAnchor");return n?n.apply(null,arguments):void 0}export function onPlayerClickSeismic(){const n=gn("onPlayerClickSeismic");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveSeismic(){const n=gn("onPlayerLeaveSeismic");return n?n.apply(null,arguments):void 0}export function onPlayerClickWindblade(){const n=gn("onPlayerClickWindblade");return n?n.apply(null,arguments):void 0}export function onPlayerClickMark(){const n=gn("onPlayerClickMark");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveMark(){const n=gn("onPlayerLeaveMark");return n?n.apply(null,arguments):void 0}export function onPlayerClickGeyser(){const n=gn("onPlayerClickGeyser");return n?n.apply(null,arguments):void 0}export function onPlayerClickFruit(){const n=gn("onPlayerClickFruit");return n?n.apply(null,arguments):void 0}export function onEntityCollisionFruit(){const n=gn("onEntityCollisionFruit");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveFruit(){const n=gn("onPlayerLeaveFruit");return n?n.apply(null,arguments):void 0}export function onPlayerClickRocket(){const n=gn("onPlayerClickRocket");return n?n.apply(null,arguments):void 0}export function onPlayerClickJumpBeacon(){const n=gn("onPlayerClickJumpBeacon");return n?n.apply(null,arguments):void 0}export function onPlayerClickfullPunch(){const n=gn("onPlayerClickfullPunch");return n?n.apply(null,arguments):void 0}export function onPlayerClickConcreteWheel(){const n=gn("onPlayerClickConcreteWheel");return n?n.apply(null,arguments):void 0}export function onPlayerClickGrowingRay(){const n=gn("onPlayerClickGrowingRay");return n?n.apply(null,arguments):void 0}export function onPlayerClickDought(){const n=gn("onPlayerClickDought");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveDought(){const n=gn("onPlayerLeaveDought");return n?n.apply(null,arguments):void 0}export function onPlayerClickSpinBlade(){const n=gn("onPlayerClickSpinBlade");return n?n.apply(null,arguments):void 0}export function onPlayerClickCataclysm(){const n=gn("onPlayerClickCataclysm");return n?n.apply(null,arguments):void 0}export function onPlayerClickBombDash(){const n=gn("onPlayerClickBombDash");return n?n.apply(null,arguments):void 0}export function onPlayerClickBladeStorm(){const n=gn("onPlayerClickBladeStorm");return n?n.apply(null,arguments):void 0}export function onPlayerClickBladeDash(){const n=gn("onPlayerClickBladeDash");return n?n.apply(null,arguments):void 0}export function onPlayerClickSpikeField(){const n=gn("onPlayerClickSpikeField");return n?n.apply(null,arguments):void 0}export function onPlayerClickJudgmentBeam(){const n=gn("onPlayerClickJudgmentBeam");return n?n.apply(null,arguments):void 0}export function onPlayerClickPaint(){const n=gn("onPlayerClickPaint");return n?n.apply(null,arguments):void 0}export function onPlayerJoinPaint(){const n=gn("onPlayerJoinPaint");return n?n.apply(null,arguments):void 0}export function onPlayerLeavePaint(){const n=gn("onPlayerLeavePaint");return n?n.apply(null,arguments):void 0}export function onPlayerUsedThrowablePaint(){const n=gn("onPlayerUsedThrowablePaint");return n?n.apply(null,arguments):void 0}export function onPlayerThrowableHitTerrainPaint(){const n=gn("onPlayerThrowableHitTerrainPaint");return n?n.apply(null,arguments):void 0}export function onEntityCollisionPaint(){const n=gn("onEntityCollisionPaint");return n?n.apply(null,arguments):void 0}export function portalSolid(){const n=gn("portalSolid");return n?n.apply(null,arguments):void 0}export function portalSpot(){const n=gn("portalSpot");return n?n.apply(null,arguments):void 0}export function portalBurst(){const n=gn("portalBurst");return n?n.apply(null,arguments):void 0}export function onPlayerClickPortal(){const n=gn("onPlayerClickPortal");return n?n.apply(null,arguments):void 0}export function onPlayerClickPortalRift(){const n=gn("onPlayerClickPortalRift");return n?n.apply(null,arguments):void 0}export function onPlayerLeavePortal(){const n=gn("onPlayerLeavePortal");return n?n.apply(null,arguments):void 0}export function onPlayerClickSmokeFog(){const n=gn("onPlayerClickSmokeFog");return n?n.apply(null,arguments):void 0}export function onPlayerClickSmokeShroud(){const n=gn("onPlayerClickSmokeShroud");return n?n.apply(null,arguments):void 0}export function onCancelSmoke(){const n=gn("onCancelSmoke");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveSmoke(){const n=gn("onPlayerLeaveSmoke");return n?n.apply(null,arguments):void 0}export function onPlayerClickRubberPunch(){const n=gn("onPlayerClickRubberPunch");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveRubber(){const n=gn("onPlayerLeaveRubber");return n?n.apply(null,arguments):void 0}export function onPlayerClickDiamondRecovery(){const n=gn("onPlayerClickDiamondRecovery");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveDiamond(){const n=gn("onPlayerLeaveDiamond");return n?n.apply(null,arguments):void 0}export function isImmuneToDamage(){const n=gn("isImmuneToDamage");return n?n.apply(null,arguments):void 0}export function onPlayerClickGhostPhase(){const n=gn("onPlayerClickGhostPhase");return n?n.apply(null,arguments):void 0}export function onPlayerClickSpectralPrison(){const n=gn("onPlayerClickSpectralPrison");return n?n.apply(null,arguments):void 0}export function onCancelGhost(){const n=gn("onCancelGhost");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveGhost(){const n=gn("onPlayerLeaveGhost");return n?n.apply(null,arguments):void 0}export function onPlayerClickPainPulse(){const n=gn("onPlayerClickPainPulse");return n?n.apply(null,arguments):void 0}export function onPlayerReleasePainPulse(){const n=gn("onPlayerReleasePainPulse");return n?n.apply(null,arguments):void 0}export function onCancelPain(){const n=gn("onCancelPain");return n?n.apply(null,arguments):void 0}export function onPlayerLeavePain(){const n=gn("onPlayerLeavePain");return n?n.apply(null,arguments):void 0}export function onPlayerClickGasTether(){const n=gn("onPlayerClickGasTether");return n?n.apply(null,arguments):void 0}export function onCancelGas(){const n=gn("onCancelGas");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveGas(){const n=gn("onPlayerLeaveGas");return n?n.apply(null,arguments):void 0}export function onPlayerClickThunderStrike(){const n=gn("onPlayerClickThunderStrike");return n?n.apply(null,arguments):void 0}export function onCancelThunder(){const n=gn("onCancelThunder");return n?n.apply(null,arguments):void 0}export function onPlayerClickDissonantWave(){const n=gn("onPlayerClickDissonantWave");return n?n.apply(null,arguments):void 0}export function onPlayerClickPetalRefrain(){const n=gn("onPlayerClickPetalRefrain");return n?n.apply(null,arguments):void 0}export function onCancelSong(){const n=gn("onCancelSong");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveSong(){const n=gn("onPlayerLeaveSong");return n?n.apply(null,arguments):void 0}export function onPlayerClickClawRip(){const n=gn("onPlayerClickClawRip");return n?n.apply(null,arguments):void 0}export function onCancelTiger(){const n=gn("onCancelTiger");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveTiger(){const n=gn("onPlayerLeaveTiger");return n?n.apply(null,arguments):void 0}export function onPlayerClickFrostfall(){const n=gn("onPlayerClickFrostfall");return n?n.apply(null,arguments):void 0}export function onPlayerClickShatterfrost(){const n=gn("onPlayerClickShatterfrost");return n?n.apply(null,arguments):void 0}export function onCancelBlizzard(){const n=gn("onCancelBlizzard");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveBlizzard(){const n=gn("onPlayerLeaveBlizzard");return n?n.apply(null,arguments):void 0}export function onPlayerClickManifestGolem(){const n=gn("onPlayerClickManifestGolem");return n?n.apply(null,arguments):void 0}export function onCancelCreation(){const n=gn("onCancelCreation");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveCreation(){const n=gn("onPlayerLeaveCreation");return n?n.apply(null,arguments):void 0}export function onPlayerClickMagmaRings(){const n=gn("onPlayerClickMagmaRings");return n?n.apply(null,arguments):void 0}export function onPlayerClickLavaJet(){const n=gn("onPlayerClickLavaJet");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveLava(){const n=gn("onPlayerLeaveLava");return n?n.apply(null,arguments):void 0}export function onPlayerClickMeteorShower(){const n=gn("onPlayerClickMeteorShower");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveMeteorShower(){const n=gn("onPlayerLeaveMeteorShower");return n?n.apply(null,arguments):void 0}export function onCancelMeteorShower(){const n=gn("onCancelMeteorShower");return n?n.apply(null,arguments):void 0}export function onPlayerClickControlDomain(){const n=gn("onPlayerClickControlDomain");return n?n.apply(null,arguments):void 0}export function onPlayerClickControlSlash(){const n=gn("onPlayerClickControlSlash");return n?n.apply(null,arguments):void 0}export function onPlayerClickControlShambles(){const n=gn("onPlayerClickControlShambles");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveControl(){const n=gn("onPlayerLeaveControl");return n?n.apply(null,arguments):void 0}export function onPlayerClickTigerForm(){const n=gn("onPlayerClickTigerForm");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveTigerForm(){const n=gn("onPlayerLeaveTigerForm");return n?n.apply(null,arguments):void 0}export function onPlayerClickGravityBarrage(){const n=gn("onPlayerClickGravityBarrage");return n?n.apply(null,arguments):void 0}export function onPlayerClickGravityGrab(){const n=gn("onPlayerClickGravityGrab");return n?n.apply(null,arguments):void 0}export function onPlayerClickGravityDevastation(){const n=gn("onPlayerClickGravityDevastation");return n?n.apply(null,arguments):void 0}export function onPlayerLeaveGravity(){const n=gn("onPlayerLeaveGravity");return n?n.apply(null,arguments):void 0}let mn=!1;function xn(){if(!mn&&hn()){mn=!0;try{function U(n,e){}const W={};function j(n,e,o){const t=n+(o?"|"+o:"");if(W[t]=(W[t]||0)+1,W[t]<=3)try{api.log("[FA][err] "+n+(o?" ("+o+")":"")+" : "+(e&&e.message?e.message:e))}catch(n){}}const V=[];function X(n,e,o){const t={handle:null,active:!0},r=function(){t.active=!1;const e=V.indexOf(t);if(-1!==e&&V.splice(e,1),hn())try{n()}catch(n){j("scheduler",n,o)}};try{const n=globalThis.S;return n&&"function"==typeof n.wait?t.handle=n.wait(r,e):t.handle=ln(r,e),V.push(t),t}catch(n){return t.active=!1,j("scheduler",n,o),null}}function $(){for(const n of V){n.active=!1;try{n.handle&&"function"==typeof n.handle.stop&&n.handle.stop()}catch(n){j("scheduler.stop",n)}}V.length=0}function q(){try{return"function"==typeof api.isNearInterrupt&&api.isNearInterrupt()}catch(n){return j("api.isNearInterrupt",n),!1}}function K(n,e,o,t){if(!(!n||"number"==typeof n&&n<0||"string"==typeof n&&/^-\d+$/.test(n))){try{if(!i(n))return}catch(e){return void j("knockBack.isAliveId",e,String(n))}try{if("NPC"===api.getEntityType(n))return}catch(e){return void j("knockBack.getEntityType",e,String(n))}try{a(n,e,o,t)}catch(e){j("knockBack.impulse",e,String(n))}}}globalThis.FA=globalThis.FA||{r:{}};const Q=globalThis.FA;Q.c=Q.c||{fx:dn,api:api,mesh:vn,sound:kn,knockBack:K,damage:n,eff:e,entitiesIn:o,heal:t,hitArea:r,hitSeg:l,impulse:a,isAliveId:i,lifeforms:c,markUntil:u,pickTarget:p,posOf:s,safeHealth:y,safePosition:f,statLevel:P,unmark:d,strengthMult:v,claimSummon:k,freeSummon:C,chest:h,facing:g,heading:m,isPlayerAlive:x,safeEntityName:S,safeEntityType:L,targetBlock:T,boom:b,box:B,boxSpan:A,CAGE:G,circle:F,clamp:D,column:R,dist2:E,distH2:w,frame:O,GOLDEN:I,inBox:M,norm:N,point:_,ring:J,TAU:z,TEX:H,run:tn,setInterval:rn,setTimeout:ln,sleep:an,blockAt:cn,clearIf:un,freeSpot:pn,isSolid:sn,raycast:yn,setBlock:fn,stuck:Pn,knockBack:K},Q.r=Q.r||{},Object.keys(Q.c).length;const Y=[1e5,1e5,100002],Z=2,nn=256,en=33,on=1,Cn=16e3,gn=!1;function xn(n){if("string"==typeof n)return n;try{const e=n&&n.persisted&&n.persisted.shared&&n.persisted.shared.text;if("string"==typeof e&&e.length)return e}catch(n){j("faText.persisted.shared",n)}try{const e=n&&n.persisted&&n.persisted.text;if("string"==typeof e&&e.length)return e}catch(n){j("faText.persisted",n)}try{const e=n&&n.text;if("string"==typeof e&&e.length)return e}catch(n){j("faText.text",n)}return null}function Sn(n,e,o){let t=null;try{t=api.getBlock(n,e,o)}catch(t){j("faRead.getBlock",t,n+","+e+","+o)}const r="string"==typeof t?t:null;if("Code Block"!==r)return{name:r,data:null,text:null};let l=null;try{l=api.getBlockData(n,e,o)}catch(t){j("faRead.getBlockData",t,n+","+e+","+o)}return{name:r,data:l,text:xn(l)}}function Ln(n){try{const e=JSON.stringify(n);return"string"==typeof e?e.length>200?e.slice(0,200)+"…":e:String(n)}catch(e){return j("faDumpShort",e),String(n)}}let Tn=!1;function bn(n,e,o,t){if(!Tn){Tn=!0;try{api.log("[FA] diagnostic 1er bloc attendu à ("+n+", "+e+", "+o+")"),api.log("[FA]   api.getBlock     -> "+JSON.stringify(t.name)+("Code Block"===t.name?"":"  <-- pas un Code Block à cet endroit !")),api.log("[FA]   api.getBlockData -> "+Ln(t.data))}catch(n){j("faDiagFirst",n)}}}function Bn(n){const e=n.length;return e+":"+n.charCodeAt(0)+","+(e>100?n.charCodeAt(e>>1):0)+","+(e>1?n.charCodeAt(e-1):0)}let An=Q.prev||{};Q.prev=An;let Gn=-1,Fn=-1;const Dn={};let Rn=0,En=0,wn=0,On=0,In=[],Mn=!1,Nn=!1,_n=!1,Jn=!1,zn=0,Hn=!1,Un=0,Wn=0,jn="";function Vn(n){hn()&&(Jn&&!n||(zn++,Rn=0,En=0,wn=0,On=0,In=[],Mn=!1,Nn=!1,_n=!1,Wn=0,jn="",Jn=!0,Xn(zn)))}function Xn(n){if(!hn()||n!==zn)return void(n===zn&&(Jn=!1));if(q())return void(X(function(){Xn(n)},1,"faBatch.interrupt")||(Jn=!1));let e=0;for(;e<on&&Rn<nn;){if(en>0&&wn>=en){Mn=!0;break}const o=Rn++,t=Y[0],r=Y[1],l=Y[2]+o*Z,a=Sn(t,r,l),i="Code Block"===a.name,c="string"==typeof a.text&&a.text.length>=10;if(!i||!c){0===o&&bn(t,r,l,a),(null===a.name||i&&!c)&&(Nn=!0),Mn=!0;break}wn++,e++;const u="bloc#"+(o+1)+" (z="+l+")";if(a.text.length>Wn&&(Wn=a.text.length,jn=u),a.text.length>Cn){_n=!0,In.push(u+" ("+a.text.length+" caractères)"),j("bloc trop grand",new Error(a.text.length+" caractères > "+Cn+" ; eval ignoré pour éviter un out of memory"),u);continue}const p=Bn(a.text);if(An[o]!==p)try{(0,eval)(a.text),An[o]=p,En++,On++,gn&&U(0,a.text.length)}catch(n){In.push(u),Nn=!0;const e=Date.now();(!Dn[u]||e-Dn[u]>2e3)&&(Dn[u]=e,U(0,n&&n.message&&n.message))}else En++}!Mn&&Rn<nn&&X(function(){Xn(n)},1,"faBatch")||(Jn=!1,qn())}function $n(){hn()&&Hn&&(Un>=200?Hn=!1:(Un++,X(function(){hn()&&Hn&&Vn(!1)},10,"faRetryStep")||(Hn=!1)))}function qn(){if(!hn())return;const n=Mn&&wn>0&&En===wn&&0===In.length&&!Nn;let e="";On>0?e=" ("+On+" bloc"+(On>1?"s":"")+" (re)chargé"+(On>1?"s":"")+")":En>0&&(e=" (aucun bloc modifié — handlers conservés)"),Wn>0&&(e+=" — plus gros : "+jn+" = "+Wn+" caractères"),En===Gn&&n||In.length&&In.join(", ");const o=Object.keys(Q.r),t=o.length;En>0&&t!==Fn&&(Fn=t,o.join(", ")),Gn=En,n||_n&&!Nn?Hn=!1:Hn?$n():hn()&&!Hn&&(Hn=!0,Un=0,$n())}Q.reload=function(n){return!!hn()&&(Hn=!1,$(),!0===n&&(An={},Q.prev=An),Vn(!0),!0)},Y.join(","),Vn(!1)}catch(Kn){try{api.log("[FA] erreur de démarrage (faStart) : "+Kn)}catch(Qn){}}}}globalThis.FA_BOOT=xn;try{ln(function(){if(hn())try{xn()}catch(n){try{api.log("[FA][err] faStart (différé) : "+(n&&n.message?n.message:n))}catch(n){}}},1)}catch(Sn){try{api.log("[FA][err] programmation du démarrage différé : "+(Sn&&Sn.message?Sn.message:Sn))}catch(Ln){}}
+// fruit/func-abilities.js — pont entre le World Code et les Code Blocks.
+//
+// Ancienne version : un fichier minifié d'un seul tenant (17,8 ko) qui
+//   - répétait 95 fois le même shim,
+//   - embarquait un chargeur illisible,
+//   - ne journalisait rien quand un fruit n'était pas chargé.
+// Ici : helpers construits une fois, 1 shim = 1 ligne lisible, et le chargeur
+// est dans code-block-loader.js. Le bundle final est minifié par build:world.
+
+import * as combat from "../utils/combat.js";
+import * as lifeform from "../utils/lifeform.js";
+import * as fx from "../utils/fx.js";
+import * as timer from "../utils/timer.ts";
+import * as world from "../utils/world.js";
+import { HANDLER_NAMES } from "./handler-names.js";
+import { createBlockLoader } from "./code-block-loader.js";
+
+export { markAggro } from "../utils/combat.js";
+
+// `api` est un global fourni par le jeu. On le lit à l'usage (getter) pour
+// rester valable après un reload du World Code.
+const getApi = () => globalThis.api;
+function log(msg) {
+  try { getApi().log(msg); } catch (_) {}
+}
+
+// Ancien comportement du helper knockBack : jamais sur un PNJ ni un id mort.
+function knockBack(id, dir, force, up) {
+  if (!id || (typeof id === "number" && id < 0) ||
+      (typeof id === "string" && /^-\d+$/.test(id))) return;
+  try {
+    if (!lifeform.isAliveId(id)) return;
+    if (getApi().getEntityType(id) === "NPC") return;
+    combat.impulse(id, dir, force, up);
+  } catch (e) {
+    log("[FA][err] knockBack : " + (e && e.message ? e.message : e));
+  }
+}
+
+// FA.c : TOUS les helpers attendus par les Code Blocks. Les namespaces sont
+// étalés une seule fois (plus de ligne de 700 caractères recopiée 32 fois).
+const HELPERS = Object.assign({}, combat, lifeform, fx, timer, world, {
+  fx, mesh: fx, sound: fx, knockBack,
+});
+Object.defineProperty(HELPERS, "api", { get: getApi, enumerable: true });
+
+const loader = createBlockLoader({ helpers: HELPERS, expected: HANDLER_NAMES, log });
+
+export const reloadFruitBlocks = loader.reload;   // FA.reload() depuis le jeu
+export const fruitBlocksStatus = loader.status;   // FA.status()
+export const logFruitBlocksStatus = loader.logStatus;
+
+// --- Shims (générés depuis handler-names.js ; 1 ligne = 1 capacité) ---------
+// Si le Code Block n'a pas fourni le handler, loader.call() journalise et
+// lève une erreur pour les clics : le World Code rembourse alors le cooldown.
+
+export const onPlayerClickSpring = (...args) => loader.call("onPlayerClickSpring", args);
+export const onPlayerLeaveSpring = (...args) => loader.call("onPlayerLeaveSpring", args);
+export const onPlayerClickLaser = (...args) => loader.call("onPlayerClickLaser", args);
+export const onPlayerClickLightning = (...args) => loader.call("onPlayerClickLightning", args);
+export const onPlayerLeaveLightning = (...args) => loader.call("onPlayerLeaveLightning", args);
+export const onPlayerClickVortex = (...args) => loader.call("onPlayerClickVortex", args);
+export const onPlayerLeaveVortex = (...args) => loader.call("onPlayerLeaveVortex", args);
+export const onPlayerClickAnchor = (...args) => loader.call("onPlayerClickAnchor", args);
+export const onPlayerClickSeismic = (...args) => loader.call("onPlayerClickSeismic", args);
+export const onPlayerLeaveSeismic = (...args) => loader.call("onPlayerLeaveSeismic", args);
+export const onPlayerClickWindblade = (...args) => loader.call("onPlayerClickWindblade", args);
+export const onPlayerClickMark = (...args) => loader.call("onPlayerClickMark", args);
+export const onPlayerLeaveMark = (...args) => loader.call("onPlayerLeaveMark", args);
+export const onPlayerClickGeyser = (...args) => loader.call("onPlayerClickGeyser", args);
+export const onPlayerClickFruit = (...args) => loader.call("onPlayerClickFruit", args);
+export const onEntityCollisionFruit = (...args) => loader.call("onEntityCollisionFruit", args);
+export const onPlayerLeaveFruit = (...args) => loader.call("onPlayerLeaveFruit", args);
+export const onPlayerClickRocket = (...args) => loader.call("onPlayerClickRocket", args);
+export const onPlayerClickJumpBeacon = (...args) => loader.call("onPlayerClickJumpBeacon", args);
+export const onPlayerClickfullPunch = (...args) => loader.call("onPlayerClickfullPunch", args);
+export const onPlayerClickConcreteWheel = (...args) => loader.call("onPlayerClickConcreteWheel", args);
+export const onPlayerClickGrowingRay = (...args) => loader.call("onPlayerClickGrowingRay", args);
+export const onPlayerClickDought = (...args) => loader.call("onPlayerClickDought", args);
+export const onPlayerLeaveDought = (...args) => loader.call("onPlayerLeaveDought", args);
+export const onPlayerClickSpinBlade = (...args) => loader.call("onPlayerClickSpinBlade", args);
+export const onPlayerClickCataclysm = (...args) => loader.call("onPlayerClickCataclysm", args);
+export const onPlayerClickBombDash = (...args) => loader.call("onPlayerClickBombDash", args);
+export const onPlayerClickBladeStorm = (...args) => loader.call("onPlayerClickBladeStorm", args);
+export const onPlayerClickBladeDash = (...args) => loader.call("onPlayerClickBladeDash", args);
+export const onPlayerClickSpikeField = (...args) => loader.call("onPlayerClickSpikeField", args);
+export const onPlayerClickJudgmentBeam = (...args) => loader.call("onPlayerClickJudgmentBeam", args);
+export const onPlayerClickPaint = (...args) => loader.call("onPlayerClickPaint", args);
+export const onPlayerJoinPaint = (...args) => loader.call("onPlayerJoinPaint", args);
+export const onPlayerLeavePaint = (...args) => loader.call("onPlayerLeavePaint", args);
+export const onPlayerUsedThrowablePaint = (...args) => loader.call("onPlayerUsedThrowablePaint", args);
+export const onPlayerThrowableHitTerrainPaint = (...args) => loader.call("onPlayerThrowableHitTerrainPaint", args);
+export const onEntityCollisionPaint = (...args) => loader.call("onEntityCollisionPaint", args);
+export const portalSolid = (...args) => loader.call("portalSolid", args);
+export const portalSpot = (...args) => loader.call("portalSpot", args);
+export const portalBurst = (...args) => loader.call("portalBurst", args);
+export const onPlayerClickPortal = (...args) => loader.call("onPlayerClickPortal", args);
+export const onPlayerClickPortalRift = (...args) => loader.call("onPlayerClickPortalRift", args);
+export const onPlayerLeavePortal = (...args) => loader.call("onPlayerLeavePortal", args);
+export const onPlayerClickSmokeFog = (...args) => loader.call("onPlayerClickSmokeFog", args);
+export const onPlayerClickSmokeShroud = (...args) => loader.call("onPlayerClickSmokeShroud", args);
+export const onCancelSmoke = (...args) => loader.call("onCancelSmoke", args);
+export const onPlayerLeaveSmoke = (...args) => loader.call("onPlayerLeaveSmoke", args);
+export const onPlayerClickRubberPunch = (...args) => loader.call("onPlayerClickRubberPunch", args);
+export const onPlayerLeaveRubber = (...args) => loader.call("onPlayerLeaveRubber", args);
+export const onPlayerClickDiamondRecovery = (...args) => loader.call("onPlayerClickDiamondRecovery", args);
+export const onPlayerLeaveDiamond = (...args) => loader.call("onPlayerLeaveDiamond", args);
+export const isImmuneToDamage = (...args) => loader.call("isImmuneToDamage", args);
+export const onPlayerClickGhostPhase = (...args) => loader.call("onPlayerClickGhostPhase", args);
+export const onPlayerClickSpectralPrison = (...args) => loader.call("onPlayerClickSpectralPrison", args);
+export const onCancelGhost = (...args) => loader.call("onCancelGhost", args);
+export const onPlayerLeaveGhost = (...args) => loader.call("onPlayerLeaveGhost", args);
+export const onPlayerClickPainPulse = (...args) => loader.call("onPlayerClickPainPulse", args);
+export const onPlayerReleasePainPulse = (...args) => loader.call("onPlayerReleasePainPulse", args);
+export const onCancelPain = (...args) => loader.call("onCancelPain", args);
+export const onPlayerLeavePain = (...args) => loader.call("onPlayerLeavePain", args);
+export const onPlayerClickGasTether = (...args) => loader.call("onPlayerClickGasTether", args);
+export const onCancelGas = (...args) => loader.call("onCancelGas", args);
+export const onPlayerLeaveGas = (...args) => loader.call("onPlayerLeaveGas", args);
+export const onPlayerClickThunderStrike = (...args) => loader.call("onPlayerClickThunderStrike", args);
+export const onCancelThunder = (...args) => loader.call("onCancelThunder", args);
+export const onPlayerClickDissonantWave = (...args) => loader.call("onPlayerClickDissonantWave", args);
+export const onPlayerClickPetalRefrain = (...args) => loader.call("onPlayerClickPetalRefrain", args);
+export const onCancelSong = (...args) => loader.call("onCancelSong", args);
+export const onPlayerLeaveSong = (...args) => loader.call("onPlayerLeaveSong", args);
+export const onPlayerClickClawRip = (...args) => loader.call("onPlayerClickClawRip", args);
+export const onCancelTiger = (...args) => loader.call("onCancelTiger", args);
+export const onPlayerLeaveTiger = (...args) => loader.call("onPlayerLeaveTiger", args);
+export const onPlayerClickFrostfall = (...args) => loader.call("onPlayerClickFrostfall", args);
+export const onPlayerClickShatterfrost = (...args) => loader.call("onPlayerClickShatterfrost", args);
+export const onCancelBlizzard = (...args) => loader.call("onCancelBlizzard", args);
+export const onPlayerLeaveBlizzard = (...args) => loader.call("onPlayerLeaveBlizzard", args);
+export const onPlayerClickManifestGolem = (...args) => loader.call("onPlayerClickManifestGolem", args);
+export const onCancelCreation = (...args) => loader.call("onCancelCreation", args);
+export const onPlayerLeaveCreation = (...args) => loader.call("onPlayerLeaveCreation", args);
+export const onPlayerClickMagmaRings = (...args) => loader.call("onPlayerClickMagmaRings", args);
+export const onPlayerClickLavaJet = (...args) => loader.call("onPlayerClickLavaJet", args);
+export const onPlayerLeaveLava = (...args) => loader.call("onPlayerLeaveLava", args);
+export const onPlayerClickMeteorShower = (...args) => loader.call("onPlayerClickMeteorShower", args);
+export const onPlayerLeaveMeteorShower = (...args) => loader.call("onPlayerLeaveMeteorShower", args);
+export const onCancelMeteorShower = (...args) => loader.call("onCancelMeteorShower", args);
+export const onPlayerClickControlDomain = (...args) => loader.call("onPlayerClickControlDomain", args);
+export const onPlayerClickControlSlash = (...args) => loader.call("onPlayerClickControlSlash", args);
+export const onPlayerClickControlShambles = (...args) => loader.call("onPlayerClickControlShambles", args);
+export const onPlayerLeaveControl = (...args) => loader.call("onPlayerLeaveControl", args);
+export const onPlayerClickTigerForm = (...args) => loader.call("onPlayerClickTigerForm", args);
+export const onPlayerLeaveTigerForm = (...args) => loader.call("onPlayerLeaveTigerForm", args);
+export const onPlayerClickGravityBarrage = (...args) => loader.call("onPlayerClickGravityBarrage", args);
+export const onPlayerClickGravityGrab = (...args) => loader.call("onPlayerClickGravityGrab", args);
+export const onPlayerClickGravityDevastation = (...args) => loader.call("onPlayerClickGravityDevastation", args);
+export const onPlayerLeaveGravity = (...args) => loader.call("onPlayerLeaveGravity", args);

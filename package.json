@@ -1,0 +1,16 @@
+{
+  "name": "block-pirate-v3",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "description": "World Code + Code Blocks du jeu Block Pirate (sources lisibles, build compact).",
+  "scripts": {
+    "build:blocks": "node tools/build-blocks.mjs",
+    "build:world": "node tools/build-world.mjs",
+    "build": "npm run build:blocks && npm run build:world",
+    "check": "node tools/check-imports.mjs && node tools/check-handlers.mjs && node tools/check-blocks.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

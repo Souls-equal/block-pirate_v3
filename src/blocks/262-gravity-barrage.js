@@ -1,0 +1,224 @@
+// src/blocks/262-gravity-barrage.js — GRAVITY (Barrage)
+// Source lisible. Ce fichier est minifié + empaqueté par `npm run build:blocks`.
+// NE PAS coller ce fichier directement dans un Code Block : utiliser code-blocks/pack-XX.js.
+
+((FA) => {
+  const C = FA.c,
+    R = FA.r,
+    V = globalThis.__GV__;
+  const { api, entitiesIn, run, sleep } = C;
+  const { at: soundAt } = C.fx;
+  const {
+    gvVolley,
+    gv_pos,
+    gv_alive,
+    gv_now,
+    gv_stale,
+    gv_norm,
+    gv_aim,
+    gv_focus,
+    gv_stand,
+    gv_blk,
+    gv_mine,
+    gv_lift,
+    gv_slide,
+    gv_blow,
+    gv_cast,
+    gv_pose,
+    gv_unpose,
+    gv_sweep,
+    gv_px,
+    gv_free,
+    gv_whisper,
+    gv_probe,
+    gv_lerp,
+    gv_dist,
+    gv_air,
+  } = V;
+  const {
+    GV_B_N,
+    GV_B_R,
+    GV_B_SPD,
+    GV_B_GAP,
+    GV_B_RISE,
+    GV_B_FUSE,
+    GV_B_RANGE,
+    GV_B_LIFT,
+    GV_SND,
+  } = V;
+
+  function gv_volley_end(v, quiet) {
+    if (gvVolley[v.pid] === v) delete gvVolley[v.pid];
+    for (const b of v.blocks) {
+      if (b.mesh) {
+        V.gv_free(b.mesh);
+        b.mesh = null;
+      }
+    }
+    v.blocks = [];
+    if (!quiet) gv_unpose(v.pid);
+    return true;
+  }
+  function gv_fly(v) {
+    for (const b of v.blocks) {
+      if (!b.fired || b.done) continue;
+      if (v.t - b.fire > GV_B_FUSE) {
+        b.done = 1;
+        if (b.mesh) {
+          V.gv_free(b.mesh);
+          b.mesh = null;
+        }
+        continue;
+      }
+      let to = b.foe ? gv_pos(b.foe) : null;
+      if (b.foe && !to && b.swaps < 2) {
+        const near = entitiesIn(
+          [b.pos[0] - 24, b.pos[1] - 24, b.pos[2] - 24],
+          [b.pos[0] + 24, b.pos[1] + 24, b.pos[2] + 24],
+        );
+        for (const id of near)
+          if (id !== v.pid) {
+            b.foe = id;
+            b.swaps++;
+            to = gv_pos(id);
+            break;
+          }
+      }
+      if (to) b.aim = [to[0], to[1] + 0.9, to[2]];
+      const d = gv_norm([b.aim[0] - b.pos[0], b.aim[1] - b.pos[1], b.aim[2] - b.pos[2]]),
+        near = V.gv_dist(b.pos, b.aim) <= GV_B_SPD + 1.8,
+        nx = b.pos[0] + d[0] * GV_B_SPD,
+        ny = b.pos[1] + d[1] * GV_B_SPD,
+        nz = b.pos[2] + d[2] * GV_B_SPD;
+      b.pos = [nx, ny, nz];
+      gv_slide(b.mesh, nx, ny, nz);
+      if (near || !V.gv_air(Math.floor(nx), Math.floor(ny), Math.floor(nz))) {
+        b.done = 1;
+        gv_blow(v.pid, b.pos);
+        if (b.mesh) {
+          V.gv_free(b.mesh);
+          b.mesh = null;
+        }
+      }
+    }
+    let all = true;
+    for (const b of v.blocks) if (!b.done) all = false;
+    if (all) v.over = 1;
+  }
+  function gv_volley_co(v) {
+    return {
+      next: function () {
+        if (gvVolley[v.pid] !== v) return { done: true };
+        if (!gv_alive(v.pid)) {
+          gv_volley_end(v, true);
+          return { done: true };
+        }
+        v.t++;
+        v.beat = gv_now();
+        try {
+          if (v.phase === 0) {
+            const k = Math.min(1, v.t / GV_B_RISE);
+            for (const b of v.blocks) {
+              b.y = V.gv_lerp(b.from, b.over, k);
+              b.hover = [
+                b.pos[0] + Math.sin(v.t * 0.4 + b.seed) * 0.05,
+                b.y,
+                b.pos[2] + Math.cos(v.t * 0.4 + b.seed) * 0.05,
+              ];
+              gv_slide(b.mesh, b.hover[0], b.hover[1], b.hover[2]);
+            }
+            if (k >= 1) {
+              for (const b of v.blocks) if (b.hover) b.pos = b.hover;
+              v.phase = 1;
+              gv_unpose(v.pid);
+            }
+          } else {
+            for (const b of v.blocks) {
+              if (b.fired || v.t < b.fire) continue;
+              b.fired = 1;
+              soundAt(b.pos, GV_SND.fire, 0.7, 1.4, 24);
+            }
+            gv_fly(v);
+          }
+          if (v.t % 200 === 0) gv_sweep();
+        } catch (e) {}
+        if (v.over) {
+          gv_volley_end(v, true);
+          return { done: true };
+        }
+        return { value: sleep(1), done: false };
+      },
+    };
+  }
+  function onPlayerClickGravityBarrage(pid, itemName) {
+    if (!gv_alive(pid)) return false;
+    let v0 = gvVolley[pid];
+    if (v0 && !gv_stale(v0)) {
+      gv_whisper(pid, "your attack is already launched");
+      return false;
+    }
+    if (v0) {
+      gv_volley_end(v0, true);
+      gv_unpose(pid);
+    }
+    const at = gv_aim(pid, GV_B_RANGE);
+    if (!at) {
+      gv_probe(pid);
+      gv_whisper(pid, "no target: be closer of any ground");
+      return false;
+    }
+    const foe = gv_focus(pid, 50),
+      gy = Math.floor(at[1]) - 1,
+      gx = Math.floor(at[0]),
+      gz = Math.floor(at[2]),
+      seen = {},
+      blocks = [];
+    for (let tries = 0; tries < GV_B_N * 16 && blocks.length < GV_B_N; tries++) {
+      const a = Math.random() * Math.PI * 2,
+        r = Math.sqrt(Math.random()) * GV_B_R,
+        x = Math.floor(gx + r * Math.cos(a)),
+        z = Math.floor(gz + r * Math.sin(a));
+      let y = null;
+      for (let k = 6; k >= -6 && y === null; k--) if (gv_stand(x, gy + k, z)) y = gy + k;
+      if (y === null) continue;
+      const key = x + "," + y + "," + z;
+      if (seen[key]) continue;
+      seen[key] = 1;
+      const name = gv_blk(x, y - 1, z);
+      if (!gv_mine(name)) continue;
+      const pos = [x + 0.5, y - 0.5, z + 0.5];
+      gv_lift(pos);
+      blocks.push({
+        mesh: gv_px(),
+        pos,
+        from: pos[1],
+        over: pos[1] + GV_B_LIFT + 1.5 * Math.random(),
+        y: pos[1],
+        foe: foe ? foe.id : null,
+        aim: [at[0], at[1] + 0.9, at[2]],
+        seed: Math.random() * 6.28,
+        fired: 0,
+        fire: 0,
+        done: 0,
+        swaps: 0,
+        hover: null,
+      });
+    }
+    if (!blocks.length) {
+      gv_probe(pid);
+      gv_whisper(pid, "no ground here, use it closer of any blocks");
+      return false;
+    }
+    for (let i = 0; i < blocks.length; i++) blocks[i].fire = GV_B_RISE + i * GV_B_GAP;
+    const v = { pid, item: itemName, t: 0, beat: gv_now(), phase: 0, blocks, over: 0, at };
+    gvVolley[pid] = v;
+    const me = gv_pos(pid) || at;
+    gv_cast(me, false);
+    gv_pose(pid, "fire", GV_B_RISE * 50 + 200);
+    soundAt(at, GV_SND.volley, 0.9, 1.1, 30);
+    run(gv_volley_co(v));
+    return true;
+  }
+  Object.assign(V, { gv_volley_end, gv_volley_co, gv_fly });
+  Object.assign(R, { onPlayerClickGravityBarrage });
+})(globalThis.FA);
