@@ -3,8 +3,9 @@
 import { addStat, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
-import { getFruit } from "../fruit";
+import { getFruit } from "../fruit/index";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
+import { isVanished } from "./admin";
 
 export const dCode = "7WGjmPHZrS"
 
@@ -183,7 +184,6 @@ export function updateLeaderboardColor(playerId){
 }
 
 /* REFRESH SINGLE PLAYER */
-import { isVanished } from "./admin";
 
 export function refreshLeaderboardPlayer(playerId) {
     if (isVanished(playerId)) {

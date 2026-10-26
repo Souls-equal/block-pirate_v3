@@ -1,5 +1,5 @@
 import { canDamage as t, crewCommands as r, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
-import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, restorePlayerFruit as g } from "./fruit";
+import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, restorePlayerFruit as g } from "./fruit/index";
 import { FRUIT_ABILITIES as h, abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./core/UI"; 
@@ -20,7 +20,7 @@ import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/kil
 import { tickLayer as Ct, onPlayerJoinLayer as Dt, onPlayerClickLayer as At } from "./build/layer";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/plane";
-import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki.js";
+import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 

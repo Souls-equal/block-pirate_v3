@@ -118,9 +118,18 @@ function makeHelpers(api) {
   );
 }
 
-const standaloneLoaderSrc = funcAbilitiesCode
-  .replace(/^import \* as (\w+) from "[^"]+";$/gm, "const $1 = {};")
-  .replace(/^export \{ markAggro \} from "[^"]+";$/gm, "export const markAggro = () => {};");
+const standaloneLoaderSrc = funcAbilitiesCode.replace(
+  /^import\s+\{([\s\S]*?)\}\s+from\s+"[^"]+";/gm,
+  (_, names) =>
+    "const {" +
+    names
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => `${s} = () => {}`)
+      .join(", ") +
+    "} = {};",
+);
 const { createBlockLoader } = await import(
   "data:text/javascript;base64," + Buffer.from(standaloneLoaderSrc, "utf8").toString("base64")
 );

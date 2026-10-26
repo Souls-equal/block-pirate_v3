@@ -1,5 +1,5 @@
 //utils/combat.js
-import { hakiBoost } from "./haki.js";
+import { hakiBoost } from "./haki";
 import { getDamageMultiplierForPoints, getStatLevel } from "../gameplay/stats";
 import { dist2, distH2, segDist } from "./fx";
 import { creditKill, noteMobSeen, recordDamager } from "./killAttribution";
