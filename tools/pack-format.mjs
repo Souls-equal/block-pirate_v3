@@ -20,8 +20,9 @@ export function fnv1a(text) {
 }
 
 export function makeBlock(index, total, payload) {
-  const head = `/*${MAGIC}:${index}/${total}:len=${payload.length}:h=${fnv1a(payload)}*/\n`;
-  return head + payload;
+  const cleanPayload = payload.replace(/\r\n?/g, "\n").trim();
+  const head = `/*${MAGIC}:${index}/${total}:len=${cleanPayload.length}:h=${fnv1a(cleanPayload)}*/\n`;
+  return head + cleanPayload;
 }
 
 const HEADER_RE = new RegExp(
@@ -30,9 +31,10 @@ const HEADER_RE = new RegExp(
 
 export function parseBlock(text) {
   if (typeof text !== "string") return null;
-  const m = HEADER_RE.exec(text);
+  const clean = text.replace(/\r\n?/g, "\n");
+  const m = HEADER_RE.exec(clean);
   if (!m) return null;
-  const payload = text.slice(m[0].length).trim();
+  const payload = clean.slice(m[0].length).trim();
   return {
     index: Number(m[1]),
     total: Number(m[2]),
@@ -41,4 +43,122 @@ export function parseBlock(text) {
     ok: payload.length === Number(m[3]) && fnv1a(payload) === m[4],
     payload,
   };
+}
+
+// --- Protection anti-censure Bloxd.io ---------------------------------------
+// Le filtre de texte des Code Blocks de Bloxd.io remplace par « ***** »
+// certaines séquences d'identifiants et d'opérateurs collés par la minification
+// (`o[n]`, `return[n*.7`, `for(const[n,r]`, `a-s`, `a&&`, `g=f`, `18+`, `D,f`,
+// `t.f`, `b(f`, `n*de`, `c===3`). L'insertion d'espaces aux endroits critiques
+// empêche toute correspondance du filtre sans modifier les noms de variables.
+
+export const CENSOR_RULES = [
+  {
+    name: "keyword[n",
+    test: /\b(?:return|const|let|var)\[n(?![A-Za-z0-9_$])/gi,
+    fix: (code) =>
+      code
+        .replace(/\b(return|const|let|var)\[n\*/gi, "$1 [ n * ")
+        .replace(/\b(return|const|let|var)\[n,/gi, "$1 [ n, ")
+        .replace(/\b(return|const|let|var)\[n(?![A-Za-z0-9_$])/gi, "$1 [ n "),
+  },
+  {
+    name: "ident[n",
+    test: /(?<=[A-Za-z0-9_$])\[n(?![A-Za-z0-9_$])/gi,
+    fix: (code) =>
+      code
+        .replace(/(?<=[A-Za-z0-9_$])\[n\]/gi, "[ n ]")
+        .replace(/(?<=[A-Za-z0-9_$])\[n\./gi, "[ n .")
+        .replace(/(?<=[A-Za-z0-9_$])\[n(?![A-Za-z0-9_$])/gi, "[ n "),
+  },
+  {
+    name: "a-s",
+    test: /\ba-s\b/gi,
+    fix: (code) => code.replace(/\b([aA])-([sS])\b/g, "$1 - $2"),
+  },
+  {
+    name: "a&&",
+    test: /a&&/gi,
+    fix: (code) =>
+      code
+        .replace(/===([aA])&&/g, "=== $1 && ")
+        .replace(/([aA])&&/g, "$1 && "),
+  },
+  {
+    name: "g=f",
+    test: /\b[gG]=[fF]\b/g,
+    fix: (code) =>
+      code
+        .replace(/,([gG])=([fF]),/g, ", $1 = $2, ")
+        .replace(/\b([gG])=([fF])\b/g, "$1 = $2"),
+  },
+  {
+    name: "18+",
+    test: /18\+/g,
+    fix: (code) => code.replace(/18\+/g, "18 + "),
+  },
+  {
+    name: "D,f",
+    test: /\b[dD],[fF]\b/g,
+    fix: (code) =>
+      code
+        .replace(/\*([dD]),([fF])=/g, " * $1, $2 = ")
+        .replace(/([dD]),([fF])\b/g, "$1, $2"),
+  },
+  {
+    name: "t.f",
+    test: /\b[tT]\.[fF]\b/g,
+    fix: (code) =>
+      code
+        .replace(/([+\-,])\b([tT])\.([fF])\*/g, "$1 $2 . $3 * ")
+        .replace(/\b([tT])\.([fF])\*/g, "$1 . $2 * ")
+        .replace(/\b([tT])\.([fF])\+\+,([tT])\.([fF])<=/g, "$1 . $2 ++, $3 . $4 <= ")
+        .replace(/,([tT])\.([fF])\//g, ", $1 . $2 / ")
+        .replace(/\(([tT])\.([fF])-/g, "($1 . $2 - ")
+        .replace(/,([tT])\.([fF])>=/g, ", $1 . $2 >= ")
+        .replace(/\b([tT])\.([fF])\b/g, "$1 . $2"),
+  },
+  {
+    name: "b(f",
+    test: /\b[bB]\([fF]\b/g,
+    fix: (code) =>
+      code
+        .replace(/&&([bB])\(([fF])\b/g, " && $1( $2")
+        .replace(/\b([bB])\(([fF])\b/g, "$1( $2"),
+  },
+  {
+    name: "n*de",
+    test: /\b[nN]\*[dD][eE]\b/g,
+    fix: (code) =>
+      code
+        .replace(/=([nN])\*([dD][eE])\+/g, " = $1 * $2 + ")
+        .replace(/\b([nN])\*([dD][eE])\b/g, "$1 * $2"),
+  },
+  {
+    name: "c===3",
+    test: /\b[cC]===?3\b/g,
+    fix: (code) =>
+      code
+        .replace(/\|\|([cC])===3\)/g, "|| $1 === 3 )")
+        .replace(/\b([cC])===3\b/g, "$1 === 3")
+        .replace(/\b([cC])==3\b/g, "$1 == 3"),
+  },
+];
+
+export function uncensorBlockCode(code) {
+  let out = code;
+  for (const rule of CENSOR_RULES) {
+    out = rule.fix(out);
+  }
+  return out;
+}
+
+export function findCensoredPatterns(code) {
+  const hits = [];
+  for (const rule of CENSOR_RULES) {
+    for (const m of code.matchAll(rule.test)) {
+      hits.push({ rule: rule.name, match: m[0], index: m.index });
+    }
+  }
+  return hits;
 }

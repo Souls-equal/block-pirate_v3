@@ -9,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
-import { parseBlock, MARKER, fnv1a } from "./pack-format.mjs";
+import { parseBlock, MARKER, fnv1a, findCensoredPatterns } from "./pack-format.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const funcAbilitiesCode = fs.readFileSync(path.join(ROOT, "src/fruit/func-abilities.js"), "utf8");
@@ -46,6 +46,13 @@ for (const p of manifest.packs) {
   check(b.hash === p.hash && fnv1a(b.payload) === p.hash, `${p.file} : hash manifest différent`);
   check(text.length <= 32_000, `${p.file} : ${text.length} car. > limite 32 000 du jeu`);
   check(text.length === p.chars, `${p.file} : taille manifest différente`);
+  check(!text.includes("*****"), `${p.file} : contient "*****" (censure Bloxd.io)`);
+  const censorHits = findCensoredPatterns(text);
+  check(
+    censorHits.length === 0,
+    `${p.file} : motif(s) censurable(s) par Bloxd.io : ` +
+      censorHits.map((h) => `${h.rule}(${h.match})`).join(", "),
+  );
   const parts = b.payload.split(MARKER).map((s) => s.trim()).filter((s) => s && s !== ";");
   check(parts.length === p.modules, `${p.file} : ${parts.length} modules / ${p.modules} annoncés`);
   for (const part of parts) {
