@@ -113,6 +113,7 @@ function shroudDraw(s) {
 }
 
 function shroudBurst(s, hitTarget) {
+    sound.at([s.px, s.y, s.z], "cannonFire3", 0.8, 0.95, 24);
     for (let i = 0; i < S_BURST_PTS; i++) {
         const a = (i / S_BURST_PTS) * Math.PI * 2;
         const k = S_BURST_R * (0.35 + (i % 4) * 0.22);
@@ -159,6 +160,7 @@ function onPlayerClickSmokeFog(pid, itemName) {
     if (fogs[pid]) return true;
     const p = posOf(pid);
     if (!p) return false;
+    sound.at(p, "pulseFromTheDark", 0.8, 1.15, 24);
     const tok = ((fogs[pid] && fogs[pid].tok) || 0) + 1;
     fogs[pid] = { tok: tok };
     run(fogCo({ caster: pid, item: itemName, c: [p[0], p[1], p[2]], r: fogRadius(pid), t: 0 }, tok));
@@ -172,6 +174,7 @@ function onPlayerClickSmokeShroud(pid, itemName) {
     const tp = posOf(target);
     if (!tp) return false;
 
+    sound.at(tp, "magicAccent3", 0.85, 0.95, 24);
     const tok = ((shrouds[pid] && shrouds[pid].tok) || 0) + 1;
     shrouds[pid] = { tok: tok };
     run(shroudCo({ pid: pid, item: itemName, target: target, px: tp[0], y: tp[1], z: tp[2], t: 0 }, tok));

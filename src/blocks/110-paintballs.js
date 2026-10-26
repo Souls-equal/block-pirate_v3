@@ -42,6 +42,7 @@ function getThrower(eId, name) {
 }
 
 function paint_impact(x, y, z, caster, itemName) {
+    sound.at([x, y, z], "cannonFire3", 0.75, 1.2, 22);
     boom([x, y, z], IMPACT_R, { count: 30, colors: [[[255, 170, 40], [255, 255, 255]], [[180, 90, 20, 0], [255, 170, 40, 0]]] });
     if (!caster) return;
     hitArea([x, y, z], IMPACT_R, caster, itemName, IMPACT_DMG, {});

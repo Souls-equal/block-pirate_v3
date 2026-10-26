@@ -78,6 +78,7 @@ function onPlayerClickDiamondRecovery(pid) {
     const cap = maxHp(pid);
     const hp = safeHealth(pid);
     if (hp === null || hp >= cap) {
+        sound.at(pid, "glass1", 0.75, 1.35, 18);
         try { api.sendMessage(pid, [{ str: "Nothing to recover — you are already at full health.", style: { color: "#8FE9FF" } }]); }
         catch (e) {}
         return false;

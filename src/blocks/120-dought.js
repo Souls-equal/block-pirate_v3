@@ -20,6 +20,7 @@ function clearFreeze(tid) {
 function castFreeze(caster, tid, itemName) {
     if (!tid || !isAliveId(tid)) return;
     clearFreeze(tid);
+    sound.at(tid, "cannonFire1", 0.85, 0.9, 24);
 
     const tok = freezeTok[tid];
     const t0 = Date.now();
@@ -95,6 +96,7 @@ const W_FOLLOW = 1, SHOCK_MAX_R = 6, SHOCK_STEP_MS = 300, SHOCK_DMG = 40;
 const wheels = {}, wheelOn = {}, wheelRoll = {}, wheelAir = {}, wheelItem = {};
 
 function stopWheel(pid) {
+    if (wheelOn[pid]) sound.at(pid, "cannonFire3", 0.75, 1.2, 22);
     wheelOn[pid] = false;
     try { api.setPlayerOpacity(pid, 1); } catch (e) {}
     setSpeed(pid, 1);
@@ -104,6 +106,7 @@ function stopWheel(pid) {
 }
 
 function shockwave(owner, cx, cy, cz, item) {
+    sound.at([cx, cy, cz], "cannonFire1", 0.9, 0.75, 26);
     let r = 1, prev = [];
     run({
         next: function () {
@@ -133,6 +136,7 @@ function shockwave(owner, cx, cy, cz, item) {
 }
 
 function startWheel(pid, itemName) {
+    sound.at(pid, "bigDrumSwish2", 0.85, 0.9, 24);
     const w = mesh.create("Gray Concrete", Math.min(W_SIZE, 1.35), pid);
     if (!w) return;
 
@@ -191,6 +195,7 @@ const beams = {}, beamItem = {};
 
 function explodeBeam(pid, ep, itemName) {
     beams[pid] = null;
+    sound.at(ep, "cannonFire2", 0.9, 0.85, 26);
     try { boom(ep, 1, { count: 80, colors: [[[255, 40, 0], [255, 180, 0]], [[255, 0, 0, 0], [255, 80, 0, 0]]] }); }
     catch (e) {}
 
@@ -204,7 +209,9 @@ function explodeBeam(pid, ep, itemName) {
 }
 
 function startBeam(pid, itemName) {
-    if (wheelOn[pid] || beams[pid]) return;
+    if (wheelOn[pid]) stopWheel(pid);
+    if (beams[pid]) return;
+    sound.at(pid, "magicAccent3", 0.85, 1.15, 22);
     beams[pid] = true;
     beamItem[pid] = itemName;
     let length = 1;

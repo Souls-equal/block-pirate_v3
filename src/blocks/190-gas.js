@@ -85,6 +85,7 @@ function gas_co(st) {
 
 function onPlayerClickGasTether(pid, itemName) {
     if (!isAliveId(pid)) return false;
+    sound.at(pid, "cannonFire3", 0.65, 1.35, 20);
     if (tethers[pid]) return true;
 
     const target = pick(pid);
@@ -98,7 +99,6 @@ function onPlayerClickGasTether(pid, itemName) {
 
     const st = { pid: pid, item: itemName, target: target, f: 0, rooted: 0 };
     tethers[pid] = st;
-    sound.at(pid, "cannonFire3", 0.45, 1.35, 16);
     run(gas_co(st));
     setTimeout(function () { if (tethers[pid] === st) gas_stop(pid, st); }, gas_MAX * gas_TICK + 6);
     return true;

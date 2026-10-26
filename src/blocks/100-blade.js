@@ -11,6 +11,7 @@ const spins = {};
 
 function castSpin(pid, itemName) {
     if (spins[pid]) return true;
+    sound.at(pid, "bigDrumSwish2", 0.85, 1.2, 22);
     const tok = (spins[pid] && spins[pid].tok || 0) + 1;
     spins[pid] = { tok: tok };
 
@@ -87,6 +88,7 @@ function castSpin(pid, itemName) {
 function castBoom(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
+    sound.at(pid, "cannonFire1", 0.95, 0.75, 28);
     boom(p, 5, { count: 190, colors: [[[255, 100, 0], [255, 255, 0]]] });
     hitArea(p, 5, pid, itemName, 25, {});
     return true;
@@ -98,6 +100,7 @@ function castBombDash(pid, itemName) {
     const p = posOf(pid);
     const d = facing(pid);
     if (!p) return true;
+    sound.at(pid, "cannonFire2", 0.85, 1.1, 24);
     hitArea(p, 2, pid, itemName, 30, { height: 5 });
     boom(p, 1.2, { count: 60, colors: [[[255, 80, 0], [255, 200, 40]]] });
     try { api.setVelocity(pid, d[0] * 18, d[1] * 18, d[2] * 18); } catch (e) {}
@@ -111,6 +114,7 @@ const storms = {};
 
 function castStorm(pid, itemName) {
     if (storms[pid]) return true;
+    sound.at(pid, "bigDrumSwish1", 0.85, 1.3, 22);
     storms[pid] = true;
     const t0 = Date.now();
     let lastD = t0 - STORM_TICK, ang = 0;
@@ -161,6 +165,7 @@ const dashes = {};
 function castBladeDash(pid, itemName) {
     const d = facing(pid);
     if (dashes[pid]) return true;
+    sound.at(pid, "critical_hit", 0.85, 1.35, 22);
     dashes[pid] = true;
     const end = Date.now() + DASH_MS;
     const hit = {};
@@ -202,6 +207,7 @@ const SPIKE_N = 10, SPIKE_SPREAD = 10, SPIKE_H = 2, SPIKE_DMG = 25, SPIKE_MS = 1
 function castSpikes(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
+    sound.at(pid, "cannonFire3", 0.85, 0.85, 24);
 
     const baseY = Math.floor(p[1]);
     const blocks = [];
@@ -258,10 +264,16 @@ function castJudgment(pid, itemName) {
     const state = lightStates[pid];
 
     const from = [p[0], p[1] + 1.5, p[2]];
-    const hit = raycast(from, facing(pid), JB_RANGE, 0.5);
-    if (!hit) return true;
+    const d = facing(pid);
+    const hit = raycast(from, d, JB_RANGE, 0.5) || [
+        Math.floor(from[0] + d[0] * 12),
+        Math.floor(from[1] + d[1] * 12),
+        Math.floor(from[2] + d[2] * 12),
+    ];
 
     const target = [hit[0] + 0.5, hit[1] + 0.5, hit[2] + 0.5];
+    sound.at(pid, "magicAccent1", 0.85, 1.4, 24);
+    sound.at(target, "cannonFire3", 0.85, 1.1, 26);
     placeZone(hit[0], hit[1], hit[2], state);
 
     const dx = target[0] - from[0], dy = target[1] - from[1], dz = target[2] - from[2];

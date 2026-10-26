@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-26T20:16:39.047Z",
+  "generatedAt": "2026-10-26T20:51:39.455Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,18 +8,18 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 399284,
-  "packedChars": 201678,
+  "sourceChars": 438894,
+  "packedChars": 222896,
   "compression": "49 %",
-  "packCount": 7,
+  "packCount": 8,
   "packs": [
     {
       "index": 1,
       "file": "pack-01.js",
       "z": 100002,
-      "chars": 27234,
-      "payloadChars": 27201,
-      "hash": "8fc4d857",
+      "chars": 27971,
+      "payloadChars": 27938,
+      "hash": "fa7a9766",
       "modules": 10,
       "sources": [
         "010-spring.js",
@@ -28,9 +28,9 @@
         "080-light.js",
         "090-rocket.js",
         "110-paintballs.js",
-        "140-smoke.js",
-        "150-rubber.js",
+        "130-portal.js",
         "160-diamond.js",
+        "180-pain.js",
         "190-gas.js"
       ]
     },
@@ -38,9 +38,9 @@
       "index": 2,
       "file": "pack-02.js",
       "z": 100003,
-      "chars": 30130,
-      "payloadChars": 30097,
-      "hash": "2ccfb4eb",
+      "chars": 30463,
+      "payloadChars": 30430,
+      "hash": "ecb4fc37",
       "modules": 5,
       "sources": [
         "020-flame.js",
@@ -54,16 +54,16 @@
       "index": 3,
       "file": "pack-03.js",
       "z": 100004,
-      "chars": 31429,
-      "payloadChars": 31396,
-      "hash": "832bf9f2",
+      "chars": 31424,
+      "payloadChars": 31391,
+      "hash": "651307df",
       "modules": 7,
       "sources": [
         "030-lightning.js",
         "040-dark.js",
         "120-dought.js",
-        "130-portal.js",
-        "180-pain.js",
+        "140-smoke.js",
+        "150-rubber.js",
         "200-song.js",
         "210-tiger-mark.js"
       ]
@@ -104,26 +104,37 @@
       "index": 6,
       "file": "pack-06.js",
       "z": 100007,
-      "chars": 24707,
-      "payloadChars": 24674,
-      "hash": "0d87f1ae",
+      "chars": 26252,
+      "payloadChars": 26219,
+      "hash": "5b9921a4",
       "modules": 2,
       "sources": [
         "300-common-uncommon-plus.js",
-        "330-mythical-apex-plus.js"
+        "310-rare-legendary-plus.js"
       ]
     },
     {
       "index": 7,
       "file": "pack-07.js",
       "z": 100008,
-      "chars": 26942,
-      "payloadChars": 26909,
-      "hash": "5fd1d5a4",
-      "modules": 2,
+      "chars": 22193,
+      "payloadChars": 22160,
+      "hash": "e2593801",
+      "modules": 1,
       "sources": [
-        "310-rare-legendary-plus.js",
         "320-legendary-mythical-plus.js"
+      ]
+    },
+    {
+      "index": 8,
+      "file": "pack-08.js",
+      "z": 100009,
+      "chars": 23357,
+      "payloadChars": 23324,
+      "hash": "7f5e94b6",
+      "modules": 1,
+      "sources": [
+        "330-mythical-apex-plus.js"
       ]
     }
   ]

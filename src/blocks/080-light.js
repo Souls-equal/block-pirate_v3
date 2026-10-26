@@ -16,6 +16,7 @@ function puff(x, y, z) {
 }
 
 function bang(x, y, z) {
+    sound.at([x, y, z], "cannonFire3", 0.75, 1.45, 22);
     boom([x, y, z], 0.3, {
         count: 8, power: [0.6, 1.6], size: [0.18, 0.35],
         gravity: [0, -2, 0], dir: [0, 0.3, 0], dirSpread: 0.8,
@@ -27,6 +28,8 @@ function fire(playerId, itemName) {
     const p = posOf(playerId);
     const d = facing(playerId);
     if (!p) return;
+
+    sound.at(playerId, "magicAccent1", 0.8, 1.65, 22);
 
     let x = p[0] + d[0] * 1.5, y = p[1] + 1.4, z = p[2] + d[2] * 1.5;
     const vx = d[0] * shot_SPEED, vy = d[1] * shot_SPEED, vz = d[2] * shot_SPEED;
