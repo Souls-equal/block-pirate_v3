@@ -40,20 +40,38 @@
   }
 
   function aimSpot(pid, maxDist) {
-    const t = targetBlock(pid);
     const p = posOf(pid);
     if (!p) return null;
-    if (t && dist2(p, t) <= maxDist * maxDist) return [t[0], t[1] + 0.5, t[2]];
     const d = facing(pid);
+    const ids = lifeforms(pid);
+    let best = null,
+      bestD2 = (maxDist + 2) * (maxDist + 2);
+    for (let i = 0; i < ids.length; i++) {
+      const q = posOf(ids[i]);
+      if (!q) continue;
+      const dx = q[0] - p[0],
+        dy = q[1] + 0.9 - (p[1] + 1.2),
+        dz = q[2] - p[2],
+        d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > bestD2 || d2 < 0.04) continue;
+      if ((dx * d[0] + dy * d[1] + dz * d[2]) / Math.sqrt(d2) >= 0.65) {
+        bestD2 = d2;
+        best = [q[0], q[1] + 0.5, q[2]];
+      }
+    }
+    if (best) return best;
+    const t = targetBlock(pid);
+    if (t && dist2(p, t) <= maxDist * maxDist) return [t[0], t[1] + 0.5, t[2]];
     return [p[0] + d[0] * maxDist, p[1] + 0.5 + d[1] * maxDist * 0.35, p[2] + d[2] * maxDist];
   }
 
   function pushOut(center, radius, caster, kbH, kbY) {
+    const r = radius + 1.5;
     const ids = lifeforms(caster);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const q = posOf(id);
-      if (!q || dist2(q, center) > radius * radius) continue;
+      if (!q || dist2(q, center) > r * r) continue;
       const dx = q[0] - center[0],
         dz = q[2] - center[2],
         d = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -246,7 +264,7 @@
             const id = ids[i];
             if (seen[id]) continue;
             const q = posOf(id);
-            if (q && dist2(q, cur) <= 5.2) {
+            if (q && dist2(q, cur) <= 18.0) {
               seen[id] = 1;
               damage(id, 58, pid, itemName);
               eff(id, "Slowness", 3500, { inbuiltLevel: 3 });
@@ -405,7 +423,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && distH2(q, c) <= 5.8 && Math.abs(q[1] - c[1]) <= 3.2) {
+          if (q && distH2(q, c) <= 18.0 && Math.abs(q[1] - c[1]) <= 3.8) {
             seen[id] = 1;
             damage(id, 74, pid, itemName);
             impulse(id, d[0] * 1.4, 0.9, d[2] * 1.4);
@@ -600,7 +618,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && dist2(q, p) <= 6.0) {
+          if (q && dist2(q, p) <= 20.0) {
             seen[id] = 1;
             damage(id, 74, pid, itemName);
             eff(id, "Slowness", 3500, { inbuiltLevel: 4 });
@@ -726,7 +744,7 @@
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
           const q = posOf(id);
-          if (q && dist2(q, p) <= 81) {
+          if (q && dist2(q, p) <= 121) {
             seg([p[0], p[1] + 2.2, p[2]], [q[0], q[1] + 1.0, q[2]], {
               r: 0.1,
               tex: TEX.glint,

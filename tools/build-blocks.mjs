@@ -61,7 +61,7 @@ const fragments = files.map((file, order) => {
   if (code.includes(MARKER))
     throw new Error(`${file} : contient le séparateur réservé ${MARKER}`);
   if (!code.endsWith(";") && !code.endsWith("}")) code += ";";
-  code = uncensorBlockCode(code, !/^0|^[12]/.test(file));
+  code = uncensorBlockCode(code, file === "251-control-domain.js" || !/^0|^[12]/.test(file));
   return { file, order, code, size: code.length };
 });
 

@@ -40,20 +40,38 @@
   }
 
   function aimSpot(pid, maxDist) {
-    const t = targetBlock(pid);
     const p = posOf(pid);
     if (!p) return null;
-    if (t && dist2(p, t) <= maxDist * maxDist) return [t[0], t[1] + 0.5, t[2]];
     const d = facing(pid);
+    const ids = lifeforms(pid);
+    let best = null,
+      bestD2 = (maxDist + 2) * (maxDist + 2);
+    for (let i = 0; i < ids.length; i++) {
+      const q = posOf(ids[i]);
+      if (!q) continue;
+      const dx = q[0] - p[0],
+        dy = q[1] + 0.9 - (p[1] + 1.2),
+        dz = q[2] - p[2],
+        d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > bestD2 || d2 < 0.04) continue;
+      if ((dx * d[0] + dy * d[1] + dz * d[2]) / Math.sqrt(d2) >= 0.65) {
+        bestD2 = d2;
+        best = [q[0], q[1] + 0.5, q[2]];
+      }
+    }
+    if (best) return best;
+    const t = targetBlock(pid);
+    if (t && dist2(p, t) <= maxDist * maxDist) return [t[0], t[1] + 0.5, t[2]];
     return [p[0] + d[0] * maxDist, p[1] + 0.6 + d[1] * maxDist * 0.4, p[2] + d[2] * maxDist];
   }
 
   function pushOut(center, radius, caster, kbH, kbY) {
+    const r = radius + 1.5;
     const ids = lifeforms(caster);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const q = posOf(id);
-      if (!q || dist2(q, center) > radius * radius) continue;
+      if (!q || dist2(q, center) > r * r) continue;
       const dx = q[0] - center[0],
         dz = q[2] - center[2],
         d = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -62,11 +80,12 @@
   }
 
   function pullIn(center, radius, caster, pullH, pullY) {
+    const r = radius + 1.5;
     const ids = lifeforms(caster);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const q = posOf(id);
-      if (!q || dist2(q, center) > radius * radius) continue;
+      if (!q || dist2(q, center) > r * r) continue;
       const dx = center[0] - q[0],
         dz = center[2] - q[2],
         d = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -209,7 +228,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && distH2(q, c) <= 4.5 && Math.abs(q[1] - c[1]) <= 2.8) {
+          if (q && distH2(q, c) <= 16.0 && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
             damage(id, 32, pid, itemName);
             impulse(id, d[0] * 1.2, 0.75, d[2] * 1.2);
@@ -390,7 +409,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && dist2(q, p) <= 5.5) {
+          if (q && dist2(q, p) <= 18.0) {
             seen[id] = 1;
             damage(id, 35, pid, itemName);
             impulse(id, d[0] * 1.4, 0.55, d[2] * 1.4);
@@ -582,12 +601,12 @@
           ],
         });
         const ids = lifeforms(pid);
-        const r = 1.6 + stepIdx * 0.35;
+        const r = 2.8 + stepIdx * 0.55;
         for (let i = 0; i < ids.length; i++) {
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && distH2(q, c) <= r * r && Math.abs(q[1] - c[1]) <= 2.6) {
+          if (q && distH2(q, c) <= r * r && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
             damage(id, 44, pid, itemName);
             eff(id, "Slowness", 4000, { inbuiltLevel: 3 });
@@ -633,7 +652,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && distH2(q, c) <= 4.0 && Math.abs(q[1] - c[1]) <= 2.8) {
+          if (q && distH2(q, c) <= 16.0 && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
             damage(id, 48, pid, itemName);
             impulse(id, d[0] * 1.1, 0.7, d[2] * 1.1);
@@ -900,7 +919,7 @@
           const id = ids[i];
           if (seen[id]) continue;
           const q = posOf(id);
-          if (q && dist2(q, p) <= 6.2) {
+          if (q && dist2(q, p) <= 20.0) {
             seen[id] = 1;
             damage(id, 52, pid, itemName);
             impulse(id, d[0] * 1.8, 0.65, d[2] * 1.8);

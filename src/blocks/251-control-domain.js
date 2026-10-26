@@ -131,21 +131,41 @@
                   if (n === t.pid) continue;
                   const r = _(n);
                   if (!r) continue;
-                  (e.add(n), a(n, "Slowness", A, 1), a(n, "Weakness", A, 1));
-                  try {
-                    c.setClientOption(
-                      n,
-                      "forcedCameraDirection",
-                      W([t.center[0] - r[0], t.center[1] + 1.5 - r[1], t.center[2] - r[2]]),
-                    );
-                  } catch (t) {}
+                  e.add(n);
                   let o = t.trapped.get(n);
                   if (!o) {
-                    const e = Math.sqrt((r[0] - t.center[0]) ** 2 + (r[2] - t.center[2]) ** 2);
                     o = {
                       a: Math.atan2(r[2] - t.center[2], r[0] - t.center[0]),
-                      r: Math.max(y, Math.min(t.r - 2.5, e)),
+                      r: Math.max(y, Math.min(t.r - 2.5, Math.hypot(r[0] - t.center[0], r[2] - t.center[2]))),
+                      hold: 1,
+                      until: t.t + 40,
+                      nextEff: 0,
                     };
+                    t.trapped.set(n, o);
+                  } else if (o.hold && t.t >= o.until) {
+                    o.hold = 0;
+                    o.until = t.t + 60;
+                    $(n);
+                  } else if (!o.hold && t.t >= o.until) {
+                    o.a = Math.atan2(r[2] - t.center[2], r[0] - t.center[0]);
+                    o.r = Math.max(y, Math.min(t.r - 2.5, Math.hypot(r[0] - t.center[0], r[2] - t.center[2])));
+                    o.hold = 1;
+                    o.until = t.t + 32;
+                  }
+                  if (!o.hold) continue;
+                  if (t.t >= o.nextEff) {
+                    o.nextEff = t.t + 36;
+                    a(n, "Slowness", 1600, { inbuiltLevel: 1 });
+                    a(n, "Weakness", 1600, { inbuiltLevel: 1 });
+                  }
+                  if (t.t % 3 === 0) {
+                    try {
+                      c.setClientOption(
+                        n,
+                        "forcedCameraDirection",
+                        W([t.center[0] - r[0], t.center[1] + 1.5 - r[1], t.center[2] - r[2]]),
+                      );
+                    } catch (t) {}
                   }
                   o.a += 0.05 * M;
                   const s = t.center[0] + o.r * Math.cos(o.a),
@@ -154,7 +174,7 @@
                   try {
                     c.setPosition(n, s, f, i);
                   } catch (t) {}
-                  (t.trapped.set(n, o),
+                  if (t.t % 2 === 0) {
                     point([s, f, i], {
                       tex: "soul_0",
                       count: 2,
@@ -167,7 +187,8 @@
                         [...N, 1],
                         [...O, 0],
                       ],
-                    }));
+                    });
+                  }
                 }
                 for (const n of Array.from(t.trapped.keys()))
                   e.has(n) || ($(n), t.trapped.delete(n));
