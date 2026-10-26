@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-26T18:12:03.509Z",
+  "generatedAt": "2026-10-26T18:55:12.810Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,8 +8,8 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 396030,
-  "packedChars": 200229,
+  "sourceChars": 399284,
+  "packedChars": 201678,
   "compression": "49 %",
   "packCount": 7,
   "packs": [
@@ -88,9 +88,9 @@
       "index": 5,
       "file": "pack-05.js",
       "z": 100006,
-      "chars": 30613,
-      "payloadChars": 30580,
-      "hash": "f4f9e0e1",
+      "chars": 30983,
+      "payloadChars": 30950,
+      "hash": "a20bb96f",
       "modules": 5,
       "sources": [
         "220-tiger-form.js",
@@ -104,9 +104,9 @@
       "index": 6,
       "file": "pack-06.js",
       "z": 100007,
-      "chars": 24167,
-      "payloadChars": 24134,
-      "hash": "944b77a8",
+      "chars": 24707,
+      "payloadChars": 24674,
+      "hash": "0d87f1ae",
       "modules": 2,
       "sources": [
         "300-common-uncommon-plus.js",
@@ -117,9 +117,9 @@
       "index": 7,
       "file": "pack-07.js",
       "z": 100008,
-      "chars": 26403,
-      "payloadChars": 26370,
-      "hash": "06f67a87",
+      "chars": 26942,
+      "payloadChars": 26909,
+      "hash": "5fd1d5a4",
       "modules": 2,
       "sources": [
         "310-rare-legendary-plus.js",

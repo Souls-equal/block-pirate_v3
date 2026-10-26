@@ -263,32 +263,70 @@ export function lifeforms(exclude) {
     return out;
 }
 
+const HITBOX_PAD = 1.35;
+const BODY_LOW = -0.3;
+const BODY_HIGH = 2.0;
+
+function gatherTargets(min, max, exclude) {
+    const out = [];
+    const seen = new Set();
+    if (exclude) seen.add(exclude);
+    const all = lifeforms(exclude);
+    for (let i = 0; i < all.length; i++) {
+        const id = all[i];
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        out.push(id);
+    }
+    const rect = entitiesIn(min, max);
+    for (let i = 0; i < rect.length; i++) {
+        const id = rect[i];
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        out.push(id);
+    }
+    return out;
+}
+
 export function inSphere(center, radius, cb) {
-    const r2 = radius * radius;
-    const list = entitiesIn(
-        [center[0] - radius, center[1] - radius, center[2] - radius],
-        [center[0] + radius, center[1] + radius, center[2] + radius]
+    const effR = radius + HITBOX_PAD;
+    const r2 = effR * effR;
+    const list = gatherTargets(
+        [center[0] - effR, center[1] - effR - 2, center[2] - effR],
+        [center[0] + effR, center[1] + effR + 2, center[2] + effR]
     );
     for (let i = 0; i < list.length; i++) {
         const id = list[i];
         if (!isAliveId(id) || safeEntityType(id) === "NPC") continue;
         const p = posOf(id);
-        if (p && dist2(p, center) <= r2) cb(id, p);
+        if (!p) continue;
+        const cy = Math.max(p[1] + BODY_LOW, Math.min(p[1] + BODY_HIGH, center[1]));
+        const dx = p[0] - center[0], dy = cy - center[1], dz = p[2] - center[2];
+        if (dx * dx + dy * dy + dz * dz <= r2) cb(id, p);
     }
 }
 
 export function inCylinder(center, radius, height, cb, floorDrop) {
-    const r2 = radius * radius;
-    const drop = floorDrop === undefined ? 2 : floorDrop;
-    const list = entitiesIn(
-        [center[0] - radius, center[1] - drop, center[2] - radius],
-        [center[0] + radius, center[1] + height, center[2] + radius]
+    const effR = radius + HITBOX_PAD;
+    const r2 = effR * effR;
+    const drop = (floorDrop === undefined ? 2.5 : floorDrop) + 1.2;
+    const top = (height === undefined ? 3.0 : height) + 1.4;
+    const list = gatherTargets(
+        [center[0] - effR, center[1] - drop - 2, center[2] - effR],
+        [center[0] + effR, center[1] + top + 2, center[2] + effR]
     );
     for (let i = 0; i < list.length; i++) {
         const id = list[i];
         if (!isAliveId(id) || safeEntityType(id) === "NPC") continue;
         const p = posOf(id);
-        if (p && distH2(p, center) <= r2 && p[1] - center[1] >= -drop && p[1] - center[1] <= height) cb(id, p);
+        if (!p) continue;
+        if (
+            distH2(p, center) <= r2 &&
+            p[1] + BODY_HIGH >= center[1] - drop &&
+            p[1] + BODY_LOW <= center[1] + top
+        ) {
+            cb(id, p);
+        }
     }
 }
 
@@ -296,6 +334,7 @@ export function hitArea(center, radius, caster, item, dmg, opts) {
     const o = opts || {};
     let count = 0;
     const run = (id, p) => {
+        if (id === caster) return;
         count++;
         if (damage(id, dmg, caster, item)) {
             if (o.knock || o.lift) {
@@ -315,11 +354,13 @@ export function hitArea(center, radius, caster, item, dmg, opts) {
 
 export function hitSeg(a, b, radius, caster, item, dmg, opts) {
     const o = opts || {};
-    const r2 = radius * radius;
-    const pad = radius + 1.2;
-    const list = entitiesIn(
+    const effR = radius + HITBOX_PAD;
+    const r2 = effR * effR;
+    const pad = effR + 2.0;
+    const list = gatherTargets(
         [Math.min(a[0], b[0]) - pad, Math.min(a[1], b[1]) - pad, Math.min(a[2], b[2]) - pad],
-        [Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad, Math.max(a[2], b[2]) + pad]
+        [Math.max(a[0], b[0]) + pad, Math.max(a[1], b[1]) + pad, Math.max(a[2], b[2]) + pad],
+        caster
     );
     let count = 0;
     let best = { t: 1, c: b };
@@ -329,11 +370,17 @@ export function hitSeg(a, b, radius, caster, item, dmg, opts) {
         if (id === caster || !isAliveId(id) || safeEntityType(id) === "NPC") continue;
         const p = safePosition(id);
         if (!p) continue;
-        const s = segDist([p[0], p[1] + 0.9, p[2]], a, b);
+        const s0 = segDist([p[0], p[1] + 0.25, p[2]], a, b);
+        const s1 = segDist([p[0], p[1] + 1.0, p[2]], a, b);
+        const s2 = segDist([p[0], p[1] + 1.75, p[2]], a, b);
+        let s = s0.d2 <= s1.d2 ? s0 : s1;
+        if (s2.d2 < s.d2) s = s2;
         if (s.d2 > r2) continue;
         count++;
         seen[id] = 1;
-        damage(id, dmg, caster, item);
+        if (dmg > 0) damage(id, dmg, caster, item);
+        if (o.slow) eff(id, "Slowness", o.slow[0], { inbuiltLevel: o.slow[1] || 1 });
+        if (o.effect) eff(id, o.effect[0], o.effect[1], { inbuiltLevel: o.effect[2] || 1 });
         if (o.knock || o.lift) {
             const dir = [b[0] - a[0], 0, b[2] - a[2]];
             const h = Math.sqrt(dir[0] * dir[0] + dir[2] * dir[2]) || 1;

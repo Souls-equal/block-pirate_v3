@@ -2,7 +2,7 @@
 
 Généré par `npm run build:blocks`. Sources lisibles : `src/blocks/`.
 
-**36 fichiers sources → 7 Code Blocks** (396 030 → 200 229 caractères, -49 %).
+**36 fichiers sources → 7 Code Blocks** (399 284 → 201 678 caractères, -49 %).
 
 Colle **le contenu entier** de chaque `pack-XX.js` dans UN Code Block du monde,
 à x=100000, y=100000, z indiqué ci-dessous (blocs consécutifs).
@@ -14,9 +14,9 @@ L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.
 | `pack-02.js` | `100003` | 30 130 | flame, blade, ghost, creation, magma |
 | `pack-03.js` | `100004` | 31 429 | lightning, dark, dought, portal, pain, song, tiger mark |
 | `pack-04.js` | `100005` | 30 253 | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
-| `pack-05.js` | `100006` | 30 613 | tiger form, control state, control domain, control slash, control shambles |
-| `pack-06.js` | `100007` | 24 167 | common uncommon plus, mythical apex plus |
-| `pack-07.js` | `100008` | 26 403 | rare legendary plus, legendary mythical plus |
+| `pack-05.js` | `100006` | 30 983 | tiger form, control state, control domain, control slash, control shambles |
+| `pack-06.js` | `100007` | 24 707 | common uncommon plus, mythical apex plus |
+| `pack-07.js` | `100008` | 26 942 | rare legendary plus, legendary mythical plus |
 
 ## Modifier un fruit
 

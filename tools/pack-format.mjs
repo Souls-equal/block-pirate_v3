@@ -160,6 +160,7 @@ export function uncensorBlockCode(code, extraSafe = false) {
       .replace(/([A-Za-z0-9_$])\[([A-Za-z_$][A-Za-z0-9_$]*)\]/g, "$1[ $2 ]")
       .replace(/\b([A-Za-z])([.,=])([fF])\b/g, "$1 $2 $3")
       .replace(/\b([A-Za-z])([(\[])([fF])\b/g, "$1$2 $3")
+      .replace(/(\]|&&|\|\|)=?([fF])\(/g, (m) => m.replace(/([fF])\(/, " $1("))
       .replace(/\b([fF])([.,=*+\-/])([uUkKcCfF])\b/g, "$1 $2 $3")
       .replace(/\b([fF])([(\[])([uUkKcCfF])\b/g, "$1$2 $3")
       .replace(/\b([sSkKpP])\*(\1)\b/gi, "$1 * $2");
