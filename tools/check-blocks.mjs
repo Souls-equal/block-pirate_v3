@@ -9,10 +9,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
-import { parseBlock, MARKER, fnv1a } from "../src/fruit/pack-format.js";
-import { HANDLER_NAMES } from "../src/fruit/handler-names.js";
+import { parseBlock, MARKER, fnv1a } from "./pack-format.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const funcAbilitiesCode = fs.readFileSync(path.join(ROOT, "src/fruit/func-abilities.js"), "utf8");
+const HANDLER_NAMES = [...funcAbilitiesCode.matchAll(/=\s*shim\("([A-Za-z0-9_]+)"\)/g)].map(
+  (m) => m[1],
+);
 const OUT = path.join(ROOT, "code-blocks");
 const SRC = path.join(ROOT, "src/blocks");
 const read = (p) => fs.readFileSync(p, "utf8");
@@ -115,7 +118,12 @@ function makeHelpers(api) {
   );
 }
 
-const { createBlockLoader } = await import("../src/fruit/code-block-loader.js");
+const standaloneLoaderSrc = funcAbilitiesCode
+  .replace(/^import \* as (\w+) from "[^"]+";$/gm, "const $1 = {};")
+  .replace(/^export \{ markAggro \} from "[^"]+";$/gm, "export const markAggro = () => {};");
+const { createBlockLoader } = await import(
+  "data:text/javascript;base64," + Buffer.from(standaloneLoaderSrc, "utf8").toString("base64")
+);
 
 function runScenario(map, label, tune = () => {}) {
   for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"])

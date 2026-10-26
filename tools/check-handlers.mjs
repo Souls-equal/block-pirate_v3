@@ -10,10 +10,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_BLOCKS = path.join(ROOT, "src/blocks");
 const read = (p) => fs.readFileSync(p, "utf8");
 
-const namesFile = read(path.join(ROOT, "src/fruit/handler-names.js"));
-const expected = [...namesFile.matchAll(/^\s*"([A-Za-z0-9_]+)",/gm)].map((m) => m[1]);
-
 const shimFile = read(path.join(ROOT, "src/fruit/func-abilities.js"));
+const expected = [...shimFile.matchAll(/=\s*shim\("([A-Za-z0-9_]+)"\)/g)].map((m) => m[1]);
 const shims = new Set([
   ...[...shimFile.matchAll(/export const ([A-Za-z0-9_]+)\s*=/g)].map((m) => m[1]),
   ...[...shimFile.matchAll(/export \{ ([A-Za-z0-9_]+)/g)].map((m) => m[1]),

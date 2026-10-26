@@ -92,7 +92,7 @@ try {
 console.log(`World Code lisible (bundle) : ${fullChars.toLocaleString("fr-FR")} car.`);
 console.log(`World Code minifié          : ${minChars.toLocaleString("fr-FR")} car. ` +
   `(${Math.round((minChars / WORLD_LIMIT) * 100)} % des ${WORLD_LIMIT.toLocaleString("fr-FR")} autorisés)`);
-console.log(`→ dist/world.js (généré, ignoré par git)`);
+console.log(`→ dist/world.js (optionnel, ignoré par git)`);
 if (blockChars)
   console.log(`Code Blocks (packs)         : ${blockChars.toLocaleString("fr-FR")} car.`);
 if (missing.size)
