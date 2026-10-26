@@ -69,8 +69,8 @@ function pruneDeadMobs(now) {
 
 const META_PREFIX = "mobreward|";
 
-function buildMobMeta(level, rank, xpReward, moneyMin, moneyMax) {
-    return META_PREFIX + level + "|" + rank + "|" + xpReward + "|" + moneyMin + "|" + moneyMax;
+function buildMobMeta(level, rank, xpReward, moneyMin, moneyMax, name) {
+    return META_PREFIX + level + "|" + rank + "|" + xpReward + "|" + moneyMin + "|" + moneyMax + "|" + (name || "");
 }
 
 function readMobMeta(mobId) {
@@ -89,7 +89,8 @@ function readMobMeta(mobId) {
             rank: parseInt(parts[2], 10) || 1,
             xp: parseInt(parts[3], 10) || 0,
             moneyMin: parseInt(parts[4], 10) || 1,
-            moneyMax: parseInt(parts[5], 10) || 1
+            moneyMax: parseInt(parts[5], 10) || 1,
+            name: parts[6] ? parts.slice(6).join("|") : null
         };
         if (data.moneyMax < data.moneyMin) data.moneyMax = data.moneyMin;
         if (data.xp > 0) return data;
@@ -155,7 +156,7 @@ function recoverMobData(mobId) {
     if (!data) data = dataFromMaxHealth(mobId);
     if (!data || !(data.level >= 1)) return null;
 
-    data.name = safeMobName(mobId);
+    if (!data.name) data.name = safeMobName(mobId);
     mobData[mobId] = data;
     return data;
 }
@@ -239,7 +240,7 @@ export function spawnEnemy(callerId, pos, type, name, amount, level, rank) {
             name: fullName
         };
 
-        try { api.setMobSetting(mobId, "metaInfo", buildMobMeta(level, rank, xpReward, moneyMin, moneyMax)) } catch (e) {}
+        try { api.setMobSetting(mobId, "metaInfo", buildMobMeta(level, rank, xpReward, moneyMin, moneyMax, fullName)) } catch (e) {}
 
         api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
           subtitle: [
@@ -319,6 +320,9 @@ export function killdMob(playerId, mobId) {
         try { api.log("[spawning] killdMob fallback used for " + mobId + " -> lvl " + estLevel); } catch (e) {}
     }
 
+    const resolvedName = (data && data.name && data.name !== "Mob" ? data.name : null) || safeMobName(mobId);
+    if (resolvedName) deadMobName[mobId] = { name: resolvedName, at: Date.now() };
+
     delete mobData[mobId];
     delete deadMobData[mobId];
 
@@ -345,18 +349,23 @@ export function killdMob(playerId, mobId) {
         {str:"✨ +"+xp+" XP  ",style:{color:"#00ffff"}},
     ]);
 
-    return safeMobName(mobId) || data.name || null;
+    return resolvedName || data.name || null;
 };
 
 function safeMobName(mobId) {
-    try {
-        const n = api.getEntityName(mobId);
-        if (n) return n;
-    } catch (e) {}
+    const cached = mobData[mobId] || deadMobData[mobId] || deadMobName[mobId];
+    if (cached && cached.name && cached.name !== "Mob") return cached.name;
     try {
         const n = api.getMobSetting(mobId, "name", false);
         if (typeof n === "string" && n) return n;
+    } catch (e) {}
+    try {
+        const n = api.getMobSetting(mobId, "name");
+        if (typeof n === "string" && n) return n;
     } catch (e2) {}
-    const cached = deadMobName[mobId] || deadMobData[mobId] || mobData[mobId];
+    try {
+        const n = api.getEntityName(mobId);
+        if (n) return n;
+    } catch (e3) {}
     return (cached && cached.name) || null;
 }

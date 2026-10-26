@@ -39,6 +39,31 @@ export function refreshAliveCache(force) {
 
 /* CHECKS — FIX: fallback sur safeHealth pour éviter faux négatif du cache */
 
+export function isMobEntityType(type) {
+    if (!type || typeof type !== "string") return false;
+    if (
+        type === "Player" ||
+        type === "PLAYER" ||
+        type === "NPC" ||
+        type === "Item" ||
+        type === "Mesh"
+    ) {
+        return false;
+    }
+    const low = type.toLowerCase();
+    if (
+        low === "player" ||
+        low === "npc" ||
+        low === "item" ||
+        low === "mesh" ||
+        low.indexOf("throw") !== -1 ||
+        low.indexOf("proj") !== -1
+    ) {
+        return false;
+    }
+    return true;
+}
+
 export function isPlayerAlive(id) {
     if (!id) return false;
     refreshAliveCache();
@@ -60,7 +85,7 @@ export function isMobAlive(id) {
     if (state.mobs.has(id)) return true;
     try {
         const t = api.getEntityType(id);
-        if (t === "MOB") {
+        if (isMobEntityType(t)) {
             const h = api.getHealth(id);
             if (typeof h === "number" && h > 0) return true;
         }
@@ -76,9 +101,9 @@ export function isAliveId(id) {
     try {
         const h = api.getHealth(id);
         if (typeof h === "number" && h > 0) return true;
-        // même si vie 0, si type MOB/PLAYER et lisible, on considère vivant pour le hit
+        // même si vie 0, si type mob ou Player et lisible, on considère vivant pour le hit
         const tp = api.getEntityType(id);
-        if (tp === "MOB" || tp === "PLAYER") return true;
+        if (tp === "Player" || isMobEntityType(tp)) return true;
     } catch (e) {}
     return false;
 }

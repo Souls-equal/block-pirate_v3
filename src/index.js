@@ -14,8 +14,8 @@ import { itemJoin as z } from "./gameplay/customItem";
 import { clearPlayerEffects as V } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
-import { claimKill as mt, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
-import { forgetAliveId as dt, getAlivePlayerIds as gt, refreshAliveCache as ht } from "./utils/lifeform";
+import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
+import { forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
 import { tickLayer as Ct, onPlayerJoinLayer as Dt, onPlayerClickLayer as At } from "./build/layer";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
@@ -79,6 +79,7 @@ function isNPCEntity(t) {
 }
 
 $(), x(), rt(H), yt(E), ct((t, r, a) => {
+    Gt("bossKill", () => Ft(t, r));
     let i = a || null;
     Gt("kill", () => {
         i = j(t, r) || i;
@@ -166,14 +167,14 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     }
     dt(t);
 }, onPlayerKilledMob = (t, r, a, i) => {
-    Ft(t, r, a, i);
     let e = t;
     if (!e) try {
-        const t = st(r);
-        e = t && t.killerId || null;
+        const d = st(r);
+        e = d && d.killerId || null;
     } catch (t) {
         e = null, _t("getLastDamager", t);
     }
+    Ft(e || t, r, a, i);
     if (!e || !r) {
         try {
             lt(r);
@@ -182,26 +183,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         }
         return void dt(r);
     }
-    if (!mt(r, e)) {
-        try {
-            lt(r);
-        } catch (t) {
-            _t("onPlayerKilledMob.forgetDamager(claim)", t);
-        }
-        return void dt(r);
-    }
-    let o = null;
-    Gt("kill", () => {
-        o = j(e, r);
-    }), o && Gt("quest", () => L(e, o)), Gt("sidebar", () => {
-        K(e);
-    });
-    try {
-        lt(r);
-    } catch (t) {
-        _t("onPlayerKilledMob.forgetDamager(fin)", t);
-    }
-    dt(r);
+    CtKill(e, r);
 }, onPlayerChat = (t, r, i) => a(t, r, i), playerCommand = (t, a) => {
     let i = null;
     try {
@@ -229,6 +211,14 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onWorldAttemptSpawnMob = (t, r, a, i) => {
     if ([ "Pig", "Sheep", "Cow", "Stag", "Deer", "Wolf", "Horse", "Bear", "Gold Watermelon Stag" ].includes(t)) return "preventSpawn";
 }, onMobDespawned = t => {
+    try {
+        const last = st(t);
+        if (last && last.killerId && Date.now() - last.at <= 30000) {
+            CtKill(last.killerId, t);
+        }
+    } catch (e) {
+        _t("onMobDespawned.creditKill", e);
+    }
     O(t), B(t);
     try {
         lt(t);
@@ -239,6 +229,29 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         ut(t);
     } catch (t) {
         _t("onMobDespawned.releaseKill", t);
+    }
+    dt(t);
+}, onEntityDeleted = (t, r) => {
+    if (!t) return;
+    if (r && !isMobType(r)) return;
+    try {
+        const last = st(t);
+        if (last && last.killerId && Date.now() - last.at <= 30000) {
+            CtKill(last.killerId, t);
+        }
+    } catch (e) {
+        _t("onEntityDeleted.creditKill", e);
+    }
+    O(t), B(t);
+    try {
+        lt(t);
+    } catch (e) {
+        _t("onEntityDeleted.forgetDamager", e);
+    }
+    try {
+        ut(t);
+    } catch (e) {
+        _t("onEntityDeleted.releaseKill", e);
     }
     dt(t);
 }, onWorldAttemptDespawnMob = t => F(t) ? "preventDespawn" : Ot(t), onEntityCollision = (t, r) => b(t, r);

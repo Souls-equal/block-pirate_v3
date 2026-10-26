@@ -1,7 +1,7 @@
 //utils/haki.js
 import { getRandomPosition, spawnBoss } from "./boss";
 import { point, TEX } from "./fx";
-import { posOf } from "./lifeform";
+import { isMobEntityType, posOf } from "./lifeform";
 import { getTotalMoney, payMoney } from "./data";
 
 const HK_CLICK = "Small Black Pod";
@@ -224,8 +224,10 @@ function hakiBossStart(playerId, posA, posB) {
     // 🧹 Cleanup mobs SEULEMENT si personne dans la zone
     if (playersInZone.length === 0) {
         for (const entity of api.getEntitiesInRect(posA, posB)) {
-            if (api.getEntityType(entity) === "Mob") {
-                api.deleteEntity(entity);
+            if (isMobEntityType(api.getEntityType(entity))) {
+                try { api.despawnMob(entity); } catch (e) {
+                    try { api.deleteEntity(entity); } catch (e2) {}
+                }
             }
         }
     }
