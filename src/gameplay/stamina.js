@@ -1,6 +1,6 @@
 // stamina.js
 
-import { setInterval } from "./utils/timer";
+import { setInterval } from "../utils/timer";
 
 /* PARAMÈTRES — modifiez tout ici */
 export const STAMINA_CONFIG = {

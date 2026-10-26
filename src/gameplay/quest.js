@@ -1,7 +1,7 @@
 // quest.js
 
-import { addStat, addXP, changeMoney, deleteStat, getStat, setStat } from "./utils/data";
-import { updateSidebar } from "./UI";
+import { addStat, addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data";
+import { updateSidebar } from "../core/UI";
 import { computeQuestReward, spawnEnemy } from "./spawning";
 
 export const quests = {

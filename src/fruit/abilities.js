@@ -1,6 +1,6 @@
 // fruit/abilities.js
 
-import { getFruit } from "../fruit";
+import { getFruit } from "./index";
 import {
     isImmuneToDamage,
     markAggro,

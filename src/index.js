@@ -1,19 +1,19 @@
-import { canDamage as t, crewCommands as r, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./team";
+import { canDamage as t, crewCommands as r, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, restorePlayerFruit as g } from "./fruit";
 import { FRUIT_ABILITIES as h, abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
-import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./UI"; 
-import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./quest";
-import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./NPCs";
-import { ensureMobData as E, forgetMob as O, killdMob as j } from "./spawning";
+import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./core/UI"; 
+import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
+import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
+import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, step as W } from "./utils/timer";
-import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./stats";
-import { assignRank as G, clearRankCache as Y } from "./ranks";
+import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
+import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
-import { itemJoin as z } from "./customItem";
+import { itemJoin as z } from "./gameplay/customItem";
 import { clearPlayerEffects as V } from "./utils/combat";
-import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./codes";
-import { STAMINA_CONFIG as tt, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./stamina";
+import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
+import { STAMINA_CONFIG as tt, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { forgetAliveId as dt, getAlivePlayerIds as gt, refreshAliveCache as ht } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -22,7 +22,7 @@ import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from 
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/plane";
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki.js";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
-import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./admin";
+import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 
 const xt = {};
 

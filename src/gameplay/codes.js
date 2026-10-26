@@ -1,7 +1,7 @@
 // codes.js
 
-import { changeMoney, getStat, setStat } from "./utils/data";
-import { applyEffect } from "./utils/combat";
+import { changeMoney, getStat, setStat } from "../utils/data";
+import { applyEffect } from "../utils/combat";
 
 const CATEGORY_KEY = "code"
 const CLAIMED_KEY = "codeRedeem"
