@@ -110,7 +110,7 @@
           p[2] + fr.r[2] * side + fr.f[2] * 1.1,
         ];
         const dir = fr.f;
-        sound.at(pid, "cannonFire3", 0.55, 1.35 + shot * 0.12, 18);
+        sound.at(pid, "cannonFire2", 0.7, 1.35 + shot * 0.12, 20);
         shot++;
         let stepIdx = 0;
         run({
@@ -160,7 +160,7 @@
   function onPlayerClickPropellerFlight(pid, itemName) {
     const p0 = posOf(pid);
     if (!p0) return true;
-    sound.at(pid, "cannonFire3", 0.55, 1.5, 18);
+    sound.at(pid, "bigDrumSwish2", 0.75, 1.35, 20);
     let t = 0;
     run({
       next: function () {
@@ -199,7 +199,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const d = flatDir(pid);
-    sound.at(pid, "cannonFire3", 0.55, 1.35, 18);
+    sound.at(pid, "bigDrumSwish1", 0.75, 1.25, 20);
     const seen = {};
     let stepIdx = 0;
     run({
@@ -247,7 +247,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const d = facing(pid);
-    sound.at(pid, "cannonFire3", 0.65, 1.25, 20);
+    sound.at(pid, "magicAccent3", 0.75, 1.3, 20);
     ring([p[0], p[1] + 0.2, p[2]], 1.6, 8, {
       tex: TEX.square,
       life: [0.2, 0.4],
@@ -284,7 +284,7 @@
               [[180, 40, 90, 0], [255, 140, 180, 0]],
             ],
           });
-          sound.at(q, "cannonFire3", 0.75, 0.85, 20);
+          sound.at(q, "cannonFire1", 0.85, 0.85, 22);
           hitArea(q, 3.6, pid, itemName, 36, { height: 2.8 });
           pushOut(q, 3.6, pid, 1.4, 0.6);
           return { done: true };
@@ -300,7 +300,7 @@
   function onPlayerClickLandmineField(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
-    sound.at(pid, "cannonFire3", 0.55, 1.1, 18);
+    sound.at(pid, "magicAccent1", 0.7, 1.15, 20);
     const mines = [
       [p[0] + 2.8, p[1] + 0.2, p[2]],
       [p[0] - 2.8, p[1] + 0.2, p[2]],
@@ -338,7 +338,7 @@
             hitArea(m, 2.8, pid, itemName, 34, { height: 2.6 });
             pushOut(m, 2.8, pid, 1.3, 0.55);
           }
-          sound.at(p, "cannonFire3", 0.85, 0.75, 22);
+          sound.at(p, "cannonFire2", 0.9, 0.75, 24);
           return { done: true };
         }
         return { value: sleep(3), done: false };
@@ -355,7 +355,7 @@
     const d = facing(pid);
     const from = [p[0], p[1] + 1.1, p[2]];
     const tip = [from[0] + d[0] * 10, from[1] + d[1] * 10, from[2] + d[2] * 10];
-    sound.at(pid, "cannonFire3", 0.55, 1.15, 18);
+    sound.at(pid, "bigDrumSwish1", 0.75, 1.1, 20);
     for (let i = 1; i <= 5; i++) {
       const k = i / 5;
       point([from[0] + (tip[0] - from[0]) * k, from[1] + (tip[1] - from[1]) * k, from[2] + (tip[2] - from[2]) * k], {
@@ -384,7 +384,7 @@
     const p0 = posOf(pid);
     if (!p0) return true;
     const d = flatDir(pid);
-    sound.at(pid, "cannonFire3", 0.6, 1.2, 18);
+    sound.at(pid, "bigDrumSwish2", 0.75, 1.15, 20);
     const seen = {};
     let t = 0;
     run({
@@ -427,7 +427,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const fr = frame(facing(pid));
-    sound.at(pid, "cannonFire3", 0.55, 1.45, 18);
+    sound.at(pid, "critical_hit", 0.75, 1.35, 20);
     const seen = {};
     for (let k = -2; k <= 2; k++) {
       const ang = k * 0.16;
@@ -550,7 +550,7 @@
     if (!p) return true;
     const target = aimSpot(pid, 13);
     if (!target) return true;
-    sound.at(pid, "cannonFire3", 0.65, 1.55, 20);
+    sound.at(pid, "glass1", 0.8, 1.35, 22);
     for (let i = -1; i <= 1; i++) {
       const origin = [p[0] + i * 0.9, p[1] + 2.4, p[2] + i * 0.5];
       seg(origin, target, {
@@ -583,7 +583,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const d = flatDir(pid);
-    sound.at(pid, "cannonFire3", 0.7, 1.35, 20);
+    sound.at(pid, "magicAccent1", 0.8, 1.2, 22);
     const seen = {};
     let stepIdx = 0;
     run({
@@ -743,7 +743,7 @@
   function onPlayerClickBlackHole(pid, itemName) {
     const c = aimSpot(pid, 9);
     if (!c) return true;
-    sound.at(c, "cannonFire3", 0.75, 0.55, 22);
+    sound.at(c, "pulseFromTheDark", 0.85, 0.75, 24);
     let t = 0;
     run({
       next: function () {
@@ -787,7 +787,7 @@
   function onPlayerClickDarkLiberation(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
-    sound.at(pid, "cannonFire3", 0.75, 0.7, 22);
+    sound.at(pid, "pulseFromTheDark", 0.85, 0.95, 24);
     for (let i = 0; i < 5; i++) {
       const a = i * GOLDEN * 1.3;
       const spot = [p[0] + Math.cos(a) * 3.4, p[1] + 0.4, p[2] + Math.sin(a) * 3.4];
@@ -936,7 +936,7 @@
   function onPlayerClickPrismReflect(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
-    sound.at(pid, "cannonFire3", 0.75, 1.6, 22);
+    sound.at(pid, "glass1", 0.85, 1.4, 24);
     eff(pid, "Damage Reduction", 6000, { inbuiltLevel: 3 });
     ring([p[0], p[1] + 1.0, p[2]], 3.6, 10, {
       tex: TEX.glint,

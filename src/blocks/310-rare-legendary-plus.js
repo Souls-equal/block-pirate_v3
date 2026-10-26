@@ -92,7 +92,7 @@
         const a = volley * 1.57;
         const from = [p[0] + Math.cos(a) * 1.4, p[1] + 2.4, p[2] + Math.sin(a) * 1.4];
         const spot = [tgt[0] + Math.cos(a * 2) * 1.1, tgt[1], tgt[2] + Math.sin(a * 2) * 1.1];
-        sound.at(pid, "cannonFire3", 0.55, 1.65, 22);
+        sound.at(pid, "magicAccent1", 0.7, 1.55 + volley * 0.08, 22);
         seg(from, spot, {
           r: 0.14,
           tex: TEX.glint,
@@ -128,7 +128,7 @@
     const p = posOf(pid);
     const dst = aimSpot(pid, 11);
     if (!p || !dst) return true;
-    sound.at(p, "cannonFire3", 0.65, 1.75, 22);
+    sound.at(p, "magicAccent3", 0.8, 1.65, 22);
     seg([p[0], p[1] + 1.0, p[2]], [dst[0], dst[1] + 1.0, dst[2]], {
       r: 0.18,
       tex: TEX.glint,
@@ -198,7 +198,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const fr = frame(facing(pid));
-    sound.at(pid, "cannonFire3", 0.7, 1.25, 20);
+    sound.at(pid, "bigDrumSwish1", 0.8, 1.25, 22);
     const seen = {};
     for (let k = -3; k <= 3; k++) {
       const ang = k * 0.28;
@@ -235,7 +235,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const fr = frame(facing(pid));
-    sound.at(pid, "cannonFire3", 0.65, 1.45, 20);
+    sound.at(pid, "pulseFromTheDark", 0.8, 1.35, 22);
     const seen = {};
     let stepIdx = 0;
     run({
@@ -283,7 +283,7 @@
   function onPlayerClickSoulScream(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
-    sound.at(pid, "cannonFire3", 0.75, 1.65, 22);
+    sound.at(pid, "futureStrangePulse", 0.85, 1.5, 24);
     ring([p[0], p[1] + 1.1, p[2]], 4.2, 10, {
       tex: TEX.soul,
       life: [0.25, 0.55],
@@ -306,7 +306,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const d = facing(pid);
-    sound.at(pid, "cannonFire3", 0.85, 0.65, 24);
+    sound.at(pid, "cannonFire2", 0.9, 0.65, 24);
     let stepIdx = 0;
     run({
       next: function () {
@@ -354,7 +354,7 @@
     if (!p) return true;
     const d = facing(pid);
     const c = [p[0] + d[0] * 3.2, p[1] + 1.2 + d[1] * 2.0, p[2] + d[2] * 3.2];
-    sound.at(c, "cannonFire3", 0.95, 0.55, 26);
+    sound.at(c, "cannonFire1", 0.95, 0.55, 26);
     boom(c, 2.6, {
       tex: TEX.glint,
       count: 28,
@@ -443,7 +443,7 @@
     if (!p) return true;
     const d = facing(pid);
     const c = [p[0] + d[0] * 4.0, p[1] + 1.2 + d[1] * 2.2, p[2] + d[2] * 4.0];
-    sound.at(pid, "cannonFire3", 0.85, 0.9, 24);
+    sound.at(pid, "ominousBellHit", 0.9, 1.0, 26);
     ring(c, 3.2, 10, {
       tex: TEX.glint,
       life: [0.22, 0.45],
@@ -508,7 +508,7 @@
     if (!isAliveId(pid)) return false;
     eff(pid, "Damage Reduction", 8000, { inbuiltLevel: 3 });
     eff(pid, "Health Regen", 8000, { inbuiltLevel: 2 });
-    sound.at(pid, "cannonFire3", 0.75, 1.25, 22);
+    sound.at(pid, "ominousBellHit", 0.85, 1.15, 24);
     let t = 0;
     run({
       next: function () {
@@ -570,7 +570,7 @@
     const d = facing(pid);
     const a = [p[0] + d[0] * 1.2, p[1] + 1.2, p[2] + d[2] * 1.2];
     const b = [p[0] + d[0] * 13, p[1] + 1.2 + d[1] * 12, p[2] + d[2] * 13];
-    sound.at(pid, "cannonFire3", 0.65, 1.55, 22);
+    sound.at(pid, "magicAccent4", 0.85, 1.35, 22);
     seg(a, b, {
       r: 0.22,
       tex: TEX.effect,
@@ -669,7 +669,7 @@
   function onPlayerClickHeartCharm(pid, itemName) {
     const p = posOf(pid);
     if (!p) return true;
-    sound.at(pid, "cannonFire3", 0.65, 1.4, 22);
+    sound.at(pid, "magicAccent4", 0.85, 1.2, 22);
     heal(pid, 35);
     eff(pid, "Health Regen", 6000, { inbuiltLevel: 3 });
     ring([p[0], p[1] + 1.0, p[2]], 4.0, 10, {
@@ -794,7 +794,7 @@
     const p = posOf(pid);
     if (!p) return true;
     const fr = frame(facing(pid));
-    sound.at(pid, "cannonFire3", 0.65, 1.65, 22);
+    sound.at(pid, "critical_hit", 0.8, 1.45, 22);
     const seen = {};
     for (let k = -2; k <= 2; k++) {
       const ang = k * 0.13;

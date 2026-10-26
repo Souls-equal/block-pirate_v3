@@ -77,8 +77,10 @@ function onPlayerClickPortal(pid, itemName) {
     const p = posOf(pid);
     if (!p || !isAliveId(pid)) return false;
 
+    sound.at(p, "futureStrangePulse", 0.8, 1.3, 24);
     portalBurst(p[0], p[1] + 0.8, p[2]);
     try { api.setPosition(pid, to[0], to[1], to[2]); } catch (e) { return false; }
+    sound.at(to, "magicAccent3", 0.8, 1.4, 24);
     portalBurst(to[0], to[1] + 0.8, to[2]);
     return true;
 }
@@ -160,6 +162,7 @@ function onPlayerClickPortalRift(pid, itemName) {
 
     const c = [p[0] + d[0] * 1.1, p[1] + 1.55 + d[1] * 1.1, p[2] + d[2] * 1.1];
     rifts[pid] = { pid: pid, item: itemName, d: d, fr: frame(d), hit: {}, trav: 0, c: c };
+    sound.at(c, "futureStrangePulse", 0.85, 0.95, 26);
     portalBurst(c[0], c[1], c[2]);
 
     run({

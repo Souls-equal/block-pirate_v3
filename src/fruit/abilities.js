@@ -191,6 +191,42 @@ function P(color, kind) {
     else return color + " Paintball Explosive Item";
 }
 
+function castUpgrade(pid, effectName, duration, level, soundName, rate) {
+    applyEffect(pid, effectName, duration, { inbuiltLevel: level });
+    try {
+        const p = api.getPosition(pid);
+        if (p) {
+            api.broadcastSound(soundName || "exp_levelup", 0.85, rate || 1.15, {
+                playerIdOrPos: p,
+                maxHearDist: 22,
+            });
+        }
+    } catch (e) {}
+    try {
+        api.animateEntity(pid, {
+            animationDurationMs: 420,
+            loop: false,
+            nodeAnimations: {
+                ArmLeftMesh: {
+                    timeline: [
+                        { timeFraction: 0, rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.45, rotation: { point: [-2.2, 0, -0.35] } },
+                        { timeFraction: 1, rotation: { point: [0, 0, 0] } },
+                    ],
+                },
+                ArmRightMesh: {
+                    timeline: [
+                        { timeFraction: 0, rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.45, rotation: { point: [-2.2, 0, 0.35] } },
+                        { timeFraction: 1, rotation: { point: [0, 0, 0] } },
+                    ],
+                },
+            },
+        });
+    } catch (e) {}
+    return true;
+}
+
 const ABILITY_BINDS = [
     // --- Existing abilities ---
     {
@@ -302,47 +338,47 @@ const ABILITY_BINDS = [
     {
         id: "speed", item: P("Light Blue"), name: "Speed Upgrade", cd: 15000,
         desc: "Get the speed effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Speed", 10000, { inbuiltLevel: 2 })
+        cast: (pid) => castUpgrade(pid, "Speed", 10000, 2, "magicAccent3", 1.35)
     },
     {
         id: "damage", item: P("Red"), name: "Damage Upgrade", cd: 15000,
         desc: "Get the damage effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Damage", 10000, { inbuiltLevel: 2 })
+        cast: (pid) => castUpgrade(pid, "Damage", 10000, 2, "ominousBellHit", 1.2)
     },
     {
         id: "damage_reduc", item: P("Gray"), name: "Protection Upgrade", cd: 15000,
         desc: "Get the damage reduction effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Damage Reduction", 10000, { inbuiltLevel: 2 })
+        cast: (pid) => castUpgrade(pid, "Damage Reduction", 10000, 2, "ominousBellHit", 0.9)
     },
     {
         id: "regen", item: P("Pink"), name: "Regen Upgrade", cd: 15000,
         desc: "Get the health regen effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Health Regen", 10000, { inbuiltLevel: 3 })
+        cast: (pid) => castUpgrade(pid, "Health Regen", 10000, 3, "magicAccent4", 1.25)
     },
     {
         id: "bounce", item: P("Lime"), name: "Bounciness Upgrade", cd: 15000,
         desc: "Get the bounciness effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Bounciness", 10000, { inbuiltLevel: 1 })
+        cast: (pid) => castUpgrade(pid, "Bounciness", 10000, 1, "exp_levelup", 1.35)
     },
     {
         id: "wall", item: P("Cyan"), name: "Wall Climbing Upgrade", cd: 15000,
         desc: "Get the wall climbing effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Wall Climbing", 10000, { inbuiltLevel: 1 })
+        cast: (pid) => castUpgrade(pid, "Wall Climbing", 10000, 1, "magicAccent1", 1.2)
     },
     {
         id: "air", item: P("Light Gray"), name: "Air Walk Upgrade", cd: 15000,
         desc: "Get the air walk effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Air Walk", 10000, { inbuiltLevel: 1 })
+        cast: (pid) => castUpgrade(pid, "Air Walk", 10000, 1, "magicAccent3", 1.45)
     },
     {
         id: "jump", item: P("Green"), name: "Jump Boost Upgrade", cd: 15000,
         desc: "Get the jump boost effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Jump Boost", 10000, { inbuiltLevel: 2 })
+        cast: (pid) => castUpgrade(pid, "Jump Boost", 10000, 2, "bigDrumSwish1", 1.25)
     },
     {
         id: "invisible", item: P("White"), name: "Invisible Upgrade", cd: 15000,
         desc: "Get the invisible effect for a certain time.",
-        cast: (pid) => applyEffect(pid, "Invisible", 10000, { inbuiltLevel: 2 })
+        cast: (pid) => castUpgrade(pid, "Invisible", 10000, 2, "futureStrangePulse", 1.35)
     },
     {
         id: "domainOfSpeed", item: P("Blue", "Sticky"), name: "Domain of Speed", cd: 10000,
@@ -1201,6 +1237,11 @@ export function abilityJoin(playerId) {
 }
 
 export function abilityLeave(playerId) {
+    try {
+        if (globalThis.FA && globalThis.FA.clearMythic) {
+            globalThis.FA.clearMythic(playerId);
+        }
+    } catch (e) {}
     for (const fruitName in FRUIT_ABILITIES) {
         const onLeave = FRUIT_ABILITIES[fruitName].hooks && FRUIT_ABILITIES[fruitName].hooks.onLeave;
         if (onLeave) { try { onLeave(playerId); } catch (e) { api.log("ability leave " + fruitName + ": " + e); } }

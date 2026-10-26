@@ -62,7 +62,11 @@ function rocket_co(tid) {
 }
 
 function onPlayerClickRocket(playerId, itemName, alt, x, y, z, block, target) {
-    if (!target) return true;
+    if (!target) {
+        sound.at(playerId, "cannonFire2", 0.75, 1.15, 22);
+        return true;
+    }
+    sound.at(target, "cannonFire2", 0.85, 0.95, 24);
     impulse(target, 0, IMP, 0);
     const p = posOf(target);
     if (p) ignite(p[0], p[1] + SMOKE_Y, p[2]);
@@ -128,6 +132,7 @@ function onPlayerClickJumpBeacon(playerId, itemName) {
 
     setBlock(px, py, pz, PAD);
     const cx = px + 0.5, cy = py + 1.05, cz = pz + 0.5;
+    sound.at([cx, cy, cz], "futureStrangePulse", 0.8, 1.25, 22);
     padBurst(cx, py + 0.2, cz);
     beam(cx, cy, cz);
     run(beamCo(cx, cy, cz));

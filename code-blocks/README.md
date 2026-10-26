@@ -2,7 +2,7 @@
 
 Généré par `npm run build:blocks`. Sources lisibles : `src/blocks/`.
 
-**36 fichiers sources → 7 Code Blocks** (399 284 → 201 678 caractères, -49 %).
+**36 fichiers sources → 8 Code Blocks** (438 894 → 222 896 caractères, -49 %).
 
 Colle **le contenu entier** de chaque `pack-XX.js` dans UN Code Block du monde,
 à x=100000, y=100000, z indiqué ci-dessous (blocs consécutifs).
@@ -10,13 +10,14 @@ L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.
 
 | Pack | z | Caractères | Fruits / modules |
 | --- | --- | --- | --- |
-| `pack-01.js` | `100002` | 27 234 | spring, ice, quakes, light, rocket, paintballs, smoke, rubber, diamond, gas |
-| `pack-02.js` | `100003` | 30 130 | flame, blade, ghost, creation, magma |
-| `pack-03.js` | `100004` | 31 429 | lightning, dark, dought, portal, pain, song, tiger mark |
+| `pack-01.js` | `100002` | 27 971 | spring, ice, quakes, light, rocket, paintballs, portal, diamond, pain, gas |
+| `pack-02.js` | `100003` | 30 463 | flame, blade, ghost, creation, magma |
+| `pack-03.js` | `100004` | 31 424 | lightning, dark, dought, smoke, rubber, song, tiger mark |
 | `pack-04.js` | `100005` | 30 253 | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
 | `pack-05.js` | `100006` | 30 983 | tiger form, control state, control domain, control slash, control shambles |
-| `pack-06.js` | `100007` | 24 707 | common uncommon plus, mythical apex plus |
-| `pack-07.js` | `100008` | 26 942 | rare legendary plus, legendary mythical plus |
+| `pack-06.js` | `100007` | 26 252 | common uncommon plus, rare legendary plus |
+| `pack-07.js` | `100008` | 22 193 | legendary mythical plus |
+| `pack-08.js` | `100009` | 23 357 | mythical apex plus |
 
 ## Modifier un fruit
 

@@ -201,6 +201,14 @@ export function activateFruit(t) {
   } catch (t) {
     return (f("consumeFruitItem.removeItemName", t, i), !1);
   }
+  try {
+    api.setPlayerDbValue(t, "fruit", r);
+  } catch (t) {
+    f("activateFruit.setPlayerDbValue", t);
+  }
+  try {
+    api.playSound(t, "exp_levelup", 0.7, 1.15);
+  } catch (t) {}
   (d.set(t, r),
     (function (t) {
       try {
@@ -431,6 +439,9 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
     m(t),
     y.clicked);
   try {
+    api.playSound(t, "magicAccent1", 0.35, 1.3);
+  } catch (t) {}
+  try {
     y.onClick(t, o, r, i, c, a, l);
   } catch (t) {
     (f("dispatch.onClick", t, C), g.delete(d));
@@ -468,13 +479,79 @@ export function handleFruitJoin(t) {
 }
 export function restorePlayerFruit(t) {
   try {
-    const e = api.getPlayerDbValue(t, "fruit");
-    e && n[e] && N(t, e, !0);
+    const pending = d.get(t);
+    if (pending && n[pending]) {
+      d.delete(t);
+      N(t, pending, !0);
+      return;
+    }
+    let dbFruit = null;
+    try {
+      dbFruit = api.getPlayerDbValue(t, "fruit");
+    } catch (t) {}
+    if (dbFruit && n[dbFruit] && h.get(t) && h.get(t) !== dbFruit) {
+      N(t, dbFruit, !0);
+      return;
+    }
+    const e = (dbFruit && n[dbFruit] ? dbFruit : null) || h.get(t);
+    if (!e || !n[e]) return;
+    h.set(t, e);
+    const r = n[e];
+    let missing = !1;
+    if (r.giveditems && r.giveditems.length) {
+      for (const item of r.giveditems) {
+        const itemType = F(item);
+        if (!itemType) continue;
+        let amt = 0;
+        try {
+          amt = api.getInventoryItemAmount(t, itemType) || 0;
+        } catch (t) {
+          amt = 0;
+        }
+        if (amt < 1) {
+          missing = !0;
+          break;
+        }
+      }
+    }
+    if (missing) {
+      k(t);
+      if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
+    }
+    if (r.hooks && r.hooks.onJoin) {
+      try {
+        r.hooks.onJoin(t);
+      } catch (t) {
+        f("restorePlayerFruit.onJoin", t, e);
+      }
+    }
   } catch (t) {
     f("restorePlayerFruit", t);
   }
 }
+export function onPlayerDeathFruit(t) {
+  const pending = d.get(t);
+  if (pending && n[pending]) {
+    d.delete(t);
+    N(t, pending, !0);
+  }
+  const e = h.get(t),
+    o = e ? n[e] : null;
+  if (o && o.hooks && o.hooks.onLeave)
+    try {
+      o.hooks.onLeave(t);
+    } catch (t) {
+      f("onPlayerDeathFruit.onLeave", t, e);
+    }
+  delete b[t];
+}
 export function clearFruitCallbacks(t) {
+  const pending = d.get(t);
+  if (pending && n[pending]) {
+    try {
+      api.setPlayerDbValue(t, "fruit", pending);
+    } catch (t) {}
+  }
   d.delete(t);
   const e = h.get(t),
     o = e ? n[e] : null;

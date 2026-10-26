@@ -64,6 +64,8 @@ function onPlayerClickSpring(playerId, itemName) {
     const p = posOf(playerId);
     if (!p) return true;
 
+    sound.at(playerId, "magicAccent1", 0.8, 1.15, 22);
+
     const tok = (token[playerId] || 0) + 1;
     token[playerId] = tok;
 

@@ -1,5 +1,5 @@
 import { canDamage as t, crewCommands as r, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
-import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, restorePlayerFruit as g } from "./fruit/index";
+import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { FRUIT_ABILITIES as h, abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./core/UI"; 
@@ -104,7 +104,12 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     bt(t), dt(t), Jt(t);
     for (const r of Xt.keys()) if (r.startsWith(String(t) + ":")) Xt.delete(r);
 }, onRespawnRequest = t => {
-    Lt(t);
+    Lt(t), g(t), P(t), K(t);
+    try {
+        w(() => {
+            g(t), P(t), K(t);
+        }, 5);
+    } catch (t) {}
 }, onPlayerClick = (t, r, a, i, e, o, m) => {
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
@@ -159,7 +164,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     }
 }, onAttemptKillPlayer = t => {
     if (A(t)) return bt(t), "preventDeath";
-    k(t), s(t), Pt(t);
+    k(t), df(t), Pt(t);
     try {
         lt(t);
     } catch (t) {
