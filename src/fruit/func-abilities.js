@@ -350,6 +350,19 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     }
   }
 
+  // Pré-chauffage du chunk distant : tant qu'aucun getBlock ne l'a touché,
+  // Bloxd.io ne le charge pas et getBlockData renvoie vide. Le chunk devient
+  // lisible ~1 tick APRÈS ce sondage — le boot et les retries sont donc
+  // décalés d'au moins un tick par rapport à warmup().
+  function warmup() {
+    const [x, y, z0] = origin();
+    for (let slot = 0; slot < SCAN_SLOTS; slot++) {
+      try {
+        getApi().getBlock(x, y, z0 + slot);
+      } catch (_) {}
+    }
+  }
+
   function readSlot(slot) {
     const [x, y, z0] = origin();
     const z = z0 + slot;
@@ -443,6 +456,9 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     if (!alive() || loading) return;
     loading = true;
     try {
+      // Sondage du chunk ce tick : si la lecture synchro ci-dessous échoue
+      // (chunk froid), le retry du tick suivant lira un chunk déjà chargé.
+      warmup();
       const { byIndex, total, errors } = collect();
       FA.errors = errors.slice();
       for (const e of FA.errors) say("[FA] " + e);
@@ -475,7 +491,10 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       FA.ready = packs.length === total && missing.length === 0 && FA.errors.length === 0;
       if (!FA.ready && retries < 30) {
         retries++;
-        schedule(() => alive() && load(false), 10);
+        // Les 2 premiers essais sont rapprochés (2 ticks) pour profiter du
+        // warmup de ce tick ; ensuite on repasse à 10 ticks pour ne pas spammer.
+        const delay = retries <= 2 ? 2 : 10;
+        schedule(() => alive() && load(false), delay);
       } else if (FA.ready) {
         retries = 0;
       }
@@ -546,10 +565,16 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   FA.reload = reload;
   FA.status = status;
   FA.logStatus = logStatus;
+  FA.prewarm = warmup;
   globalThis.FA_BOOT = boot;
 
+  // Tick 0 : on demande le chunk tout de suite, pour que la première lecture
+  // (boot décalé de 2 ticks) ait déjà au moins un tick de chargement derrière.
   try {
-    schedule(() => alive() && boot(), 1);
+    warmup();
+  } catch (_) {}
+  try {
+    schedule(() => alive() && boot(), 2);
   } catch (_) {
     boot();
   }

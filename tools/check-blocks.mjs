@@ -222,6 +222,78 @@ moved.delete(firstZ);
 const displaced = runScenario(moved, "pack déplacé");
 check(displaced.status.packCount === manifest.packCount, "pack déplacé non retrouvé");
 
+// --------------------------------------------- chunk froid (non chargé) ----
+// Bloxd.io ne stream le chunk qu'APRÈS un premier getBlock : la lecture du
+// tick 0 échoue, puis le chunk devient lisible un tick plus tard. Le chargeur
+// doit préchauffer (warmup) et réessayer au tick suivant.
+function makeColdEnv(texts, { typeKnown = false } = {}) {
+  for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"])
+    delete globalThis[k];
+  const logs = [];
+  let loaded = false;
+  let probes = 0;
+  let tick = 0;
+  const queue = []; // { at, fn?, _load? }
+  const api = new Proxy(
+    {
+      log: (m) => logs.push(String(m)),
+      now: () => Date.now(),
+      getBlock: (x, y, z) => {
+        probes++;
+        if (!loaded && !queue.some((q) => q._load)) queue.push({ at: tick + 1, _load: true });
+        if (texts.has(z)) return loaded || typeKnown ? "Code Block" : "Air";
+        return "Air";
+      },
+      getBlockData: (x, y, z) =>
+        loaded ? { persisted: { shared: { text: texts.get(z) } } } : { persisted: { shared: {} } },
+      getEntityType: () => "Player",
+      getHealth: () => 20,
+      getPlayerIds: () => ["p1"],
+      getPlayerFacingInfo: () => ({ camPos: [0, 65, 0], dir: [0, 0, 1] }),
+    },
+    { get: (t, k) => (k in t ? t[k] : noop) },
+  );
+  const helpers = makeHelpers(api);
+  helpers.setTimeout = (fn, ticks) => {
+    queue.push({ at: tick + ticks, fn });
+    return { stop: noop };
+  };
+  const step = (n = 1) => {
+    for (let i = 0; i < n; i++) {
+      tick++;
+      const due = queue.filter((q) => q.at <= tick);
+      due.sort((a, b) => (a._load ? -1 : 1) - (b._load ? -1 : 1)); // chunk avant timers
+      for (const q of due) {
+        queue.splice(queue.indexOf(q), 1);
+        if (q._load) loaded = true;
+        else q.fn();
+      }
+    }
+  };
+  return { api, helpers, step, logs, probes: () => probes, loaded: () => loaded };
+}
+
+const coldResults = [];
+for (const typeKnown of [false, true]) {
+  const label = typeKnown ? "type connu/données froides" : "chunk totalement froid";
+  const env = makeColdEnv(texts, { typeKnown });
+  globalThis.api = env.api;
+  const coldLoader = createBlockLoader({
+    helpers: env.helpers,
+    expected: HANDLER_NAMES,
+    log: (m) => env.logs.push(String(m)),
+  });
+  check(env.probes() >= 16, `[${label}] warmup absent à la création (${env.probes()} sondes)`);
+  coldLoader.boot();
+  check(coldLoader.status().ready === false, `[${label}] prêt à tort sur chunk froid`);
+  env.step(6);
+  const s = coldLoader.status();
+  check(s.ready === true, `[${label}] jamais prêt après chargement : ${JSON.stringify(s.errors)}`);
+  check(s.packCount === manifest.packCount, `[${label}] ${s.packCount}/${manifest.packCount} packs`);
+  check(s.missing.length === 0, `[${label}] handlers manquants : ${s.missing.join(", ")}`);
+  coldResults.push(`${label}: prêt=${s.ready} (${env.probes()} sondes)`);
+}
+
 console.log(
   `${manifest.packCount} packs, ${manifest.packedChars} car., ` +
     `${HANDLER_NAMES.length} handlers vérifiés (dont ${FRUIT_HANDLERS.length} Control/Gravity).`,
@@ -229,6 +301,7 @@ console.log(
 console.log(`  scénario nominal : ${base.status.packCount} packs, prêt=${base.status.ready}`);
 console.log(`  pack manquant    : ${hole.status.packCount} packs, erreur journalisée`);
 console.log(`  pack déplacé     : ${displaced.status.packCount} packs retrouvés`);
+for (const r of coldResults) console.log(`  chunk froid      : ${r}`);
 console.log(`  Control Domain   : ${pointCalls} appel(s) de point() (bug du dôme corrigé)`);
 if (problems.length) {
   console.error("\n" + problems.map((p) => "  ✖ " + p).join("\n"));
