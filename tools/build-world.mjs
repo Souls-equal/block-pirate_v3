@@ -71,9 +71,6 @@ const code = min.outputFiles[0].text;
 const minChars = code.length;
 const fullChars = full.outputFiles[0].text.length;
 
-const rootWorldFile = path.join(ROOT, "world.js");
-fs.writeFileSync(rootWorldFile, code, "utf8");
-
 const outDir = path.join(ROOT, "dist");
 fs.mkdirSync(outDir, { recursive: true });
 const outFile = path.join(outDir, "world.js");
@@ -95,7 +92,7 @@ try {
 console.log(`World Code lisible (bundle) : ${fullChars.toLocaleString("fr-FR")} car.`);
 console.log(`World Code minifié          : ${minChars.toLocaleString("fr-FR")} car. ` +
   `(${Math.round((minChars / WORLD_LIMIT) * 100)} % des ${WORLD_LIMIT.toLocaleString("fr-FR")} autorisés)`);
-console.log(`→ world.js (à la racine, prêt à coller) + dist/world.js`);
+console.log(`→ dist/world.js (optionnel, ignoré par git)`);
 if (blockChars)
   console.log(`Code Blocks (packs)         : ${blockChars.toLocaleString("fr-FR")} car.`);
 if (missing.size)

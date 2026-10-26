@@ -3,28 +3,27 @@
 Code source du jeu (One Piece / voxel) : un « moteur » en modules ES sous `src/`,
 et les capacités des fruits empaquetées sous `code-blocks/`.
 
-> **En une phrase** : les sources restent **lisibles** dans `src/`, le build produit
-> **1 World Code minifié** (`world.js`, 174 k / 512 k) et **5 Code Blocks**
-> (150 k au total au lieu de 32 blocs / 272 k). Et Control + Gravity remarchent.
+> **En une phrase** : le World Code garde son **format multi-fichiers lisible** dans `src/`
+> (seuls `src/fruit/func-abilities.js` et `src/fruit/index.js` changent en jeu), et les
+> 32 capacités des fruits sont regroupées en **5 Code Blocks** (`code-blocks/pack-01.js` … `pack-05.js`,
+> 150 k au total au lieu de 32 blocs / 272 k). Et Control + Gravity remarchent.
 
 ---
 
-## Démarrage rapide
+## Démarrage rapide (copier-coller dans Bloxd.io)
 
-```bash
-npm install                 # esbuild (seule dépendance, dev uniquement)
-npm run build               # build:blocks + build:world
-npm run check               # imports + handlers + intégrité des packs + simulation du chargeur
-```
+Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/abilities.js`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à remplacer :
 
-Puis, dans le jeu :
-
-1. Colle `world.js` (à la racine du dépôt) dans le **World Code**.
-2. Colle le contenu entier de `code-blocks/pack-01.js` … `pack-05.js` dans
-   **5 Code Blocks** à `x=100000, y=100000, z=100002 … 100006`
-   (le détail est dans [`code-blocks/README.md`](code-blocks/README.md)).
+1. Dans le **World Code** (dossier `fruit/`) :
+   - **`src/fruit/func-abilities.js`** *(nouveau chargeur BP3 lisible et autonome — aucun nouveau fichier à créer)*
+   - **`src/fruit/index.js`** *(rembourse le cooldown si un bloc manque, et reformaté en multi-lignes lisible)*
+2. Dans le **monde** (les **5 Code Blocks** à `x=100000, y=100000, z=100002 … 100006`) :
+   - Colle le contenu entier de **`code-blocks/pack-01.js` … `pack-05.js`**
+     (détail dans [`code-blocks/README.md`](code-blocks/README.md)).
 3. `FA.logStatus()` dans le World Code doit répondre
    `5 pack(s), 96 handlers, 0 manquant(s), 0 erreur(s)`.
+
+*(Si tu modifies les sources de `src/blocks/` plus tard : `npm install && npm run build:blocks && npm run check`.)*
 
 ---
 
@@ -37,24 +36,21 @@ Puis, dans le jeu :
 │   ├── core/                     # UI, équipages, grades, admin
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   ├── fruit/
-│   │   ├── index.js              # équiper / lancer un fruit
+│   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
 │   │   ├── fruitData.js          # données pures
-│   │   ├── func-abilities.js     # ⭐ pont lisible : 95 shims + helpers FA.c
-│   │   ├── handler-names.js      # ⭐ liste canonique des handlers
-│   │   ├── code-block-loader.js  # ⭐ chargeur des packs (lisible, verbeux)
-│   │   └── pack-format.js        # ⭐ format BP3 (partagé build ↔ jeu)
+│   │   └── func-abilities.js     # ⭐ pont + chargeur BP3 lisible et autonome (95 shims)
 │   ├── blocks/                   # ⭐ 32 sources LISIBLES (1 par capacité / état)
 │   ├── utils/                    # timer, combat, fx, world, boss…
 │   └── build/                    # ⚠ 3 modules absents (voir plus bas)
 ├── code-blocks/                  # ⭐ 5 packs GÉNÉRÉS + manifest.json + README
 ├── tools/
+│   ├── pack-format.mjs           # format BP3 pour les outils Node
 │   ├── build-blocks.mjs          # ⭐ sources → nombre minimal de Code Blocks
-│   ├── build-world.mjs           # ⭐ src/index.js → dist/world.js minifié
+│   ├── build-world.mjs           # bundle optionnel src/index.js → dist/world.js
 │   ├── check-imports.mjs
 │   ├── check-handlers.mjs        # ⭐ détecte un handler sans shim (cooldown only)
 │   └── check-blocks.mjs          # ⭐ intègre les packs + simule le chargeur
-├── dist/world.js                 # ⭐ généré, ignoré par git
 └── package.json
 ```
 

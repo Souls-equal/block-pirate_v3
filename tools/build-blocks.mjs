@@ -21,7 +21,7 @@ import {
   makeBlock,
   parseBlock,
   fnv1a,
-} from "../src/fruit/pack-format.js";
+} from "./pack-format.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src", "blocks");
