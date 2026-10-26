@@ -93,6 +93,14 @@ export const CENSOR_RULES = [
         .replace(/\b([gG])=([fF])\b/g, "$1 = $2"),
   },
   {
+    name: "g,f",
+    test: /\b[gG]\s*,\s*[fF]\b/g,
+    fix: (code) =>
+      code
+        .replace(/=([gG])\s*,\s*([fF])=/g, "=$1;const $2=")
+        .replace(/\b([gG])\s*,\s*([fF])\b/g, "($1),($2)"),
+  },
+  {
     name: "D,f",
     test: /\b[dD],[fF]\b/g,
     fix: (code) =>
@@ -147,9 +155,6 @@ export const CENSOR_RULES = [
 
 export function uncensorBlockCode(code, extraSafe = false) {
   let out = code;
-  for (const rule of CENSOR_RULES) {
-    out = rule.fix(out);
-  }
   if (extraSafe) {
     out = out
       .replace(/([A-Za-z0-9_$])\[([A-Za-z_$][A-Za-z0-9_$]*)\]/g, "$1[ $2 ]")
@@ -158,6 +163,9 @@ export function uncensorBlockCode(code, extraSafe = false) {
       .replace(/\b([fF])([.,=*+\-/])([uUkKcCfF])\b/g, "$1 $2 $3")
       .replace(/\b([fF])([(\[])([uUkKcCfF])\b/g, "$1$2 $3")
       .replace(/\b([sSkKpP])\*(\1)\b/gi, "$1 * $2");
+  }
+  for (const rule of CENSOR_RULES) {
+    out = rule.fix(out);
   }
   return out;
 }

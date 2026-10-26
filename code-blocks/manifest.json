@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-26T17:51:05.931Z",
+  "generatedAt": "2026-10-26T18:12:03.509Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -9,7 +9,7 @@
   },
   "sourceFiles": 36,
   "sourceChars": 396030,
-  "packedChars": 200225,
+  "packedChars": 200229,
   "compression": "49 %",
   "packCount": 7,
   "packs": [
@@ -117,9 +117,9 @@
       "index": 7,
       "file": "pack-07.js",
       "z": 100008,
-      "chars": 26399,
-      "payloadChars": 26366,
-      "hash": "40e4ec6f",
+      "chars": 26403,
+      "payloadChars": 26370,
+      "hash": "06f67a87",
       "modules": 2,
       "sources": [
         "310-rare-legendary-plus.js",
