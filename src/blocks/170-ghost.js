@@ -129,9 +129,9 @@ function phaseCo(st) {
 }
 
 
-/* SPECTRAL PRISON */
+/* SPECTRAL PRISON (100% particules, sans mesh) */
 const PR_MS = 7000, PR_R = 8, PR_MAX = 4, PR_DMG = 3, PR_PULSE = 1000, PR_SELF = 3000;
-const PR_BLOCK = "Glass", PR_SPD = 3, PR_REG = 2;
+const PR_SPD = 3, PR_REG = 2;
 const prisons = {};
 
 function unroot(tid) {
@@ -143,7 +143,6 @@ function prisonOff(pid, st) {
     if (!st) return false;
     for (let i = 0; i < st.caged.length; i++) {
         unroot(st.caged[i].id);
-        for (let j = 0; j < st.caged[i].cubes.length; j++) mesh.remove(st.caged[i].cubes[j].mesh);
     }
     if (st.h) { try { st.h.stop(); } catch (e2) {} }
     if (prisons[pid] === st) delete prisons[pid];
@@ -151,13 +150,27 @@ function prisonOff(pid, st) {
 }
 
 function cageFor(pid, tid) {
-    const cubes = [];
-    for (let i = 0; i < CAGE.length; i++) {
-        const m = mesh.create(PR_BLOCK, 0.55, pid);
-        if (m) cubes.push({ mesh: m.id, off: CAGE[i] });
-    }
     if (isPlayerAlive(tid)) { try { api.setClientOption(tid, "speedMultiplier", 0); } catch (e) {} }
-    return { id: tid, cubes: cubes };
+    eff(tid, "Slowness", PR_MS, { inbuiltLevel: 6 });
+    return { id: tid };
+}
+
+function drawSpectralCage(tp, tStep) {
+    for (let j = 0; j < CAGE.length; j++) {
+        const o = CAGE[j];
+        const bob = Math.sin(tStep * 0.4 + j) * 0.14;
+        point([tp[0] + o[0], tp[1] + 0.9 + o[1] * 0.85 + bob, tp[2] + o[2]], {
+            r: 0.16, tex: TEX.square, count: 3,
+            life: [0.16, 0.34], power: [0.08, 0.3], size: [0.36, 0.65],
+            colors: [[[190, 245, 255, 0.95], [255, 255, 255, 0.85]], [[110, 210, 235, 0], [190, 245, 255, 0]]],
+        });
+    }
+    if (tStep % 2 === 0) {
+        ring([tp[0], tp[1] + 0.3, tp[2]], 1.25, 8, {
+            tex: TEX.soul, life: [0.22, 0.42], size: [0.32, 0.56], power: [0.1, 0.35],
+            colors: [[[180, 255, 235, 0.9], [255, 255, 255, 0.8]], [[100, 200, 220, 0], [180, 255, 235, 0]]],
+        }, tStep * 0.3);
+    }
 }
 
 function prisonTargets(pid) {
@@ -192,18 +205,13 @@ function prisonCo(st) {
                 if (!tp) { gone.push(i); continue; }
 
                 if (!isPlayerAlive(t.id)) { try { api.setVelocity(t.id, 0, 0, 0); } catch (e1) {} }
-                for (let j = 0; j < t.cubes.length; j++) {
-                    const c = t.cubes[j];
-                    const bob = Math.sin(st.t * 0.4 + j) * 0.12;
-                    mesh.move(c.mesh, tp[0] + c.off[0], tp[1] + c.off[1] + bob, tp[2] + c.off[2]);
-                }
+                drawSpectralCage(tp, st.t + i);
                 ghost_wisp(t.id, st.t + i, [200, 240, 255, 0.8]);
             }
 
             for (let i = gone.length - 1; i >= 0; i--) {
                 const c = st.caged[gone[i]];
                 unroot(c.id);
-                for (let k = 0; k < c.cubes.length; k++) mesh.remove(c.cubes[k].mesh);
                 st.caged.splice(gone[i], 1);
             }
 

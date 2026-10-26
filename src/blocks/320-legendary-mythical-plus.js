@@ -37,7 +37,6 @@
     } = C,
     sound = F;
 
-  const BODY_NODES = ["TorsoNode", "HeadMesh", "ArmLeftMesh", "ArmRightMesh", "LegLeftMesh", "LegRightMesh"];
   const mythicForms = FA.m || (FA.m = {});
 
   function flatDir(pid) {
@@ -61,19 +60,6 @@
     } catch (e) {}
   }
 
-  function attachNode(pid, node, blockName, size, offset, rot) {
-    try {
-      api.updateEntityNodeMeshAttachment(
-        pid,
-        node,
-        "BloxdBlock",
-        { blockName: blockName, size: size, meshOffset: [0, 0, 0] },
-        offset || [0, 0, 0],
-        rot || [0, 0, 0],
-      );
-    } catch (e) {}
-  }
-
   function setScale(pid, s) {
     try {
       api.setLifeformScale(pid, s);
@@ -85,11 +71,6 @@
     if (prev) prev.tok = -1;
     delete mythicForms[pid];
     setScale(pid, 1);
-    for (let i = 0; i < BODY_NODES.length; i++) {
-      try {
-        api.updateEntityNodeMeshAttachment(pid, BODY_NODES[i], null);
-      } catch (e) {}
-    }
   }
 
   function startMythicForm(pid, cfg) {
@@ -101,11 +82,24 @@
     if (cfg.scale) setScale(pid, cfg.scale);
     if (cfg.title) banner(pid, cfg.title, cfg.bannerColor);
     shake(pid, cfg.shake || 0.42, 380);
-    if (cfg.parts) {
-      for (let i = 0; i < cfg.parts.length; i++) {
-        const pt = cfg.parts[i];
-        attachNode(pid, pt[0], pt[1], pt[2], pt[3], pt[4]);
-      }
+    const cols = cfg.colors || [
+      [[255, 215, 80], [255, 120, 40]],
+      [[180, 70, 20, 0], [255, 240, 150, 0]],
+    ];
+    const p0 = posOf(pid);
+    if (p0) {
+      boom([p0[0], p0[1] + 1.1, p0[2]], 2.2, {
+        tex: TEX.soul,
+        count: 24,
+        colors: cols,
+      });
+      column(p0, 3.2, {
+        steps: 6,
+        tex: TEX.glint,
+        life: [0.22, 0.45],
+        size: [0.32, 0.64],
+        colors: cols,
+      });
     }
     let step = 0;
     const maxSteps = cfg.steps || 14;
@@ -118,6 +112,16 @@
           return { done: true };
         }
         step++;
+        point([p[0], p[1] + 1.15, p[2]], {
+          r: 0.65,
+          tex: TEX.soul,
+          count: 4,
+          life: [0.2, 0.42],
+          power: [0.2, 0.85],
+          size: [0.28, 0.54],
+          gravity: [0, 1.2, 0],
+          colors: cols,
+        });
         if (cfg.onAura) {
           try {
             cfg.onAura(p, step);
@@ -761,15 +765,6 @@
   }
 
   // --------------------------------------------------- MYTHICAL : MAMMOTH ---
-  const MAMMOTH_PARTS = [
-    ["TorsoNode", "Brown Concrete", [0.7, 0.9, 0.65], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Bone Block", [0.85, 0.25, 0.6], [0, -0.1, 0.35], [0.25, 0, 0]],
-    ["ArmLeftMesh", "Brown Concrete", [0.38, 0.8, 0.38], [0, -0.1, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Brown Concrete", [0.38, 0.8, 0.38], [0, -0.1, 0], [0, 0, 0]],
-    ["LegLeftMesh", "Gray Concrete", [0.38, 0.75, 0.38], [0, -0.1, 0], [0, 0, 0]],
-    ["LegRightMesh", "Gray Concrete", [0.38, 0.75, 0.38], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Prehistoric Stampede : transformation en Mammouth Titan + charge sismique colossale.
   function onPlayerClickMammothStampede(pid, itemName) {
     const p0 = posOf(pid);
@@ -784,7 +779,10 @@
       scale: 1.45,
       title: "ANCIENT MAMMOTH TITAN",
       bannerColor: "#d97706",
-      parts: MAMMOTH_PARTS,
+      colors: [
+        [[210, 175, 120], [135, 95, 55]],
+        [[90, 60, 35, 0], [245, 235, 210, 0]],
+      ],
       steps: 14,
       onAura: function (ap, st) {
         ring(
@@ -969,15 +967,6 @@
   }
 
   // ----------------------------------------------------- MYTHICAL : T-REX ---
-  const TREX_PARTS = [
-    ["TorsoNode", "Red Concrete", [0.68, 0.88, 0.62], [0, 0.05, 0], [0.15, 0, 0]],
-    ["HeadMesh", "Red Concrete", [0.62, 0.55, 0.78], [0, 0.12, 0.25], [0, 0, 0]],
-    ["ArmLeftMesh", "Black Concrete", [0.3, 0.65, 0.3], [0, -0.1, 0.1], [-0.4, 0, 0]],
-    ["ArmRightMesh", "Black Concrete", [0.3, 0.65, 0.3], [0, -0.1, 0.1], [-0.4, 0, 0]],
-    ["LegLeftMesh", "Red Concrete", [0.38, 0.78, 0.42], [0, -0.1, 0], [0, 0, 0]],
-    ["LegRightMesh", "Red Concrete", [0.38, 0.78, 0.42], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Tyrant Jaws : bond prédateur + double mâchoire d'énergie écarlate/noire qui se referme.
   function onPlayerClickTrexBite(pid, itemName) {
     const p = posOf(pid);
@@ -1059,7 +1048,10 @@
       scale: 1.42,
       title: "APEX T-REX AWAKENING",
       bannerColor: "#ef4444",
-      parts: TREX_PARTS,
+      colors: [
+        [[255, 40, 40], [35, 5, 10]],
+        [[25, 0, 0, 0], [255, 110, 50, 0]],
+      ],
       steps: 14,
       onAura: function (ap, st) {
         ring(
@@ -1136,12 +1128,6 @@
   }
 
   // ---------------------------------------------------- MYTHICAL : DOUGHT ---
-  const DOUGHT_PARTS = [
-    ["TorsoNode", "White Concrete", [0.65, 0.25, 0.65], [0, 0.35, 0], [0, 0, 0]],
-    ["ArmLeftMesh", "Yellow Concrete", [0.42, 0.42, 0.42], [0, -0.25, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Yellow Concrete", [0.42, 0.42, 0.42], [0, -0.25, 0], [0, 0, 0]],
-  ];
-
   // Mochi Thrust : éveil Mochi + vrille foreuse entourée d'un tunnel d'anneaux de pâte.
   function onPlayerClickMochiBuzzsaw(pid, itemName) {
     const p0 = posOf(pid);
@@ -1154,7 +1140,10 @@
       scale: 1.18,
       title: "AWAKENED MOCHI SOVEREIGN",
       bannerColor: "#fef08a",
-      parts: DOUGHT_PARTS,
+      colors: [
+        [[255, 250, 230], [235, 195, 130]],
+        [[195, 160, 100, 0], [255, 252, 235, 0]],
+      ],
       steps: 12,
       onAura: function (ap, st) {
         ring(
@@ -1271,13 +1260,6 @@
   }
 
   // ---------------------------------------------------- MYTHICAL : SHADOW ---
-  const SHADOW_PARTS = [
-    ["TorsoNode", "Obsidian", [0.68, 0.9, 0.58], [0, 0.05, 0], [0, 0, 0]],
-    ["HeadMesh", "Black Concrete", [0.55, 0.55, 0.55], [0, 0.18, 0], [0, 0.78, 0]],
-    ["ArmLeftMesh", "Obsidian", [0.36, 0.78, 0.36], [0, -0.1, 0], [0, 0, 0]],
-    ["ArmRightMesh", "Obsidian", [0.36, 0.78, 0.36], [0, -0.1, 0], [0, 0, 0]],
-  ];
-
   // Brick Bat Swarm : 3 vagues de chauves-souris d'ombre qui lacèrent en ligne.
   function onPlayerClickBrickBat(pid, itemName) {
     if (!isAliveId(pid)) return false;
@@ -1413,7 +1395,10 @@
       scale: 1.5,
       title: "SHADOWS' ASGARD OVERLORD",
       bannerColor: "#a855f7",
-      parts: SHADOW_PARTS,
+      colors: [
+        [[175, 60, 255], [25, 0, 50]],
+        [[15, 0, 30, 0], [130, 35, 200, 0]],
+      ],
       steps: 15,
       onAura: function (ap, st) {
         ring(
