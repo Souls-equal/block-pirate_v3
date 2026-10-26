@@ -139,17 +139,20 @@ export function fnv1a(text) {
 
 export function parseBlock(text) {
   if (typeof text !== "string") return null;
-  const m = HEADER_RE.exec(text);
+  const clean = text.replace(/\r\n?/g, "\n");
+  const m = HEADER_RE.exec(clean);
   if (!m) return null;
-  const payload = text.slice(m[0].length).trim();
+  const payload = clean.slice(m[0].length).trim();
   const len = Number(m[3]);
   const hash = m[4];
+  const censored = payload.includes("*****");
   return {
     index: Number(m[1]),
     total: Number(m[2]),
     len,
     hash,
-    ok: payload.length === len && fnv1a(payload) === hash,
+    censored,
+    ok: !censored && payload.length === len && fnv1a(payload) === hash,
     payload,
   };
 }
@@ -387,7 +390,9 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       if (byIndex[b.index]) errors.push(`pack ${b.index} en double (z=${found.z})`);
       if (!b.ok) {
         errors.push(
-          `pack ${b.index} (z=${found.z}) TRONQUÉ ou corrompu : ${b.payload.length}/${b.len} car. (${b.hash})`,
+          b.censored
+            ? `pack ${b.index} (z=${found.z}) CENSURÉ par Bloxd.io ("*****" détecté)`
+            : `pack ${b.index} (z=${found.z}) TRONQUÉ ou modifié : ${b.payload.length}/${b.len} car. (${b.hash})`,
         );
       }
       byIndex[b.index] = { ...b, z: found.z };
@@ -444,7 +449,9 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
 
       const packs = [];
       for (let i = 1; i <= total; i++) {
-        if (byIndex[i]?.ok) packs.push(byIndex[i]);
+        if (byIndex[i] && !byIndex[i].censored && byIndex[i].payload.length > 0) {
+          packs.push(byIndex[i]);
+        }
       }
 
       const sourceHash = packs.length ? fnv1a(packs.map((p) => p.payload).join("\n")) : "";

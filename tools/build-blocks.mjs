@@ -21,6 +21,8 @@ import {
   makeBlock,
   parseBlock,
   fnv1a,
+  uncensorBlockCode,
+  findCensoredPatterns,
 } from "./pack-format.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,6 +61,7 @@ const fragments = files.map((file, order) => {
   if (code.includes(MARKER))
     throw new Error(`${file} : contient le séparateur réservé ${MARKER}`);
   if (!code.endsWith(";") && !code.endsWith("}")) code += ";";
+  code = uncensorBlockCode(code);
   return { file, order, code, size: code.length };
 });
 
@@ -126,12 +129,18 @@ let totalChars = 0;
 const packs = bins.map((bin, i) => {
   const index = i + 1;
   const items = bin.units.flatMap((u) => u.items).sort((a, b) => a.order - b.order);
-  const payload = items.map((it) => it.code).join(SEPARATOR);
+  const payload = uncensorBlockCode(items.map((it) => it.code).join(SEPARATOR));
   const block = makeBlock(index, total, payload);
   // Vérification croisée : le parseur utilisé par le jeu doit accepter notre bloc.
   const check = parseBlock(block);
   if (!check || !check.ok || check.index !== index || check.total !== total)
     throw new Error(`Bloc ${index} : en-tête/hash incohérent`);
+  const censorHits = findCensoredPatterns(block);
+  if (censorHits.length)
+    throw new Error(
+      `Bloc ${index} : motif(s) censurable(s) par Bloxd.io : ` +
+        censorHits.map((h) => `${h.rule}(${h.match})`).join(", "),
+    );
   if (block.length > MAX + 120)
     throw new Error(`Bloc ${index} : ${block.length} caractères, trop grand`);
 
