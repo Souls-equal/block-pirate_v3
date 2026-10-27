@@ -140,16 +140,20 @@ export function updateNameTag(playerId) {
     const name = api.getEntityName(playerId);
     const team = getTeamData(getPlayerTeam(playerId));
     const crew = getCrewName(playerId) || "No Crew";
-    api.setTargetedPlayerSettingForEveryone(playerId, "nameTagInfo", {
-        content: [{ str: name, style: { color: "white" } }],
-        subtitle: [
-            { str: team.prefix, style: { color: team.color, fontWeight: "bold" } },
-            { str: " | ", style: { color: "lightgray", fontWeight: "bold" } },
-            { str: crew, style: { color: "#ffcc00", fontWeight: "bold" } },
-        ],
-        border: { colour: team.color, applyTo: "both", style: "glow" },
-        healthbar: {height:"19px", display:"always", backgroundColour:"gray" }
-    });
+    /* Une erreur d'API (joueur qui vient de partir) ne doit pas remonter et
+       casser la suite de onPlayerJoin. */
+    try {
+        api.setTargetedPlayerSettingForEveryone(playerId, "nameTagInfo", {
+            content: [{ str: name, style: { color: "white" } }],
+            subtitle: [
+                { str: team.prefix, style: { color: team.color, fontWeight: "bold" } },
+                { str: " | ", style: { color: "lightgray", fontWeight: "bold" } },
+                { str: crew, style: { color: "#ffcc00", fontWeight: "bold" } },
+            ],
+            border: { colour: team.color, applyTo: "both", style: "glow" },
+            healthbar: {height:"19px", display:"always", backgroundColour:"gray" }
+        });
+    } catch (e) {}
 }
 
 /* CHAT CHANNEL UI */
