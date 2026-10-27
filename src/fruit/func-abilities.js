@@ -167,9 +167,11 @@ const log = (msg) => {
 };
 
 function knockBack(id, dir, force, up) {
-  if (!id || (typeof id === "number" && id < 0) || (typeof id === "string" && /^-\d+$/.test(id))) {
-    return;
-  }
+  /* ATTENTION : les ids Bloxd sont des entiers NEGATIFS sous forme de chaîne
+     ("-3", "-810"…). On ne filtre donc JAMAIS un id par son format, sinon
+     plus aucune cible n'est repoussée. Les NPCs sont protégés juste en
+     dessous par isAliveId() (qui les exclut) et par le test de type. */
+  if (!id) return;
   try {
     if (isAliveId(id) && getApi().getEntityType(id) !== "NPC") {
       impulse(id, dir, force, up);

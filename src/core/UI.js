@@ -35,31 +35,20 @@ function makeXpBar(xp, xpNeeded, size = 18){
     return makeBar(xp, xpNeeded, size);
 }
 
-/* Id refusé par les API Bloxd : "-1" est la sentinelle renvoyée quand le
-   joueur n'existe plus. On ne teste pas le format (un id valide peut être
-   n'importe quelle chaîne). Helper local : aucun import en plus. */
-function validId(playerId) {
-    if (null === playerId || void 0 === playerId) return false;
-    const id = String(playerId);
-    return !!id && "-1" !== id && "0" !== id && "undefined" !== id && "null" !== id;
-}
-
 const title = "1.9em", title2 = "1.5em", text = "1.1em";
 const border = "lightgray"
 
 export function updateSidebar(playerId){
-    if (!validId(playerId)) return;
+    if (!playerId) return;
     updateLeaderboard(playerId)
     drawSidebar(playerId)
 }
 
 export function updateSidebarLight(playerId){
-    if (!validId(playerId)) return;
     drawSidebar(playerId)
 }
 
 function drawSidebar(playerId){
-    if (!validId(playerId)) return;
     const money = getStat(playerId, "money", 0);
     const lvl = getStat(playerId, "lvl", 1);
     const xp = getStat(playerId, "xp", 0);
@@ -155,7 +144,6 @@ function drawSidebar(playerId){
 
 /* SETUP TABLE STRUCTURE */
 export function setupLeaderboard(playerId){
-    if (!validId(playerId)) return;
     try {
         api.setClientOption(playerId, "lobbyLeaderboardInfo", {
             name:  { displayName: "Name",  sortPriority: 5 },
@@ -171,7 +159,6 @@ export function setupLeaderboard(playerId){
 
 /* UPDATE PLAYER VALUES */
 export function updateLeaderboard(playerId){
-    if (!validId(playerId)) return;
 
     const lvl = getStat(playerId, "lvl", 1);
     const money = getStat(playerId, "money", 0);
@@ -198,7 +185,6 @@ export function updateLeaderboard(playerId){
 
 /* TEAM COLOR ON LEADERBOARD */
 export function updateLeaderboardColor(playerId){
-    if (!validId(playerId)) return;
 
     const team = getStat(playerId, "team", "NONE");
 
@@ -221,7 +207,6 @@ export function updateLeaderboardColor(playerId){
 /* REFRESH SINGLE PLAYER */
 
 export function refreshLeaderboardPlayer(playerId) {
-    if (!validId(playerId)) return;
     if (isVanished(playerId)) {
         try {
             api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {}, true);

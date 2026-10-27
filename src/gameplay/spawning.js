@@ -11,13 +11,6 @@ export const RANK_MULT = {
 
 const RANK_NAME = {1:"",2:"",3:"Boss"};
 
-/* Id refusé par les API Bloxd : "-1" = joueur qui n'existe plus. */
-function validId(playerId) {
-    if (null === playerId || void 0 === playerId) return false;
-    const id = String(playerId);
-    return !!id && "-1" !== id && "0" !== id && "undefined" !== id && "null" !== id;
-}
-
 function mobBaseHp(level){
     return Math.round(20 + Math.pow(level,1.6)*8);
 }
@@ -333,12 +326,8 @@ export function killdMob(playerId, mobId) {
     delete mobData[mobId];
     delete deadMobData[mobId];
 
-    /* Le tueur s'est déconnecté avant le crédit du kill : on ne récompense
-       personne, mais on ne doit surtout pas lever d'ApiError. */
-    if (!validId(realPlayerId)) {
-        return resolvedName || data.name || null;
-    }
-
+    /* Le tueur s'est peut-être déconnecté avant le crédit du kill : les
+       récompenses sont isolées plus bas (try/catch), aucune ApiError ne sort. */
     const playerLvl = getStat(realPlayerId,"lvl",1);
 
     let xp = data.xp;
