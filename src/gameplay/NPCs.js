@@ -7,6 +7,7 @@ import { getPlayerTeam } from "../core/team";
 import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
+import { buyFightingStyle } from "./fightingStyles";
 export function attackNPC(playerId, mobId) {
 
     const name = safeEntityName(mobId);
@@ -24,6 +25,14 @@ export function attackNPC(playerId, mobId) {
         rollFruit(playerId, 1.25);
     } else if (name === "Haki Seller") {
         buyArmamentHaki(playerId);
+    } else if (name === "Combat Teacher") {
+        buyFightingStyle(playerId, "Combat");
+    } else if (name === "Dark Step Teacher") {
+        buyFightingStyle(playerId, "Dark Step");
+    } else if (name === "Mad Scientist") {
+        buyFightingStyle(playerId, "Electric");
+    } else if (name === "Water Kung-Fu Teacher") {
+        buyFightingStyle(playerId, "Water Kung-Fu");
     }
 
     else if (name === "Apple Seller") {

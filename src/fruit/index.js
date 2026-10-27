@@ -10,6 +10,7 @@ try {
   } catch (O) {}
 }
 import { FRUIT_ABILITIES as n } from "./abilities";
+import { isFightingStyleAbilityName, restoreFightingStyle } from "../gameplay/fightingStyles";
 import {
   FRUITS_BY_RARITY as i,
   FRUIT_RARITIES as c,
@@ -304,16 +305,24 @@ function k(t) {
     if (r && r.giveditems)
       for (const o of r.giveditems) {
         const r = F(o);
-        if (r && !e[r]) {
-          e[r] = !0;
-          try {
-            const e = api.getInventoryItemAmount(t, r);
-            "number" == typeof e && e > 0 && api.removeItemName(t, r, e);
-          } catch (t) {
-            f("clearFruitCallbacks.removeAll", t, r);
-          }
-        }
+        if (r) e[r] = !0;
       }
+  }
+  for (let slot = 0; slot <= 50; slot++) {
+    let item = null;
+    try {
+      item = api.getItemSlot(t, slot);
+    } catch (t) {
+      item = null;
+    }
+    if (!item || !item.name || !e[item.name]) continue;
+    const cName = item.attributes && item.attributes.customDisplayName;
+    if (isFightingStyleAbilityName(cName)) continue;
+    try {
+      api.setItemSlot(t, slot, "Air");
+    } catch (t) {
+      f("clearFruitCallbacks.removeSlot", t, item.name);
+    }
   }
 }
 function N(t, e, o) {
@@ -321,6 +330,9 @@ function N(t, e, o) {
   const r = n[e];
   if (r) {
     if ((k(t), r.giveditems)) for (const e of r.giveditems) I(t, e, r);
+    try {
+      restoreFightingStyle(t);
+    } catch (t) {}
     if (r.hooks && r.hooks.onJoin)
       try {
         r.hooks.onJoin(t);
@@ -365,6 +377,7 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
   const p = n[s];
   if (!p) return !1;
   const customName = u.attributes && u.attributes.customDisplayName;
+  if (isFightingStyleAbilityName(customName)) return !1;
   const y = (function (t, e, cName) {
     if (cName) {
       for (const o in t) {
@@ -499,24 +512,32 @@ export function restorePlayerFruit(t) {
     const r = n[e];
     let missing = !1;
     if (r.giveditems && r.giveditems.length) {
-      for (const item of r.giveditems) {
-        const itemType = F(item);
-        if (!itemType) continue;
-        let amt = 0;
+      let fruitItemCount = 0;
+      for (let slot = 0; slot <= 50; slot++) {
+        let it = null;
         try {
-          amt = api.getInventoryItemAmount(t, itemType) || 0;
+          it = api.getItemSlot(t, slot);
         } catch (t) {
-          amt = 0;
+          it = null;
         }
-        if (amt < 1) {
-          missing = !0;
-          break;
+        if (!it || !it.name) continue;
+        const cName = it.attributes && it.attributes.customDisplayName;
+        if (isFightingStyleAbilityName(cName)) continue;
+        for (const item of r.giveditems) {
+          if (F(item) === it.name) {
+            fruitItemCount++;
+            break;
+          }
         }
       }
+      if (fruitItemCount < r.giveditems.length) missing = !0;
     }
     if (missing) {
       k(t);
       if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
+      try {
+        restoreFightingStyle(t);
+      } catch (t) {}
     }
     if (r.hooks && r.hooks.onJoin) {
       try {

@@ -4,14 +4,16 @@ import { updateSidebar } from "../core/UI";
 import { checkQuestValidity, quests } from "../gameplay/quest";
 import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../gameplay/stats";
 import { clearFruit } from "../fruit/index";
+import { clearFightingStyle } from "../gameplay/fightingStyles";
 
 resetPlayer = (id) => {
     setLevel(id, 1, true);
-    resetStats(playerId);
+    resetStats(id);
     setStat(id, "money", 0);
     setStat(id, "sp", 0);
-    clearFruit(id)
-    api.clearInventory(id)
+    clearFruit(id);
+    clearFightingStyle(id);
+    api.clearInventory(id);
 }
 
 export function getStat(playerId, key, def=0){
