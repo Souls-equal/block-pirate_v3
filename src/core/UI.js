@@ -1,6 +1,6 @@
 // UI.js
 
-import { addStat, getStat, setStat, xpToNext } from "../utils/data";
+import { addStat, getStat, isValidPlayerId, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
@@ -39,15 +39,18 @@ const title = "1.9em", title2 = "1.5em", text = "1.1em";
 const border = "lightgray"
 
 export function updateSidebar(playerId){
+    if (!isValidPlayerId(playerId)) return;
     updateLeaderboard(playerId)
     drawSidebar(playerId)
 }
 
 export function updateSidebarLight(playerId){
+    if (!isValidPlayerId(playerId)) return;
     drawSidebar(playerId)
 }
 
 function drawSidebar(playerId){
+    if (!isValidPlayerId(playerId)) return;
     const money = getStat(playerId, "money", 0);
     const lvl = getStat(playerId, "lvl", 1);
     const xp = getStat(playerId, "xp", 0);
@@ -153,6 +156,7 @@ export function setupLeaderboard(playerId){
 
 /* UPDATE PLAYER VALUES */
 export function updateLeaderboard(playerId){
+    if (!isValidPlayerId(playerId)) return;
 
     const lvl = getStat(playerId, "lvl", 1);
     const money = getStat(playerId, "money", 0);
@@ -175,6 +179,7 @@ export function updateLeaderboard(playerId){
 
 /* TEAM COLOR ON LEADERBOARD */
 export function updateLeaderboardColor(playerId){
+    if (!isValidPlayerId(playerId)) return;
 
     const team = getStat(playerId, "team", "NONE");
 
@@ -195,6 +200,7 @@ export function updateLeaderboardColor(playerId){
 /* REFRESH SINGLE PLAYER */
 
 export function refreshLeaderboardPlayer(playerId) {
+    if (!isValidPlayerId(playerId)) return;
     if (isVanished(playerId)) {
         api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {}, true);
         api.setTargetedPlayerSettingForEveryone(playerId, "colorInLobbyLeaderboard", "", true);

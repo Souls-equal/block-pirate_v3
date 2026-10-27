@@ -10,11 +10,11 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { reconcileSP as _ } from "./utils/data";
+import { isOnlinePlayer as isOnline, reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
 import { clearPlayerEffects as V } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { STAMINA_CONFIG as tt, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -79,12 +79,43 @@ function isNPCEntity(t) {
     }
 }
 
+/* Nom de l'item tenu (null si inconnu). */
+function heldItemName(t) {
+    try {
+        const h = api.getHeldItem(t);
+        if (!h) return null;
+        if ("string" == typeof h) return h;
+        return h.name || h.type || null;
+    } catch (t) {
+        _t("getHeldItem", t);
+        return null;
+    }
+}
+
+/* Pendant un dash, le coup de poing (main vide) est bloqué.
+   Les dégâts venant d'une habileté (withItem = item d'habileté) passent. */
+function meleeLocked(t, withItem) {
+    try {
+        if (!isDash(t)) return !1;
+    } catch (e) {
+        return !1;
+    }
+    const held = heldItemName(t);
+    if (held && "Air" !== held) return !1;
+    const src = Vt(withItem);
+    if (src && "Air" !== src && (C(src) || fsItemName(src))) return !1;
+    return !0;
+}
+
 $(), x(), rt(H), yt(E), ct((t, r, a) => {
-    Gt("bossKill", () => Ft(t, r));
+    /* Le kill peut être crédité après la déconnexion du tueur (id "-1") :
+       on ne touche alors ni aux récompenses, ni à la quête, ni à la sidebar. */
+    const online = isOnline(t);
+    online && Gt("bossKill", () => Ft(t, r));
     let i = a || null;
-    Gt("kill", () => {
+    online && Gt("kill", () => {
         i = j(t, r) || i;
-    }), i && Gt("quest", () => L(t, i)), Gt("sidebar", () => K(t));
+    }), i && online && Gt("quest", () => L(t, i)), online && Gt("sidebar", () => K(t));
     try {
         lt(r);
     } catch (t) {
@@ -122,11 +153,22 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         }
         return;
     }
+    /* Pendant un dash, aucun coup de poing (style ou capacité en cooldown). */
+    const canPunch = !isDash(t);
     let s = !1;
     try {
         s = fsClick(t, r, a, i, e, o, m) || p(t, r, a, i, e, o, m);
     } catch (t) {
         _t("onPlayerClick.handleAbility", t), s = !0;
+    }
+    /* Capacité en cooldown : le clic devient un coup de poing du style. */
+    if ("cooldown" === s) {
+        if (canPunch) try {
+            fsM1(t, m, !0);
+        } catch (t) {
+            _t("onPlayerClick.fightingStyleM1", t);
+        }
+        return;
     }
     if (!s) {
         try {
@@ -134,7 +176,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         } catch (t) {
             _t("onPlayerClick.handleFruit", t);
         }
-        try {
+        if (canPunch) try {
             fsM1(t, m);
         } catch (t) {
             _t("onPlayerClick.fightingStyleM1", t);
@@ -164,6 +206,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     }
     const res = t(r, a);
     if (res !== "preventDamage") {
+        if (meleeLocked(r, e)) return "preventDamage";
         try {
             if (fsM1(r, a)) return "preventDamage";
         } catch (t) {
@@ -179,6 +222,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     } catch (t) {
         _t("onPlayerDamagingMob.recordDamager", t);
     }
+    if (meleeLocked(t, i)) return "preventDamage";
     try {
         if (fsM1(t, r)) return "preventDamage";
     } catch (t) {

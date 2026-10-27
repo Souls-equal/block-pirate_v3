@@ -1,7 +1,7 @@
 //spawning.js
 
 import { updateSidebar } from "../core/UI";
-import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
+import { addStat, addXP, changeMoney, getStat, isOnlinePlayer, setStat, xpToNext } from "../utils/data";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},
@@ -325,6 +325,13 @@ export function killdMob(playerId, mobId) {
 
     delete mobData[mobId];
     delete deadMobData[mobId];
+
+    /* Le tueur s'est déconnecté avant le crédit du kill : inutile d'appeler
+       addXP / changeMoney / sendMessage sur un id invalide (ApiError). */
+    if (!isOnlinePlayer(realPlayerId)) {
+        try { api.log("[spawning] kill ignoré : joueur hors ligne (" + realPlayerId + ")"); } catch (e) {}
+        return resolvedName || data.name || null;
+    }
 
     const playerLvl = getStat(realPlayerId,"lvl",1);
 
