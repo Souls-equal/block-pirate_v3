@@ -140,7 +140,7 @@ function castForwardPunchBarrage(caster, itemName) {
 
 
 /* CONCRETE WHEEL — roue de mochi/béton en particules qui écrase tout sur son passage */
-const W_SPEED = 1.45, dought_W_DMG = 14, W_DMG_TICKS = 3, W_MAX_MS = 5500;
+const W_SPEED = 1.45, dought_W_DMG = 14, W_DMG_TICKS = 3, W_MAX_MS = 10000;
 const W_FOLLOW = 2, SHOCK_MAX_R = 6, SHOCK_STEP_MS = 220, SHOCK_DMG = 40;
 
 const wheelOn = {}, wheelRoll = {}, wheelAir = {}, wheelItem = {};

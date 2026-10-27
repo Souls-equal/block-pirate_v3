@@ -101,6 +101,12 @@ export const CENSOR_RULES = [
         .replace(/\b([gG])\s*,\s*([fF])\b/g, "($1),($2)"),
   },
   {
+    name: "g(f",
+    test: /\b[gG]\s*\(\s*[fF]\b/g,
+    fix: (code) =>
+      code.replace(/\b([gG])\s*\(\s*([fF])\b/g, "$1(0||$2"),
+  },
+  {
     name: "D,f",
     test: /\b[dD],[fF]\b/g,
     fix: (code) =>

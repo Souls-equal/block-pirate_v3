@@ -128,7 +128,7 @@
       });
     }
     let step = 0;
-    const maxSteps = cfg.steps || 14;
+    const maxSteps = (cfg.steps || 14) * 6;
     run({
       next: function () {
         if (mythicForms[pid] !== state || state.tok !== tok) return { done: true };
@@ -153,7 +153,7 @@
             cfg.onAura(p, step);
           } catch (e) {}
         }
-        return { value: sleep(cfg.interval || 3), done: false };
+        return { value: sleep(cfg.interval || 5), done: false };
       },
     });
   }
@@ -808,8 +808,8 @@
     const p0 = posOf(pid);
     if (!p0) return true;
     const d = flatDir(pid);
-    eff(pid, "Damage Reduction", 8000, { inbuiltLevel: 3 });
-    eff(pid, "Speed", 7000, { inbuiltLevel: 2 });
+    eff(pid, "Damage Reduction", 22000, { inbuiltLevel: 3 });
+    eff(pid, "Speed", 21000, { inbuiltLevel: 2 });
     sound.at(pid, "bearRoar1", 1.0, 0.55, 28);
     sound.at(pid, "cannonFire1", 0.9, 0.6, 26);
     poseSlam(pid, 600);
@@ -1088,8 +1088,8 @@
     const p = posOf(pid);
     if (!p) return true;
     poseRoar(pid, 640);
-    eff(pid, "Damage", 8000, { inbuiltLevel: 3 });
-    eff(pid, "Speed", 8000, { inbuiltLevel: 2 });
+    eff(pid, "Damage", 22000, { inbuiltLevel: 3 });
+    eff(pid, "Speed", 22000, { inbuiltLevel: 2 });
     sound.at(pid, "bearRoar1", 1.0, 0.6, 30);
     sound.at(pid, "ominousBellHit", 0.85, 0.75, 28);
     startMythicForm(pid, {
@@ -1191,6 +1191,8 @@
     poseSlash(pid, 500);
     sound.at(pid, "bigDrumSwish2", 0.9, 1.15, 24);
     sound.at(pid, "cannonFire2", 0.8, 1.1, 24);
+    eff(pid, "Damage Reduction", 20000, { inbuiltLevel: 2 });
+    eff(pid, "Speed", 20000, { inbuiltLevel: 2 });
     startMythicForm(pid, {
       scale: 1.18,
       title: "AWAKENED MOCHI SOVEREIGN",
@@ -1452,8 +1454,8 @@
     poseRoar(pid, 680);
     sound.at(pid, "pulseFromTheDark", 1.0, 0.55, 30);
     sound.at(pid, "ominousBellHit", 0.95, 0.6, 30);
-    eff(pid, "Damage", 9000, { inbuiltLevel: 3 });
-    eff(pid, "Damage Reduction", 9000, { inbuiltLevel: 3 });
+    eff(pid, "Damage", 23000, { inbuiltLevel: 3 });
+    eff(pid, "Damage Reduction", 23000, { inbuiltLevel: 3 });
     startMythicForm(pid, {
       scale: 1.5,
       title: "SHADOWS' ASGARD OVERLORD",
