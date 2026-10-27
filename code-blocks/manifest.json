@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-27T11:05:59.570Z",
+  "generatedAt": "2026-10-27T12:26:34.355Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,8 +8,8 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 445801,
-  "packedChars": 226265,
+  "sourceChars": 445788,
+  "packedChars": 226252,
   "compression": "49 %",
   "packCount": 8,
   "packs": [
@@ -106,7 +106,7 @@
       "z": 100007,
       "chars": 26447,
       "payloadChars": 26414,
-      "hash": "bddf28d1",
+      "hash": "aa8915c9",
       "modules": 2,
       "sources": [
         "300-common-uncommon-plus.js",
@@ -117,9 +117,9 @@
       "index": 7,
       "file": "pack-07.js",
       "z": 100008,
-      "chars": 22998,
-      "payloadChars": 22965,
-      "hash": "32891bca",
+      "chars": 22994,
+      "payloadChars": 22961,
+      "hash": "306f3021",
       "modules": 1,
       "sources": [
         "320-legendary-mythical-plus.js"
@@ -129,9 +129,9 @@
       "index": 8,
       "file": "pack-08.js",
       "z": 100009,
-      "chars": 24443,
-      "payloadChars": 24410,
-      "hash": "d9ec7b41",
+      "chars": 24434,
+      "payloadChars": 24401,
+      "hash": "b79de118",
       "modules": 1,
       "sources": [
         "330-mythical-apex-plus.js"
