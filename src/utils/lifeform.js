@@ -22,6 +22,15 @@ function toSet(ids) {
     return s;
 }
 
+export function isNpcEntity(id) {
+    if (!id) return false;
+    try {
+        const t = api.getEntityType(id);
+        if (t === "NPC" || (typeof t === "string" && t.toLowerCase() === "npc")) return true;
+    } catch (e) {}
+    return false;
+}
+
 export function refreshAliveCache(force) {
     const n = nowMs();
     if (!force && state.t && (n - state.t) < ALIVE_TTL_MS) return;
@@ -31,10 +40,15 @@ export function refreshAliveCache(force) {
     try { p = api.getPlayerIds() || []; } catch (e) { p = []; }
     try { m = api.getMobIds() || []; } catch (e2) { m = []; }
 
+    const mobsFiltered = [];
+    for (let i = 0; i < m.length; i++) {
+        if (!isNpcEntity(m[i])) mobsFiltered.push(m[i]);
+    }
+
     state.playersArr = p;
-    state.mobsArr = m;
+    state.mobsArr = mobsFiltered;
     state.players = toSet(p);
-    state.mobs = toSet(m);
+    state.mobs = toSet(mobsFiltered);
 }
 
 /* CHECKS — FIX: fallback sur safeHealth pour éviter faux négatif du cache */
@@ -65,11 +79,13 @@ export function isMobEntityType(type) {
 }
 
 export function isPlayerAlive(id) {
-    if (!id) return false;
+    if (!id || isNpcEntity(id)) return false;
     refreshAliveCache();
     if (state.players.has(id)) return true;
     // fallback: si on peut lire sa vie, c'est qu'il existe
     try {
+        const tp = api.getEntityType(id);
+        if (tp && tp !== "Player" && tp !== "PLAYER") return false;
         const h = api.getHealth(id);
         if (typeof h === "number" && h > 0) {
             // c'est un joueur vivant mais pas encore dans le cache
@@ -80,7 +96,7 @@ export function isPlayerAlive(id) {
 }
 
 export function isMobAlive(id) {
-    if (!id) return false;
+    if (!id || isNpcEntity(id)) return false;
     refreshAliveCache();
     if (state.mobs.has(id)) return true;
     try {
@@ -94,15 +110,16 @@ export function isMobAlive(id) {
 }
 
 export function isAliveId(id) {
-    if (!id) return false;
+    if (!id || isNpcEntity(id)) return false;
     refreshAliveCache();
     if (state.players.has(id) || state.mobs.has(id)) return true;
     // FIX: cache stale juste après spawn -> on tente lecture directe
     try {
+        const tp = api.getEntityType(id);
+        if (tp === "NPC" || (typeof tp === "string" && tp.toLowerCase() === "npc")) return false;
         const h = api.getHealth(id);
         if (typeof h === "number" && h > 0) return true;
         // même si vie 0, si type mob ou Player et lisible, on considère vivant pour le hit
-        const tp = api.getEntityType(id);
         if (tp === "Player" || isMobEntityType(tp)) return true;
     } catch (e) {}
     return false;
@@ -113,10 +130,12 @@ export function isLifeform(id) {
 }
 
 export function isAliveIdFresh(id) {
-    if (!id) return false;
+    if (!id || isNpcEntity(id)) return false;
     refreshAliveCache(true);
     if (state.players.has(id) || state.mobs.has(id)) return true;
     try {
+        const tp = api.getEntityType(id);
+        if (tp === "NPC" || (typeof tp === "string" && tp.toLowerCase() === "npc")) return false;
         const h = api.getHealth(id);
         if (typeof h === "number" && h > 0) return true;
     } catch (e) {}

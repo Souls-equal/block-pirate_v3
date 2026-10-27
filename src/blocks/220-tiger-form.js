@@ -10,11 +10,36 @@
 const TF_LIFE = 16000, TF_STEP = 6000, TF_MAX = 26000, TF_LOCK = 8000, TF_GAP = 3500;
 const TF_DMG = 30, TF_R = 2.7, TF_LUNGE = 9.5, TF_LIFT = 3.4, TF_KB = 22;
 const TF_TEETH = 8, TF_SEG = 0.66, TF_TAIL = 4, TF_SPEED = 1100, TF_TICK = 20;
+const TF_FUR = "Orange Concrete", TF_PAW = "Black Concrete";
 const TF_ORANGE = [236, 142, 42], TF_DARK = [46, 30, 18], TF_BONE = [252, 248, 238];
 const TF_SND = { form: "pulseFromTheDark", leap: "bigDrumSwish1", land: "cannonFire1", off: "magicAccent4", cut: "critical_hit" };
 
+const TF_NODES = [
+    ["TorsoNode", TF_FUR, 1.44, [0, 0.05, -0.05]],
+    ["HeadMesh", TF_FUR, 0.72, [0, 0.08, 0.08]],
+    ["ArmLeftMesh", TF_FUR, 0.68, [0.07, -0.48, 0]],
+    ["ArmRightMesh", TF_FUR, 0.68, [-0.07, -0.48, 0]],
+    ["LegLeftMesh", TF_PAW, 0.62, [0.02, -0.46, 0.03]],
+    ["LegRightMesh", TF_PAW, 0.62, [-0.02, -0.46, 0.03]],
+];
+
 const tfOn = {};                                  /* pid -> la forme en cours */
 const tfLock = {};                                /* pid -> fin du verrou */
+
+function tf_suit(pid) {
+    for (let i = 0; i < TF_NODES.length; i++) {
+        const n = TF_NODES[i];
+        try {
+            api.updateEntityNodeMeshAttachment(pid, n[0], "BloxdBlock",
+                { blockName: n[1], size: n[2], meshOffset: [0, 0, 0] }, n[3], [0, 0, 0]);
+        } catch (e) {}
+    }
+}
+function tf_bare(pid) {
+    for (let i = 0; i < TF_NODES.length; i++) {
+        try { api.updateEntityNodeMeshAttachment(pid, TF_NODES[i][0], null, null, null, null) } catch (e) {}
+    }
+}
 
 function tf_now() { try { return api.now() } catch (e) { return Date.now() } }
 function tf_pos(pid) { let p = null; try { p = posOf(pid) } catch (e) {} return p }
@@ -81,7 +106,7 @@ function tf_chomp(st) {
     const ids = entitiesIn([c[0] - TF_R, c[1] - 1.8, c[2] - TF_R], [c[0] + TF_R, c[1] + 1.8, c[2] + TF_R]);
     for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
-        if (!id || id === st.pid || st.hit[id] || !isAliveId(id)) continue;
+        if (!id || id === st.pid || st.hit[id] || !isAliveId(id) || safeEntityType(id) === "NPC") continue;
         const q = tf_pos(id);
         if (!q) continue;
         const dx = q[0] - p[0], dz = q[2] - p[2];
@@ -173,6 +198,7 @@ function tf_off(pid, expire) {
     const st = tfOn[pid];
     if (!st) return false;
     delete tfOn[pid];
+    tf_bare(pid);
     tf_puff(st, false);
     tfLock[pid] = tf_now() + TF_LOCK;
     if (expire) try { api.sendMessage(pid, "Your fur settles back into skin.") } catch (e) {}
@@ -198,6 +224,7 @@ function onPlayerClickTigerForm(pid, itemName) {
         teeth: 0, land: 0, hit: {}, a: tf_axes(pid),
     };
     tfOn[pid] = rec;
+    tf_suit(pid);
     tf_puff(rec, true);
     tf_leap(rec);
     eff(pid, "Speed", TF_SPEED, 1);
