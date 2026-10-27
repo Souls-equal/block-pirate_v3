@@ -7,7 +7,7 @@
    tu as l'aura, la queue et la vitesse du tigre en particules. Un bond par clic : chaque
    bond rallonge la forme de 6 s, jusqu'a 26 s. */
 
-const TF_LIFE = 16000, TF_STEP = 6000, TF_MAX = 26000, TF_LOCK = 8000, TF_GAP = 3500;
+const TF_LIFE = 30000, TF_STEP = 10000, TF_MAX = 50000, TF_LOCK = 8000, TF_GAP = 3500;
 const TF_DMG = 30, TF_R = 2.7, TF_LUNGE = 9.5, TF_LIFT = 3.4, TF_KB = 22;
 const TF_TEETH = 8, TF_SEG = 0.66, TF_TAIL = 4, TF_SPEED = 1100, TF_TICK = 20;
 const TF_FUR = "Orange Concrete", TF_PAW = "Black Concrete";

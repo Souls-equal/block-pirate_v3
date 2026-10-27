@@ -126,7 +126,7 @@
       });
     }
     let step = 0;
-    const maxSteps = cfg.steps || 14;
+    const maxSteps = (cfg.steps || 14) * 6;
     run({
       next: function () {
         if (mythicForms[pid] !== state || state.tok !== tok) return { done: true };
@@ -151,7 +151,7 @@
             cfg.onAura(p, step);
           } catch (e) {}
         }
-        return { value: sleep(cfg.interval || 3), done: false };
+        return { value: sleep(cfg.interval || 5), done: false };
       },
     });
   }
@@ -499,8 +499,8 @@
     poseRoar(pid, 680);
     sound.at(pid, "pulseFromTheDark", 1.0, 0.5, 30);
     sound.at(pid, "ominousBellHit", 0.95, 0.55, 30);
-    eff(pid, "Damage", 9000, { inbuiltLevel: 3 });
-    eff(pid, "Damage Reduction", 9000, { inbuiltLevel: 3 });
+    eff(pid, "Damage", 23000, { inbuiltLevel: 3 });
+    eff(pid, "Damage Reduction", 23000, { inbuiltLevel: 3 });
     startMythicForm(pid, {
       scale: 1.48,
       title: "VENOM DEMON: KINJITE",
@@ -614,7 +614,7 @@
     poseRoar(pid, 580);
     sound.at(pid, "futureStrangePulse", 0.9, 0.85, 26);
     sound.at(pid, "pulseFromTheDark", 0.85, 0.75, 26);
-    eff(pid, "Damage Reduction", 8000, { inbuiltLevel: 3 });
+    eff(pid, "Damage Reduction", 20000, { inbuiltLevel: 3 });
     startMythicForm(pid, {
       scale: 1.32,
       title: "SHINOKUNI GAS REALM",
@@ -624,7 +624,7 @@
         [[140, 230, 255], [195, 110, 255]],
         [[70, 160, 220, 0], [140, 60, 210, 0]],
       ],
-      steps: 12,
+      steps: 14,
       onAura: function (ap, st) {
         ring(
           [ap[0], ap[1] + 1.0, ap[2]],
@@ -642,8 +642,8 @@
           },
           st * 0.75,
         );
-        pullIn(ap, 4.8, pid, 0.7, 0.15);
-        if (st % 2 === 0) {
+        if (st % 4 === 0) pullIn(ap, 4.8, pid, 0.7, 0.15);
+        if (st % 8 === 0) {
           hitArea(ap, 4.6, pid, itemName, 24, { height: 3.4, slow: [2500, 3] });
         }
       },
@@ -698,7 +698,7 @@
     poseRoar(pid, 620);
     sound.at(pid, "ominousBellHit", 0.95, 1.05, 28);
     sound.at(pid, "magicAccent4", 0.9, 1.25, 26);
-    eff(pid, "Damage", 8000, { inbuiltLevel: 2 });
+    eff(pid, "Damage", 22000, { inbuiltLevel: 2 });
     startMythicForm(pid, {
       scale: 1.28,
       title: "SOUL SOVEREIGN: ZEUS & PROMETHEUS",
@@ -926,6 +926,7 @@
     poseSlash(pid, 480);
     sound.at(p, "bearRoar1", 0.95, 1.05, 26);
     sound.at(p, "magicAccent3", 0.85, 1.45, 24);
+    eff(pid, "Speed", 20000, { inbuiltLevel: 2 });
     startMythicForm(pid, {
       scale: 1.25,
       title: "BYAKKO WHITE TIGER",
@@ -935,7 +936,7 @@
         [[255, 245, 180], [255, 150, 40]],
         [[190, 90, 15, 0], [255, 250, 210, 0]],
       ],
-      steps: 10,
+      steps: 14,
       onAura: function (ap, st) {
         ring(
           [ap[0], ap[1] + 0.9, ap[2]],
@@ -1044,7 +1045,7 @@
     poseRoar(pid, 650);
     sound.at(pid, "bearRoar1", 1.0, 0.55, 30);
     sound.at(pid, "glass1", 0.9, 0.75, 28);
-    eff(pid, "Damage Reduction", 8000, { inbuiltLevel: 3 });
+    eff(pid, "Damage Reduction", 22000, { inbuiltLevel: 3 });
     startMythicForm(pid, {
       scale: 1.46,
       title: "ABOMINABLE FROST TITAN",
@@ -1188,6 +1189,7 @@
     const c = [p[0] + d[0] * 3.6, p[1] + 1.1, p[2] + d[2] * 3.6];
     sound.at(pid, "bigDrumSwish2", 0.9, 1.3, 24);
     sound.at(pid, "magicAccent4", 0.85, 1.35, 24);
+    eff(pid, "Speed", 22000, { inbuiltLevel: 2 });
     startMythicForm(pid, {
       scale: 1.24,
       title: "CELESTIAL NINE-TAILS KITSUNE",
@@ -1482,8 +1484,8 @@
     poseRoar(pid, 680);
     sound.at(pid, "bearRoar1", 1.0, 0.5, 32);
     sound.at(pid, "ominousBellHit", 0.95, 0.65, 30);
-    eff(pid, "Damage Reduction", 9000, { inbuiltLevel: 3 });
-    eff(pid, "Damage", 9000, { inbuiltLevel: 3 });
+    eff(pid, "Damage Reduction", 24000, { inbuiltLevel: 3 });
+    eff(pid, "Damage", 24000, { inbuiltLevel: 3 });
     startMythicForm(pid, {
       scale: 1.48,
       title: "EMPEROR DRAGON ASCENSION",
