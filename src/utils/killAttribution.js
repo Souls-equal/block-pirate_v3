@@ -11,6 +11,47 @@ const CREDIT_HOLD_MS = 15000;
 
 const CLAIMED = {};
 
+/* Anti-exploit : un mob qui despawn parce que le joueur a quitte la zone (chunks
+   decharges) ne doit JAMAIS payer. Seul un kill confirme par le moteur
+   (onPlayerKilledMob) est paye sans verification ; sinon le tueur doit etre a
+   portee de la cible. 64 blocs = 2 chunks, la zone que le joueur garde
+   toujours chargee. */
+const CREDIT_MAX_DIST = 64;
+const CREDIT_MAX_DIST_SQ = CREDIT_MAX_DIST * CREDIT_MAX_DIST;
+
+function posOf(id) {
+    if (!id) return null;
+    try {
+        const p = api.getPosition(id);
+        if (!p || p.length < 3) return null;
+        const x = +p[0], y = +p[1], z = +p[2];
+        /* NaN => coordonnee illisible : on considere la position inconnue. */
+        if (x !== x || y !== y || z !== z) return null;
+        return [x, y, z];
+    } catch (e) {
+        return null;
+    }
+}
+
+/* Position de la cible : vivante si lisible, sinon celle memorisee au dernier
+   coup recu (le mob a disparu avec le chunk, api.getPosition leve). */
+function targetPos(targetId) {
+    const live = posOf(targetId);
+    if (live) return live;
+    const h = HITS[targetId];
+    return h && h.pos ? h.pos : null;
+}
+
+/* true si le tueur peut legitimement encaisser la mort de cette cible. */
+export function killerInRange(killerId, targetId) {
+    const k = posOf(killerId);
+    if (!k) return false;   // tueur deconnecte : impossible de verifier, on ne paie pas
+    const t = targetPos(targetId);
+    if (!t) return false;   // position de la cible inconnue : on ne paie pas
+    const dx = k[0] - t[0], dy = k[1] - t[1], dz = k[2] - t[2];
+    return dx * dx + dy * dy + dz * dz <= CREDIT_MAX_DIST_SQ;
+}
+
 let lastPrune = 0;
 
 let creditHook = null;
@@ -74,9 +115,12 @@ export function releaseKill(targetId) {
     delete CLAIMED[targetId];
 }
 
-export function creditKill(killerId, targetId, targetName) {
+export function creditKill(killerId, targetId, targetName, confirmed) {
     if (!killerId || !targetId) return false;
     const realKiller = resolveOwnerId(killerId) || killerId;
+    /* Mort confirmee par le moteur (onPlayerKilledMob) ou simple despawn :
+       dans le second cas on exige que le tueur soit encore a portee. */
+    if (!confirmed && !killerInRange(realKiller, targetId)) return false;
     if (!claimKill(targetId, realKiller)) return false;
     if (creditHook) {
         try { creditHook(realKiller, targetId, targetName || null); }
@@ -93,7 +137,9 @@ export function recordDamager(targetId, killerId, itemName) {
     HITS[targetId] = {
         killerId: realKiller,
         itemName: itemName || null,
-        at: Date.now()
+        at: Date.now(),
+        /* memorisee ici : au despawn, la cible n'a plus de position lisible */
+        pos: posOf(targetId)
     };
 }
 
