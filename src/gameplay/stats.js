@@ -34,13 +34,6 @@ export const STAT_CONFIG = {
 
 const STAT_ORDER = ["h", "d", "s", "r", "df"];
 
-/* Id refusé par les API Bloxd : "-1" = joueur qui n'existe plus. */
-function validId(playerId) {
-    if (null === playerId || void 0 === playerId) return false;
-    const id = String(playerId);
-    return !!id && "-1" !== id && "0" !== id && "undefined" !== id && "null" !== id;
-}
-
 function statCurrencyId(key) { return "stat_" + key; }
 
 /* EFFECT FORMULAS */
@@ -130,7 +123,7 @@ function spendSP(playerId, amount) {
 
 /* APPLY EFFECTS */
 export function applyStatEffects(playerId) {
-    if (!validId(playerId)) return;
+    if (!playerId) return;
     const h  = getStatLevel(playerId, "h");
     const d  = getStatLevel(playerId, "d");
     const s  = getStatLevel(playerId, "s");
@@ -158,7 +151,7 @@ export function applyStatEffects(playerId) {
 }
 
 export function fullHeal(playerId) {
-    if (!validId(playerId)) return;
+    if (!playerId) return;
     try {
         const max = Number(api.getClientOption(playerId, "maxHealth")) || BASE_HP;
         api.setHealth(playerId, max);

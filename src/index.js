@@ -79,13 +79,6 @@ function isNPCEntity(t) {
     }
 }
 
-/* Id refusé par les API Bloxd : "-1" = joueur qui n'existe plus. */
-function validId(t) {
-    if (null === t || void 0 === t) return !1;
-    const r = String(t);
-    return !!r && "-1" !== r && "0" !== r && "undefined" !== r && "null" !== r;
-}
-
 /* Nom de l'item tenu (null si inconnu). */
 function heldItemName(t) {
     try {
@@ -115,15 +108,13 @@ function meleeLocked(t, withItem) {
 }
 
 $(), x(), rt(H), yt(E), ct((t, r, a) => {
-    /* Le kill peut être crédité après la déconnexion du tueur (id "-1").
-       Les fonctions appelées en dessous sont déjà protégées (try/catch), donc
-       on ne bloque que la sentinelle : le reste doit continuer à fonctionner. */
-    const alive = validId(t);
+    /* Le kill peut être crédité après la déconnexion du tueur : toutes les
+       fonctions appelées ici sont protégées (try/catch), on ne filtre rien. */
     Gt("bossKill", () => Ft(t, r));
     let i = a || null;
     Gt("kill", () => {
         i = j(t, r) || i;
-    }), i && Gt("quest", () => L(t, i)), alive && Gt("sidebar", () => K(t));
+    }), i && Gt("quest", () => L(t, i)), Gt("sidebar", () => K(t));
     try {
         lt(r);
     } catch (t) {
