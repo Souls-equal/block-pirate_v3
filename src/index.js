@@ -281,7 +281,9 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         }
         return void dt(r);
     }
-    CtKill(e, r);
+    /* Mort confirmee par le moteur : credit garanti, sans test de distance
+       (contrairement aux despawns, voir killAttribution). */
+    CtKill(e, r, null, !0);
 }, onPlayerChat = (t, r, i) => a(t, r, i), playerCommand = (t, a) => {
     let i = null;
     try {
