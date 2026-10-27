@@ -657,3 +657,84 @@ function crewInfo(playerId) {
 
     return true;
 }
+
+/* ---------- BOUNTY ---------- */
+/* Un Pirate (ou un joueur sans equipe, traite comme pirate) qui tue vole 10 %
+   de l'argent de sa victime (1000 max) : ce montant est ajoute a sa prime.
+   Un Marine qui tue un pirate empoche la prime (10000 max) et la prime du
+   pirate repart a 0 (le surplus eventuel est perdu). La prime n'a pas de
+   plafond : seule la recolte d'un Marine est plafonnee. */
+const BOUNTY_STEAL_RATE = 0.1;
+const BOUNTY_STEAL_MAX = 1000;
+const BOUNTY_MARINE_MAX = 10000;
+/* Le moteur peut signaler une meme mort deux fois : on ignore un second
+   traitement pour la meme victime pendant ce delai. */
+const BOUNTY_LOCK_MS = 3000;
+const BOUNTY_LAST = {};
+
+function moneyOf(playerId) {
+    const n = Math.floor(Number(getStat(playerId, "money", 0)));
+    return n > 0 ? n : 0;
+}
+
+function giveMoney(playerId, amount) {
+    if (!playerId || !amount) return;
+    setStat(playerId, "money", Math.max(0, moneyOf(playerId) + amount));
+}
+
+function bountySay(playerId, text, color) {
+    try {
+        api.sendMessage(playerId, [ { str: text, style: { color: color } } ]);
+    } catch (e) {}
+}
+
+export function getBounty(playerId) {
+    const n = Math.floor(Number(getStat(playerId, "bounty", 0)));
+    return n > 0 ? n : 0;
+}
+
+export function setBounty(playerId, amount) {
+    return setStat(playerId, "bounty", Math.max(0, Math.floor(amount || 0)));
+}
+
+export function addBounty(playerId, amount) {
+    const gain = Math.max(0, Math.floor(amount || 0));
+    const next = getBounty(playerId) + gain;
+    setStat(playerId, "bounty", next);
+    return next;
+}
+
+/* killerId doit etre un id de JOUEUR (verifie par l'appelant) ; victimId aussi. */
+export function handleBountyKill(killerId, victimId) {
+    if (!killerId || !victimId || killerId === victimId) return null;
+    const now = Date.now();
+    if (BOUNTY_LAST[victimId] && now - BOUNTY_LAST[victimId] < BOUNTY_LOCK_MS) return null;
+    BOUNTY_LAST[victimId] = now;
+
+    let killerTeam = "NONE";
+    let victimTeam = "NONE";
+    try { killerTeam = getPlayerTeam(killerId) || "NONE"; } catch (e) {}
+    try { victimTeam = getPlayerTeam(victimId) || "NONE"; } catch (e) {}
+
+    /* Marine vs Marine : rien (ils ne peuvent pas se frapper de toute facon). */
+    if (killerTeam === "MARINES" && victimTeam === "MARINES") return null;
+
+    if (killerTeam === "MARINES") {
+        const victimBounty = getBounty(victimId);
+        if (victimBounty <= 0) return { type: "none", amount: 0, bounty: 0 };
+        const payout = Math.min(victimBounty, BOUNTY_MARINE_MAX);
+        setBounty(victimId, 0);
+        giveMoney(killerId, payout);
+        bountySay(killerId, "\u2693 Bounty collected: $" + payout + " (" + safeName(victimId) + ")", "#3b82f6");
+        return { type: "payout", amount: payout, lost: victimBounty - payout, bounty: 0 };
+    }
+
+    /* Pirate (ou sans equipe) : vol de 10 % de l'argent de la victime. */
+    const stolen = Math.min(Math.floor(moneyOf(victimId) * BOUNTY_STEAL_RATE), BOUNTY_STEAL_MAX);
+    if (stolen <= 0) return { type: "none", amount: 0, bounty: getBounty(killerId) };
+    giveMoney(victimId, -stolen);
+    giveMoney(killerId, stolen);
+    const bounty = addBounty(killerId, stolen);
+    bountySay(killerId, "\u2620 Bounty: +$" + stolen + " (total $" + bounty + ")", "#ef4444");
+    return { type: "steal", amount: stolen, bounty: bounty };
+}

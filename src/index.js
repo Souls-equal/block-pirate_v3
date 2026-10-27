@@ -1,4 +1,4 @@
-import { canDamage as t, crewCommands as r, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
+import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { FRUIT_ABILITIES as h, abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
@@ -238,9 +238,26 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     } catch (t) {
         _t("onPlayerDamagingMob.fsM1", t);
     }
-}, onAttemptKillPlayer = t => {
+}, onAttemptKillPlayer = (t, r) => {
     if (A(t)) return bt(t), "preventDeath";
     k(t), df(t), Pt(t);
+    /* Bounty : le moteur fournit le tueur (r), sinon on reprend le dernier
+       attaquant — a lire AVANT de l'oublier. Le tueur doit etre un joueur en
+       vie (les mobs et l'environnement ne volent rien). */
+    let bKiller = r || null;
+    if (!bKiller) try {
+        const d = st(t);
+        bKiller = d && d.killerId || null;
+    } catch (e) {
+        _t("onAttemptKillPlayer.lastDamager", e);
+    }
+    if (bKiller) Gt("bounty", () => {
+        let isPlayer = !1;
+        try {
+            isPlayer = gt().indexOf(bKiller) !== -1;
+        } catch (e) {}
+        isPlayer && bKill(bKiller, t);
+    });
     try {
         lt(t);
     } catch (t) {
