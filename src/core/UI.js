@@ -4,6 +4,7 @@ import { addStat, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
+import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
 import { isVanished } from "./admin";
 
@@ -52,6 +53,10 @@ function drawSidebar(playerId){
     const xp = getStat(playerId, "xp", 0);
     const sp = getStat(playerId, "sp", 0);
     const fruit = getFruit(playerId) || "No fruit";
+    const styleName = getFightingStyle(playerId);
+    const styleInfo = getFightingStyleInfo(styleName);
+    const styleLabel = styleName || "No style";
+    const styleColor = (styleInfo && styleInfo.color) || "#94a3b8";
     const xpNeeded = xpToNext(lvl);
 
     const xpData = makeXpBar(xp, xpNeeded);
@@ -96,7 +101,11 @@ function drawSidebar(playerId){
 
         /* FRUIT */
         { icon:"Hunger", style:{ fontSize: title2, fontWeight: "bold" } },
-        { str: fruit + "\n\n", style: { color: "#E84759", fontWeight: "bold", fontSize:title2  } },
+        { str: fruit + "\n", style: { color: "#E84759", fontWeight: "bold", fontSize:title2  } },
+
+        /* FIGHTING STYLE */
+        { icon: "fa-solid fa-hand-fist", style: { color: styleColor, fontSize: title2 } },
+        { str: " " + styleLabel + "\n\n", style: { color: styleColor, fontWeight: "bold", fontSize: title2 } },
 
         /* LEVEL */
         { icon: "fa-solid fa-angle-double-up", style: { color: "#FF8C00", fontSize: title2} },

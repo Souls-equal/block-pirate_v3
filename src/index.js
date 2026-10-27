@@ -6,8 +6,9 @@ import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboa
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
 import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
-import { setInterval as R, step as W } from "./utils/timer";
+import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
+import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
@@ -93,9 +94,9 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }), onPlayerJoin = t => {
     qt(t) || (Qt(t), y(t), X(t), Rt(t), Ht(t), z(t), M(t), m(t), Gt("weapons", () => i(t)), 
     e(t), S(t), K(t), T(t), o(t), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)), 
-    G(t), _(t), g(t), P(t));
+    G(t), _(t), g(t), fsRestore(t), P(t));
 }, onPlayerLeave = t => {
-    k(t), Y(t), J(t), s(t), V(t), it(t), Wt(t);
+    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t);
     try {
         lt(t);
     } catch (t) {
@@ -104,18 +105,26 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     bt(t), dt(t), Jt(t);
     for (const r of Xt.keys()) if (r.startsWith(String(t) + ":")) Xt.delete(r);
 }, onRespawnRequest = t => {
-    Lt(t), g(t), P(t), K(t);
+    Lt(t), g(t), fsRestore(t), P(t), K(t);
     try {
-        w(() => {
-            g(t), P(t), K(t);
+        sTimeout(() => {
+            g(t), fsRestore(t), P(t), K(t);
         }, 5);
     } catch (t) {}
 }, onPlayerClick = (t, r, a, i, e, o, m) => {
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
+    if (m && isNPCEntity(m)) {
+        try {
+            Zt(t, m);
+        } catch (t) {
+            _t("onPlayerClick.attackNPC", t);
+        }
+        return;
+    }
     let s = !1;
     try {
-        s = p(t, r, a, i, e, o, m);
+        s = fsClick(t, r, a, i, e, o, m) || p(t, r, a, i, e, o, m);
     } catch (t) {
         _t("onPlayerClick.handleAbility", t), s = !0;
     }
@@ -126,9 +135,9 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
             _t("onPlayerClick.handleFruit", t);
         }
         try {
-            Zt(t, m);
+            fsM1(t, m);
         } catch (t) {
-            _t("onPlayerClick.attackNPC", t);
+            _t("onPlayerClick.fightingStyleM1", t);
         }
     }
 }, onPlayerClickUp = (t, r, a, i, e, o, m) => {
@@ -143,7 +152,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     } catch (t) {
         m = null, _t("getPlayerPhysicsState", t);
     }
-    return !m || 1 === m.type || api.getHeldItem(t) || api.isPlayerCrouching(t) || ot(t) ? void 0 : D(t) ? "preventAction" : void 0;
+    return !m || 1 === m.type || api.getHeldItem(t) || api.isPlayerCrouching(t) || ot(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r) => {
     if (A(r)) return "preventDamage";
 }, onPlayerDamagingOtherPlayer = (r, a, i, e) => {
@@ -153,7 +162,15 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     } catch (t) {
         _t("onPlayerDamagingOtherPlayer.recordDamager", t);
     }
-    return t(r, a);
+    const res = t(r, a);
+    if (res !== "preventDamage") {
+        try {
+            fsM1(r, a);
+        } catch (t) {
+            _t("onPlayerDamagingOtherPlayer.fsM1", t);
+        }
+    }
+    return res;
 }, onPlayerDamagingMob = (t, r, a, i) => {
     if (Et(t, r, a, i) || isNPCEntity(r)) return "preventDamage";
     nt(r);
@@ -161,6 +178,11 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         ft(r, t, Vt(i));
     } catch (t) {
         _t("onPlayerDamagingMob.recordDamager", t);
+    }
+    try {
+        fsM1(t, r);
+    } catch (t) {
+        _t("onPlayerDamagingMob.fsM1", t);
     }
 }, onAttemptKillPlayer = t => {
     if (A(t)) return bt(t), "preventDeath";
@@ -199,10 +221,10 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     "EPICOO00000" !== i && "K4miNoK4mi" !== i && "Yanick2010" !== i && Gt("crew", () => r(t, a));
 }, onPlayerChangeBlock = (t, r, a, i, e, o, m, l, s) => {
     const n = api.getEntityName(t);
-    if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) ? "preventChange" : void 0;
+    if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) || fsItemName(o) ? "preventChange" : void 0;
 }, onPlayerDropItem = (t, r, a, i, e, o, m) => {
     const l = "string" == typeof e ? e : e?.name || e?.type;
-    if (C(l)) return "preventDrop";
+    if (C(l) || fsItemName(l)) return "preventDrop";
     const s = h[n(t)];
     return s?.baseItem && s.baseItem.type === l ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
