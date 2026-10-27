@@ -10,7 +10,7 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { isOnlinePlayer as isOnline, reconcileSP as _ } from "./utils/data";
+import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
 import { clearPlayerEffects as V } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
@@ -79,6 +79,13 @@ function isNPCEntity(t) {
     }
 }
 
+/* Id refusé par les API Bloxd : "-1" = joueur qui n'existe plus. */
+function validId(t) {
+    if (null === t || void 0 === t) return !1;
+    const r = String(t);
+    return !!r && "-1" !== r && "0" !== r && "undefined" !== r && "null" !== r;
+}
+
 /* Nom de l'item tenu (null si inconnu). */
 function heldItemName(t) {
     try {
@@ -108,14 +115,15 @@ function meleeLocked(t, withItem) {
 }
 
 $(), x(), rt(H), yt(E), ct((t, r, a) => {
-    /* Le kill peut être crédité après la déconnexion du tueur (id "-1") :
-       on ne touche alors ni aux récompenses, ni à la quête, ni à la sidebar. */
-    const online = isOnline(t);
-    online && Gt("bossKill", () => Ft(t, r));
+    /* Le kill peut être crédité après la déconnexion du tueur (id "-1").
+       Les fonctions appelées en dessous sont déjà protégées (try/catch), donc
+       on ne bloque que la sentinelle : le reste doit continuer à fonctionner. */
+    const alive = validId(t);
+    Gt("bossKill", () => Ft(t, r));
     let i = a || null;
-    online && Gt("kill", () => {
+    Gt("kill", () => {
         i = j(t, r) || i;
-    }), i && online && Gt("quest", () => L(t, i)), online && Gt("sidebar", () => K(t));
+    }), i && Gt("quest", () => L(t, i)), alive && Gt("sidebar", () => K(t));
     try {
         lt(r);
     } catch (t) {
@@ -123,9 +131,17 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     }
     dt(r);
 }), onPlayerJoin = t => {
-    qt(t) || (Qt(t), y(t), X(t), Rt(t), Ht(t), z(t), M(t), m(t), Gt("weapons", () => i(t)), 
-    e(t), S(t), K(t), T(t), o(t), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)), 
-    G(t), _(t), g(t), fsRestore(t), P(t));
+    if (qt(t)) return;
+    /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
+       quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
+       être sautés à cause d'une erreur survenue plus tôt dans le join. */
+    Qt(t), Gt("fruit", () => y(t)), Gt("codes", () => X(t)), Gt("admin", () => Rt(t)),
+    Gt("haki", () => Ht(t)), Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
+    Gt("nametag", () => m(t)), Gt("weapons", () => i(t)), Gt("chat", () => e(t)),
+    Gt("leaderboard", () => S(t)), Gt("sidebar", () => K(t)), Gt("quest", () => T(t)),
+    Gt("crew", () => o(t)), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)),
+    Gt("rank", () => G(t)), Gt("sp", () => _(t)), Gt("restoreFruit", () => g(t)),
+    Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t));
 }, onPlayerLeave = t => {
     k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t);
     try {
@@ -136,10 +152,13 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     bt(t), dt(t), Jt(t);
     for (const r of Xt.keys()) if (r.startsWith(String(t) + ":")) Xt.delete(r);
 }, onRespawnRequest = t => {
-    Lt(t), g(t), fsRestore(t), P(t), K(t);
+    Gt("hakiRespawn", () => Lt(t)), Gt("restoreFruit", () => g(t)),
+    Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
+    Gt("sidebar", () => K(t));
     try {
         sTimeout(() => {
-            g(t), fsRestore(t), P(t), K(t);
+            Gt("restoreFruit", () => g(t)), Gt("restoreStyle", () => fsRestore(t)),
+            Gt("abilities", () => P(t)), Gt("sidebar", () => K(t));
         }, 5);
     } catch (t) {}
 }, onPlayerClick = (t, r, a, i, e, o, m) => {

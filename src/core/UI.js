@@ -1,6 +1,6 @@
 // UI.js
 
-import { addStat, getStat, isValidPlayerId, setStat, xpToNext } from "../utils/data";
+import { addStat, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
@@ -35,22 +35,31 @@ function makeXpBar(xp, xpNeeded, size = 18){
     return makeBar(xp, xpNeeded, size);
 }
 
+/* Id refusé par les API Bloxd : "-1" est la sentinelle renvoyée quand le
+   joueur n'existe plus. On ne teste pas le format (un id valide peut être
+   n'importe quelle chaîne). Helper local : aucun import en plus. */
+function validId(playerId) {
+    if (null === playerId || void 0 === playerId) return false;
+    const id = String(playerId);
+    return !!id && "-1" !== id && "0" !== id && "undefined" !== id && "null" !== id;
+}
+
 const title = "1.9em", title2 = "1.5em", text = "1.1em";
 const border = "lightgray"
 
 export function updateSidebar(playerId){
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
     updateLeaderboard(playerId)
     drawSidebar(playerId)
 }
 
 export function updateSidebarLight(playerId){
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
     drawSidebar(playerId)
 }
 
 function drawSidebar(playerId){
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
     const money = getStat(playerId, "money", 0);
     const lvl = getStat(playerId, "lvl", 1);
     const xp = getStat(playerId, "xp", 0);
@@ -95,7 +104,7 @@ function drawSidebar(playerId){
             { str: "No active quest\n\n", style: { color: "#AAAAAA", fontSize:text  } }
         ];
     }
-    api.setClientOption(playerId, "RightInfoText", [
+    const sidebarText = [
         { str: "╔ BLOCK PIRATES ╗\n", style: { color: "#00BFFF", fontWeight: "bold", fontSize: title } },
 
         /* MONEY */
@@ -137,26 +146,32 @@ function drawSidebar(playerId){
         { str: sp + "\n\n", style: { color: "#FFFFFF", fontWeight: "bold", fontSize:text  } },
 
         ...questLines,
-    ]);
+
+    ];
+    try {
+        api.setClientOption(playerId, "RightInfoText", sidebarText);
+    } catch (e) {}
 }
 
 /* SETUP TABLE STRUCTURE */
 export function setupLeaderboard(playerId){
-    api.setClientOption(playerId, "lobbyLeaderboardInfo", {
-        name:  { displayName: "Name",  sortPriority: 5 },
-        level: { displayName: "Level", sortPriority: 0 },
-        xp:    { displayName: "XP %",  sortPriority: 2 },
-        money: { displayName: "Money", sortPriority: 1 },
-        team:  { displayName: "Team",  sortPriority: 4 },
-        crew:  { displayName: "Crew",  sortPriority: 3 },
-        fruit: { displayName: "Fruit", sortPriority: 6 },
-
-    });
+    if (!validId(playerId)) return;
+    try {
+        api.setClientOption(playerId, "lobbyLeaderboardInfo", {
+            name:  { displayName: "Name",  sortPriority: 5 },
+            level: { displayName: "Level", sortPriority: 0 },
+            xp:    { displayName: "XP %",  sortPriority: 2 },
+            money: { displayName: "Money", sortPriority: 1 },
+            team:  { displayName: "Team",  sortPriority: 4 },
+            crew:  { displayName: "Crew",  sortPriority: 3 },
+            fruit: { displayName: "Fruit", sortPriority: 6 },
+        });
+    } catch (e) {}
 }
 
 /* UPDATE PLAYER VALUES */
 export function updateLeaderboard(playerId){
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
 
     const lvl = getStat(playerId, "lvl", 1);
     const money = getStat(playerId, "money", 0);
@@ -167,19 +182,23 @@ export function updateLeaderboard(playerId){
     const xpNeeded = xpToNext(lvl);
     const xpPercent = xpNeeded > 0 ? Math.floor((xp / xpNeeded) * 100) : 0;
 
-    api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {
-        level: lvl,
-        money: money,
-        xp: xpPercent,
-        team: team,
-        crew: crew,
-        fruit: fruit,
-    });
+    /* Un joueur qui vient de se déconnecter fait lever une ApiError : on
+       l'ignore silencieusement pour ne jamais casser l'affichage des autres. */
+    try {
+        api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {
+            level: lvl,
+            money: money,
+            xp: xpPercent,
+            team: team,
+            crew: crew,
+            fruit: fruit,
+        });
+    } catch (e) {}
 }
 
 /* TEAM COLOR ON LEADERBOARD */
 export function updateLeaderboardColor(playerId){
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
 
     const team = getStat(playerId, "team", "NONE");
 
@@ -190,21 +209,25 @@ export function updateLeaderboardColor(playerId){
         NONE: "#aaaaaa"
     };
 
-    api.setTargetedPlayerSettingForEveryone(
-        playerId,
-        "colorInLobbyLeaderboard",
-        colorMap[team] || "#aaaaaa"
-    );
+    try {
+        api.setTargetedPlayerSettingForEveryone(
+            playerId,
+            "colorInLobbyLeaderboard",
+            colorMap[team] || "#aaaaaa"
+        );
+    } catch (e) {}
 }
 
 /* REFRESH SINGLE PLAYER */
 
 export function refreshLeaderboardPlayer(playerId) {
-    if (!isValidPlayerId(playerId)) return;
+    if (!validId(playerId)) return;
     if (isVanished(playerId)) {
-        api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {}, true);
-        api.setTargetedPlayerSettingForEveryone(playerId, "colorInLobbyLeaderboard", "", true);
-        api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardTags", null, true);
+        try {
+            api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardValues", {}, true);
+            api.setTargetedPlayerSettingForEveryone(playerId, "colorInLobbyLeaderboard", "", true);
+            api.setTargetedPlayerSettingForEveryone(playerId, "lobbyLeaderboardTags", null, true);
+        } catch (e) {}
         return;
     }
     updateLeaderboard(playerId);

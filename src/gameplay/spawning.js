@@ -1,7 +1,7 @@
 //spawning.js
 
 import { updateSidebar } from "../core/UI";
-import { addStat, addXP, changeMoney, getStat, isOnlinePlayer, setStat, xpToNext } from "../utils/data";
+import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},
@@ -10,6 +10,13 @@ export const RANK_MULT = {
 };
 
 const RANK_NAME = {1:"",2:"",3:"Boss"};
+
+/* Id refusé par les API Bloxd : "-1" = joueur qui n'existe plus. */
+function validId(playerId) {
+    if (null === playerId || void 0 === playerId) return false;
+    const id = String(playerId);
+    return !!id && "-1" !== id && "0" !== id && "undefined" !== id && "null" !== id;
+}
 
 function mobBaseHp(level){
     return Math.round(20 + Math.pow(level,1.6)*8);
@@ -326,10 +333,9 @@ export function killdMob(playerId, mobId) {
     delete mobData[mobId];
     delete deadMobData[mobId];
 
-    /* Le tueur s'est déconnecté avant le crédit du kill : inutile d'appeler
-       addXP / changeMoney / sendMessage sur un id invalide (ApiError). */
-    if (!isOnlinePlayer(realPlayerId)) {
-        try { api.log("[spawning] kill ignoré : joueur hors ligne (" + realPlayerId + ")"); } catch (e) {}
+    /* Le tueur s'est déconnecté avant le crédit du kill : on ne récompense
+       personne, mais on ne doit surtout pas lever d'ApiError. */
+    if (!validId(realPlayerId)) {
         return resolvedName || data.name || null;
     }
 
@@ -349,12 +355,16 @@ export function killdMob(playerId, mobId) {
         Math.random() * (data.moneyMax - data.moneyMin + 1)
     ) + data.moneyMin;
 
-    addXP(realPlayerId, xp);
-    changeMoney(realPlayerId, money);
+    /* Chaque appel est isolé : un joueur qui vient de se déconnecter ne doit
+       jamais empêcher le kill d'être compté pour les autres. */
+    try { addXP(realPlayerId, xp); } catch (e) {}
+    try { changeMoney(realPlayerId, money); } catch (e) {}
 
-    api.sendMessage(realPlayerId,[
-        {str:"✨ +"+xp+" XP  ",style:{color:"#00ffff"}},
-    ]);
+    try {
+        api.sendMessage(realPlayerId,[
+            {str:"✨ +"+xp+" XP  ",style:{color:"#00ffff"}},
+        ]);
+    } catch (e) {}
 
     return resolvedName || data.name || null;
 };
