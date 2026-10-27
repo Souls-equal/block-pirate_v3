@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-26T23:58:46.930Z",
+  "generatedAt": "2026-10-27T00:28:21.015Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,9 +8,9 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 437580,
-  "packedChars": 220796,
-  "compression": "50 %",
+  "sourceChars": 445541,
+  "packedChars": 226082,
+  "compression": "49 %",
   "packCount": 8,
   "packs": [
     {
@@ -38,15 +38,15 @@
       "index": 2,
       "file": "pack-02.js",
       "z": 100003,
-      "chars": 30579,
-      "payloadChars": 30546,
-      "hash": "8f770736",
+      "chars": 30979,
+      "payloadChars": 30946,
+      "hash": "e230b669",
       "modules": 5,
       "sources": [
         "020-flame.js",
         "100-blade.js",
         "170-ghost.js",
-        "230-creation.js",
+        "220-tiger-form.js",
         "240-magma.js"
       ]
     },
@@ -54,9 +54,9 @@
       "index": 3,
       "file": "pack-03.js",
       "z": 100004,
-      "chars": 31027,
-      "payloadChars": 30994,
-      "hash": "42dd3aa4",
+      "chars": 31216,
+      "payloadChars": 31183,
+      "hash": "83b1786b",
       "modules": 7,
       "sources": [
         "030-lightning.js",
@@ -65,7 +65,7 @@
         "140-smoke.js",
         "200-song.js",
         "210-tiger-mark.js",
-        "220-tiger-form.js"
+        "230-creation.js"
       ]
     },
     {
@@ -104,9 +104,9 @@
       "index": 6,
       "file": "pack-06.js",
       "z": 100007,
-      "chars": 26252,
-      "payloadChars": 26219,
-      "hash": "5b9921a4",
+      "chars": 26447,
+      "payloadChars": 26414,
+      "hash": "bddf28d1",
       "modules": 2,
       "sources": [
         "300-common-uncommon-plus.js",
@@ -117,9 +117,9 @@
       "index": 7,
       "file": "pack-07.js",
       "z": 100008,
-      "chars": 21088,
-      "payloadChars": 21055,
-      "hash": "ace26a09",
+      "chars": 22911,
+      "payloadChars": 22878,
+      "hash": "f470af05",
       "modules": 1,
       "sources": [
         "320-legendary-mythical-plus.js"
@@ -129,9 +129,9 @@
       "index": 8,
       "file": "pack-08.js",
       "z": 100009,
-      "chars": 21668,
-      "payloadChars": 21635,
-      "hash": "af3ae9ad",
+      "chars": 24347,
+      "payloadChars": 24314,
+      "hash": "df5ed032",
       "modules": 1,
       "sources": [
         "330-mythical-apex-plus.js"

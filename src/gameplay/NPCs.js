@@ -116,13 +116,25 @@ function npcKey(pos, name) {
     return name + "|" + Math.round(pos[0]) + "," + Math.round(pos[1]) + "," + Math.round(pos[2]);
 }
 
+function anchorNPCPos(id, pos) {
+    if (!id || !pos) return;
+    const tx = pos[0] + 0.5, ty = pos[1] + 1, tz = pos[2] + 0.5;
+    try {
+        const p = api.getPosition(id);
+        if (p && (Math.abs(p[0] - tx) > 0.12 || Math.abs(p[1] - ty) > 0.5 || Math.abs(p[2] - tz) > 0.12)) {
+            api.setPosition(id, tx, ty, tz);
+            api.setVelocity(id, 0, 0, 0);
+        }
+    } catch (e) {}
+}
+
 function findNPCNear(pos, name, radius) {
-    radius = radius || 4;
+    radius = radius || 16;
     let around = [];
     try {
         around = api.getEntitiesInRect(
-            [pos[0] - radius, pos[1] - 3, pos[2] - radius],
-            [pos[0] + radius, pos[1] + 3, pos[2] + radius]
+            [pos[0] - radius, pos[1] - 6, pos[2] - radius],
+            [pos[0] + radius, pos[1] + 6, pos[2] + radius]
         ) || [];
     } catch (e) { return null }
     for (let i = 0; i < around.length; i++) {
@@ -167,6 +179,7 @@ function dressUpNPC(NPC, name) {
 }
 
 function ensureNPC(entry, playerId, force) {
+    if (entry.id) anchorNPCPos(entry.id, entry.pos);
     const now = Date.now();
     if (!force && now < entry.nextCheck) return entry.id || null;
     entry.nextCheck = now + NPC_MAINTAIN_MIN_MS + Math.floor(Math.random() * (NPC_MAINTAIN_MAX_MS - NPC_MAINTAIN_MIN_MS));
@@ -176,6 +189,7 @@ function ensureNPC(entry, playerId, force) {
         if (entry.id && entry.id !== existing) NPC_IDS.delete(entry.id);
         entry.id = existing;
         NPC_IDS.add(existing);
+        anchorNPCPos(existing, entry.pos);
         return existing;
     }
     entry.id = null;
@@ -213,6 +227,9 @@ function startNPCSweeper() {
         if (NPC_REGISTRY.size === 0) return;
         const entries = Array.from(NPC_REGISTRY.values());
         const now = Date.now();
+        for (let j = 0; j < entries.length; j++) {
+            if (entries[j].id) anchorNPCPos(entries[j].id, entries[j].pos);
+        }
         const batch = Math.min(entries.length, NPC_SWEEP_BATCH);
         for (let i = 0; i < batch; i++) {
             const entry = entries[sweepCursor % entries.length];

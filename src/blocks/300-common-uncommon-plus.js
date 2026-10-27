@@ -16,6 +16,7 @@
       isAliveId,
       lifeforms,
       posOf,
+      safeEntityType,
       facing,
       targetBlock,
       boom,
@@ -47,6 +48,7 @@
     let best = null,
       bestD2 = (maxDist + 2) * (maxDist + 2);
     for (let i = 0; i < ids.length; i++) {
+      if (safeEntityType(ids[i]) === "NPC") continue;
       const q = posOf(ids[i]);
       if (!q) continue;
       const dx = q[0] - p[0],
@@ -70,6 +72,7 @@
     const ids = lifeforms(caster);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
+      if (safeEntityType(id) === "NPC") continue;
       const q = posOf(id);
       if (!q || dist2(q, center) > r * r) continue;
       const dx = q[0] - center[0],
@@ -84,6 +87,7 @@
     const ids = lifeforms(caster);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
+      if (safeEntityType(id) === "NPC") continue;
       const q = posOf(id);
       if (!q || dist2(q, center) > r * r) continue;
       const dx = center[0] - q[0],

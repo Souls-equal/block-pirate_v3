@@ -14,6 +14,7 @@ import {
     isAliveIdFresh,
     isMobAlive,
     isMobEntityType,
+    isNpcEntity,
     isPlayerAlive,
     isStillAlive,
     posOf,
@@ -223,14 +224,13 @@ export function damage(target, rawAmount, caster, itemName) {
 
 /* MOUVEMENT / EFFETS */
 export function impulse(id, x, y, z) {
-    if (!isAliveId(id)) return false;
-    if (safeEntityType(id) === "NPC") return false;
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
     try { return !!api.applyImpulse(id, x, y, z); }
     catch (e) { return false; }
 }
 
 export function setVel(id, x, y, z) {
-    if (!isAliveId(id)) return false;
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
     try { return !!api.setVelocity(id, x, y, z); }
     catch (e) { return false; }
 }
@@ -260,16 +260,25 @@ export { aggro as markAggro };
 
 /* CIBLES */
 export function entitiesIn(min, max) {
-    try { return api.getEntitiesInRect(min, max) || []; }
-    catch (e) { return []; }
+    try {
+        const raw = api.getEntitiesInRect(min, max) || [];
+        const out = [];
+        for (let i = 0; i < raw.length; i++) {
+            const id = raw[i];
+            if (id && !isNpcEntity(id)) out.push(id);
+        }
+        return out;
+    } catch (e) {
+        return [];
+    }
 }
 
 export function lifeforms(exclude) {
     const p = getAlivePlayerIds();
     const m = getAliveMobIds();
     const out = [];
-    for (let i = 0; i < p.length; i++) if (p[i] !== exclude) out.push(p[i]);
-    for (let i = 0; i < m.length; i++) if (m[i] !== exclude) out.push(m[i]);
+    for (let i = 0; i < p.length; i++) if (p[i] !== exclude && !isNpcEntity(p[i])) out.push(p[i]);
+    for (let i = 0; i < m.length; i++) if (m[i] !== exclude && !isNpcEntity(m[i])) out.push(m[i]);
     return out;
 }
 
@@ -445,7 +454,7 @@ export function grounded(id) {
 }
 
 export function teleport(id, x, y, z) {
-    if (!isAliveId(id)) return false;
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
     try { api.setPosition(id, x, y, z); return true; }
     catch (e) { return false; }
 }
