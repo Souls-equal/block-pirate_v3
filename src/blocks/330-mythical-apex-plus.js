@@ -401,7 +401,7 @@
       for (const id in res.seen) {
         if (!seen[id]) {
           seen[id] = 1;
-          damage(id, 96, pid, itemName);
+          damage(id, 40, pid, itemName);
           eff(id, "Slowness", 3500, { inbuiltLevel: 3 });
           eff(id, "Weakness", 4000, { inbuiltLevel: 2 });
         }
@@ -488,7 +488,7 @@
         [[95, 15, 145, 0], [70, 185, 60, 0]],
       ],
     });
-    hitArea(dst, 4.4, pid, itemName, 84, { height: 3.4, slow: [3000, 3] });
+    hitArea(dst, 4.4, pid, itemName, 40, { height: 3.4, slow: [3000, 3] });
     return true;
   }
 
@@ -529,8 +529,8 @@
           },
           st * 0.7,
         );
-        if (st % 3 === 0) {
-          hitArea(ap, 4.8, pid, itemName, 20, {
+        if (st % 12 === 0) {
+          hitArea(ap, 4.8, pid, itemName, 7, {
             height: 3.6,
             slow: [2500, 3],
             effect: ["Weakness", 3000, 2],
@@ -604,7 +604,7 @@
         [[50, 140, 220, 0], [150, 40, 210, 0]],
       ],
     });
-    hitSeg(a, b, 1.9, pid, itemName, 98, { slow: [2500, 3] });
+    hitSeg(a, b, 1.9, pid, itemName, 40, { slow: [2500, 3] });
     return true;
   }
 
@@ -643,8 +643,8 @@
           st * 0.75,
         );
         if (st % 4 === 0) pullIn(ap, 4.8, pid, 0.7, 0.15);
-        if (st % 8 === 0) {
-          hitArea(ap, 4.6, pid, itemName, 24, { height: 3.4, slow: [2500, 3] });
+        if (st % 16 === 0) {
+          hitArea(ap, 4.6, pid, itemName, 8, { height: 3.4, slow: [2500, 3] });
         }
       },
     });
@@ -679,7 +679,7 @@
         [[70, 150, 230, 0], [200, 60, 220, 0]],
       ],
     });
-    hitArea(p, 6.2, pid, itemName, 120, { height: 4.0 });
+    hitArea(p, 6.2, pid, itemName, 40, { height: 4.0 });
     pushOut(p, 6.2, pid, 2.3, 0.9);
     return true;
   }
@@ -747,7 +747,7 @@
         [[180, 60, 220, 0], [90, 200, 240, 0]],
       ],
     });
-    const hits = hitArea(p, 5.4, pid, itemName, 88, { height: 3.4, slow: [3000, 3] });
+    const hits = hitArea(p, 5.4, pid, itemName, 40, { height: 3.4, slow: [3000, 3] });
     heal(pid, Math.min(50, 20 + hits * 15));
     return true;
   }
@@ -829,7 +829,7 @@
         [[180, 20, 0, 0], [255, 130, 20, 0]],
       ],
     });
-    hitArea(c, 5.4, pid, itemName, 108, { height: 3.8 });
+    hitArea(c, 5.4, pid, itemName, 40, { height: 3.8 });
     pushOut(c, 5.4, pid, 2.0, 0.85);
     return true;
   }
@@ -863,7 +863,7 @@
         [[220, 50, 10, 0], [160, 60, 240, 0]],
       ],
     });
-    const res = hitSeg(a, b, 2.6, pid, itemName, 126);
+    const res = hitSeg(a, b, 2.6, pid, itemName, 40);
     for (const id in res.seen) {
       impulse(id, d[0] * 2.4, 0.9, d[2] * 2.4);
     }
@@ -977,7 +977,7 @@
         [[180, 60, 10, 0], [255, 220, 130, 0]],
       ],
     });
-    hitArea(dst, 4.8, pid, itemName, 118, { height: 3.6 });
+    hitArea(dst, 4.8, pid, itemName, 40, { height: 3.6 });
     pushOut(dst, 4.8, pid, 1.9, 0.8);
     return true;
   }
@@ -1033,7 +1033,7 @@
         ],
       });
     }
-    hitArea(c, 4.8, pid, itemName, 96, { height: 3.6, slow: [3800, 4] });
+    hitArea(c, 4.8, pid, itemName, 40, { height: 3.6, slow: [3800, 4] });
     pushOut(c, 4.8, pid, 1.8, 0.75);
     return true;
   }
@@ -1087,7 +1087,7 @@
         ],
       });
     }
-    hitArea(p, 5.6, pid, itemName, 92, { height: 3.6, slow: [4800, 5] });
+    hitArea(p, 5.6, pid, itemName, 40, { height: 3.6, slow: [4800, 5] });
     pushOut(p, 5.6, pid, 2.0, 0.7);
     return true;
   }
@@ -1122,7 +1122,7 @@
         ],
       });
     }
-    hitArea(p, 6.0, pid, itemName, 112, { height: 4.0, slow: [4200, 4] });
+    hitArea(p, 6.0, pid, itemName, 40, { height: 4.0, slow: [4200, 4] });
     pushOut(p, 6.0, pid, 1.9, 0.9);
     return true;
   }
@@ -1176,7 +1176,7 @@
         [[30, 140, 240, 0], [220, 60, 180, 0]],
       ],
     });
-    hitArea(tgt, 4.4, pid, itemName, 98, { height: 3.4 });
+    hitArea(tgt, 4.4, pid, itemName, 40, { height: 3.4 });
     return true;
   }
 
@@ -1229,7 +1229,7 @@
         [[25, 130, 235, 0], [210, 50, 180, 0]],
       ],
     });
-    hitArea(c, 4.8, pid, itemName, 92, { height: 3.4 });
+    hitArea(c, 4.8, pid, itemName, 40, { height: 3.4 });
     pushOut(c, 4.8, pid, 2.0, 0.7);
     return true;
   }
@@ -1270,7 +1270,7 @@
         [[25, 130, 235, 0], [210, 50, 180, 0]],
       ],
     });
-    hitArea(dst, 4.4, pid, itemName, 94, { height: 3.4 });
+    hitArea(dst, 4.4, pid, itemName, 40, { height: 3.4 });
     return true;
   }
 
@@ -1321,7 +1321,7 @@
         [[25, 135, 240, 0], [215, 50, 180, 0]],
       ],
     });
-    hitArea(c, 6.0, pid, itemName, 125, { height: 4.2 });
+    hitArea(c, 6.0, pid, itemName, 40, { height: 4.2 });
     pushOut(c, 6.0, pid, 2.2, 0.9);
     return true;
   }
@@ -1355,7 +1355,7 @@
         [[30, 180, 100, 0], [40, 160, 220, 0]],
       ],
     });
-    hitArea(dst, 4.2, pid, itemName, 104, { height: 3.4, slow: [3500, 4] });
+    hitArea(dst, 4.2, pid, itemName, 40, { height: 3.4, slow: [3500, 4] });
     return true;
   }
 
@@ -1375,7 +1375,7 @@
         [[40, 160, 235, 0], [255, 220, 60, 0]],
       ],
     });
-    hitArea(c, 4.5, pid, itemName, 92, { height: 3.4, slow: [2500, 3] });
+    hitArea(c, 4.5, pid, itemName, 40, { height: 3.4, slow: [2500, 3] });
     pushOut(c, 4.5, pid, 2.2, 0.8);
     return true;
   }
@@ -1433,8 +1433,8 @@
         [[180, 15, 0, 0], [255, 140, 25, 0]],
       ],
     });
-    hitSeg(a, b, 2.7, pid, itemName, 130);
-    hitArea(b, 5.4, pid, itemName, 42, { height: 4.0 });
+    hitSeg(a, b, 2.7, pid, itemName, 40);
+    hitArea(b, 5.4, pid, itemName, 40, { height: 4.0 });
     pushOut(b, 5.4, pid, 2.4, 0.95);
     return true;
   }
@@ -1514,8 +1514,8 @@
           },
           st * 0.85,
         );
-        if (st % 3 === 0) {
-          hitArea(ap, 4.8, pid, itemName, 20, { height: 3.8 });
+        if (st % 12 === 0) {
+          hitArea(ap, 4.8, pid, itemName, 7, { height: 3.8 });
         }
       },
     });
@@ -1530,7 +1530,7 @@
         [[180, 15, 0, 0], [255, 130, 30, 0]],
       ],
     });
-    hitArea(p, 5.6, pid, itemName, 110, { height: 4.2 });
+    hitArea(p, 5.6, pid, itemName, 40, { height: 4.2 });
     pushOut(p, 5.6, pid, 2.0, 0.9);
     return true;
   }

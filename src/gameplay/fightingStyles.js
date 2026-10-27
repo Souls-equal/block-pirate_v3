@@ -213,7 +213,7 @@ export function onPlayerClickCombatM1(pid, itemName, targetId) {
         soundAt(m.center, "critical_hit", 0.8, 1.15, 20);
         for (let i = 0; i < m.list.length; i++) {
             const id = m.list[i];
-            damage(id, 30, pid, "Combat Fist");
+            damage(id, 6, pid, "Combat Fist");
             impulse(id, m.d[0] * 3.8, 1.2, m.d[2] * 3.8);
         }
     }
@@ -231,7 +231,7 @@ export function onPlayerClickCombatSmash(pid, itemName) {
     boom(c, 3.0, { tex: TEX.crit, count: 30, colors: COL_COMBAT });
     halo(c, 2.6, 12, TEX.square, [0.24, 0.5], [0.3, 0.6], COL_COMBAT);
     halo(c, 5.2, 12, TEX.square, [0.24, 0.5], [0.3, 0.6], COL_COMBAT);
-    hitArea(p, 5.6, pid, itemName, 85, { height: 3.4, slow: [2000, 2] });
+    hitArea(p, 5.6, pid, itemName, 13, { height: 3.4, slow: [2000, 2] });
     pushOut(p, 5.6, pid, 2.1, 0.85);
     return true;
 }
@@ -284,11 +284,11 @@ export function onPlayerClickCombatGrab(pid, itemName) {
                 try {
                     api.setPosition(grabbed, slamPos[0], p[1], slamPos[2]);
                 } catch (e) {}
-                damage(grabbed, 105, pid, itemName);
+                damage(grabbed, 16, pid, itemName);
                 impulse(grabbed, d[0] * 4.5, -10.0, d[2] * 4.5);
                 eff(grabbed, "Slowness", 2500, { inbuiltLevel: 3 });
             } else {
-                hitArea(slamPos, 4.2, pid, itemName, 92, { height: 3.4, slow: [2200, 3] });
+                hitArea(slamPos, 4.2, pid, itemName, 14, { height: 3.4, slow: [2200, 3] });
             }
             return { done: true };
         },
@@ -325,7 +325,7 @@ export function onPlayerClickDarkStepM1(pid, itemName, targetId) {
     }
     for (let i = 0; i < m.list.length; i++) {
         const id = m.list[i];
-        damage(id, 38, pid, "Dark Step Kick");
+        damage(id, 8, pid, "Dark Step Kick");
         impulse(id, d[0] * 5.2, 1.8, d[2] * 5.2);
     }
     return true;
@@ -356,7 +356,7 @@ export function onPlayerClickFlyingKick(pid, itemName) {
             soundAt(land, "fireball", 0.95, 0.85, 28);
             boom(land, 3.2, { tex: TEX.crit, count: 32, colors: COL_DARK });
             halo(land, 4.6, 12, TEX.soul, [0.24, 0.5], [0.32, 0.62], COL_DARK);
-            hitArea(land, 5.4, pid, itemName, 98, { height: 3.6, slow: [2200, 2] });
+            hitArea(land, 5.4, pid, itemName, 18, { height: 3.6, slow: [2200, 2] });
             pushOut(land, 5.4, pid, 2.3, 0.95);
             return { done: true };
         },
@@ -381,7 +381,7 @@ export function onPlayerClickBreakdance(pid, itemName) {
             });
             soundAt(pid, "fireball", 0.7, 1.15 + (spin % 3) * 0.1, 22);
             halo([p[0], p[1] + 0.55, p[2]], 3.8, 10, TEX.crit, [0.2, 0.42], [0.28, 0.56], COL_DARK, null, spin * 0.85);
-            hitArea(p, 4.6, pid, itemName, 22, { height: 3.0 });
+            hitArea(p, 4.6, pid, itemName, 3, { height: 3.0 });
             pushOut(p, 4.6, pid, 1.65, 0.45);
             return { value: sleep(2), done: false };
         },
@@ -402,7 +402,7 @@ export function onPlayerClickElectricM1(pid, itemName, targetId) {
     burst(m.center, 0.4, TEX.glint, 14, [0.16, 0.34], [0.26, 0.52], COL_ELEC);
     for (let i = 0; i < m.list.length; i++) {
         const id = m.list[i];
-        damage(id, 44, pid, "Electric Claw");
+        damage(id, 10, pid, "Electric Claw");
         freezeEntity(id, isPlayerAlive(id) ? 500 : 2000);
     }
     return true;
@@ -443,7 +443,7 @@ export function onPlayerClickElectricStomp(pid, itemName) {
                 if (!isTargetable(id, pid)) continue;
                 const q = posOf(id);
                 if (q && dist2(q, p) <= 60.0) {
-                    damage(id, 112, pid, itemName);
+                    damage(id, 22, pid, itemName);
                     freezeEntity(id, isPlayerAlive(id) ? 500 : 2000);
                 }
             }
@@ -465,7 +465,7 @@ export function onPlayerClickElectricTackle(pid, itemName) {
     soundAt(pid, "magicAccent3", 0.9, 1.25, 28);
     impulse(pid, d[0] * 15.0, 0.45, d[2] * 15.0);
     lineFx([p0[0], p0[1] + 1.0, p0[2]], [end[0], end[1] + 1.0, end[2]], 0.45, TEX.glint, 18, [0.25, 0.55], [0.32, 0.62], COL_ELEC);
-    hitSeg([p0[0], p0[1] + 1.0, p0[2]], [end[0], end[1] + 1.0, end[2]], 2.4, pid, itemName, 65, { slow: [1500, 3] });
+    hitSeg([p0[0], p0[1] + 1.0, p0[2]], [end[0], end[1] + 1.0, end[2]], 2.4, pid, itemName, 14, { slow: [1500, 3] });
     let tick = 0;
     run({
         next: function () {
@@ -473,7 +473,7 @@ export function onPlayerClickElectricTackle(pid, itemName) {
             lineFx([p0[0], p0[1] + 0.45, p0[2]], [end[0], end[1] + 0.45, end[2]], 0.55, TEX.glint, 14, [0.24, 0.5], [0.28, 0.54], COL_ELEC);
             if (tick % 2 === 0) {
                 soundAt(end, "magicAccent3", 0.65, 1.4, 22);
-                hitSeg([p0[0], p0[1] + 0.8, p0[2]], [end[0], end[1] + 0.8, end[2]], 2.5, pid, itemName, 26, { slow: [1200, 2] });
+                hitSeg([p0[0], p0[1] + 0.8, p0[2]], [end[0], end[1] + 0.8, end[2]], 2.5, pid, itemName, 3, { slow: [1200, 2] });
             }
             if (tick >= 12) return { done: true };
             return { value: sleep(10), done: false };
@@ -495,7 +495,7 @@ export function onPlayerClickWaterM1(pid, itemName, targetId) {
     burst(m.center, 0.42, TEX.bubble, 14, [0.2, 0.42], [0.28, 0.54], COL_WATER);
     for (let i = 0; i < m.list.length; i++) {
         const id = m.list[i];
-        damage(id, 52, pid, "Water Palm");
+        damage(id, 12, pid, "Water Palm");
         eff(id, "Slowness", 2600, { inbuiltLevel: 2 });
         impulse(id, m.d[0] * 6.8, 2.0, m.d[2] * 6.8);
     }
@@ -524,7 +524,7 @@ export function onPlayerClickSteamFist(pid, itemName) {
             COL_WATER,
         );
     }
-    hitSeg(a, b, 3.4, pid, itemName, 62, {
+    hitSeg(a, b, 3.4, pid, itemName, 14, {
         slow: [2500, 2],
         onHit: function (id, hitPt) {
             const q = posOf(id) || hitPt;
@@ -539,7 +539,7 @@ export function onPlayerClickSteamFist(pid, itemName) {
         soundAt(b, "cannonFire1", 1.0, 0.72, 32);
         boom(b, 3.8, { tex: TEX.bubble, count: 38, colors: COL_WATER });
         halo(b, 5.2, 14, TEX.glint, [0.26, 0.54], [0.34, 0.68], COL_WATER);
-        hitArea(b, 5.8, pid, itemName, 74, { height: 4.0, slow: [3000, 2] });
+        hitArea(b, 5.8, pid, itemName, 16, { height: 4.0, slow: [3000, 2] });
         pushOut(b, 6.0, pid, 3.1, 1.25);
     }, 5);
     return true;
@@ -570,7 +570,7 @@ export function onPlayerClickDeadlyShower(pid, itemName) {
                 lineFx([drop[0], drop[1] + 7.0, drop[2]], drop, 0.18, TEX.bubble, 6, [0.16, 0.34], [0.24, 0.48], COL_WATER);
                 burst(drop, 0.4, TEX.glint, 5, [0.16, 0.32], [0.24, 0.46], COL_WATER);
             }
-            hitArea(c, 4.8, pid, itemName, 20, { height: 3.8, slow: [2200, 2] });
+            hitArea(c, 4.8, pid, itemName, 5, { height: 3.8, slow: [2200, 2] });
             if (wave >= 7) return { done: true };
             return { value: sleep(2), done: false };
         },
@@ -1063,7 +1063,7 @@ export function handleFightingStyleM1(playerId, targetId) {
 
     const now = Date.now();
     const nextAt = m1Cooldowns.get(playerId) || 0;
-    if (now < nextAt) return false;
+    if (now < nextAt) return true;
     m1Cooldowns.set(playerId, now + (style.m1Cooldown || 380));
 
     try {

@@ -137,7 +137,7 @@
                 [[120, 120, 120, 0], [60, 60, 60, 0]],
               ],
             });
-            const h = hitArea(cur, 1.9, pid, itemName, 14, { height: 2.2 });
+            const h = hitArea(cur, 1.9, pid, itemName, 12, { height: 2.2 });
             if (h > 0 || stepIdx >= 6) {
               boom(cur, 1.4, {
                 count: 16,
@@ -146,7 +146,7 @@
                   [[90, 90, 90, 0], [40, 40, 40, 0]],
                 ],
               });
-              hitArea(cur, 2.6, pid, itemName, 20, { height: 2.6 });
+              hitArea(cur, 2.6, pid, itemName, 12, { height: 2.6 });
               pushOut(cur, 2.8, pid, 1.2, 0.45);
               return { done: true };
             }
@@ -234,7 +234,7 @@
           const q = posOf(id);
           if (q && distH2(q, c) <= 16.0 && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
-            damage(id, 32, pid, itemName);
+            damage(id, 12, pid, itemName);
             impulse(id, d[0] * 1.2, 0.75, d[2] * 1.2);
           }
         }
@@ -289,7 +289,7 @@
             ],
           });
           sound.at(q, "cannonFire1", 0.85, 0.85, 22);
-          hitArea(q, 3.6, pid, itemName, 36, { height: 2.8 });
+          hitArea(q, 3.6, pid, itemName, 12, { height: 2.8 });
           pushOut(q, 3.6, pid, 1.4, 0.6);
           return { done: true };
         }
@@ -339,7 +339,7 @@
                 [[80, 20, 10, 0], [160, 60, 20, 0]],
               ],
             });
-            hitArea(m, 2.8, pid, itemName, 34, { height: 2.6 });
+            hitArea(m, 2.8, pid, itemName, 12, { height: 2.6 });
             pushOut(m, 2.8, pid, 1.3, 0.55);
           }
           sound.at(p, "cannonFire2", 0.9, 0.75, 24);
@@ -375,7 +375,7 @@
         ],
       });
     }
-    const res = hitSeg(from, tip, 1.8, pid, itemName, 30, { slow: [2500, 2] });
+    const res = hitSeg(from, tip, 1.8, pid, itemName, 12, { slow: [2500, 2] });
     for (const id in res.seen) {
       impulse(id, d[0] * 1.85, 0.5, d[2] * 1.85);
     }
@@ -415,7 +415,7 @@
           const q = posOf(id);
           if (q && dist2(q, p) <= 18.0) {
             seen[id] = 1;
-            damage(id, 35, pid, itemName);
+            damage(id, 12, pid, itemName);
             impulse(id, d[0] * 1.4, 0.55, d[2] * 1.4);
           }
         }
@@ -456,7 +456,7 @@
       for (const id in res.seen) {
         if (!seen[id]) {
           seen[id] = 1;
-          damage(id, 28, pid, itemName);
+          damage(id, 12, pid, itemName);
           impulse(id, dir[0] * 0.95, 0.35, dir[2] * 0.95);
         }
       }
@@ -489,7 +489,7 @@
             [[200, 30, 0, 0], [255, 120, 20, 0]],
           ],
         });
-        const hits = hitArea(cur, 2.3, pid, itemName, 24, { height: 2.5 });
+        const hits = hitArea(cur, 2.3, pid, itemName, 18, { height: 2.5 });
         if (hits > 0 || stepIdx >= 6) {
           boom(cur, 2.2, {
             count: 26,
@@ -499,7 +499,7 @@
             ],
           });
           sound.at(cur, "cannonFire3", 0.85, 0.7, 24);
-          hitArea(cur, 3.6, pid, itemName, 28, { height: 3.0 });
+          hitArea(cur, 3.6, pid, itemName, 18, { height: 3.0 });
           pushOut(cur, 3.6, pid, 1.5, 0.55);
           return { done: true };
         }
@@ -578,7 +578,7 @@
         [[40, 120, 210, 0], [180, 235, 255, 0]],
       ],
     });
-    hitArea(target, 3.2, pid, itemName, 46, { height: 2.8, slow: [3500, 3] });
+    hitArea(target, 3.2, pid, itemName, 18, { height: 2.8, slow: [3500, 3] });
     return true;
   }
 
@@ -612,7 +612,7 @@
           const q = posOf(id);
           if (q && distH2(q, c) <= r * r && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
-            damage(id, 44, pid, itemName);
+            damage(id, 18, pid, itemName);
             eff(id, "Slowness", 4000, { inbuiltLevel: 3 });
           }
         }
@@ -658,7 +658,7 @@
           const q = posOf(id);
           if (q && distH2(q, c) <= 16.0 && Math.abs(q[1] - c[1]) <= 3.6) {
             seen[id] = 1;
-            damage(id, 48, pid, itemName);
+            damage(id, 18, pid, itemName);
             impulse(id, d[0] * 1.1, 0.7, d[2] * 1.1);
           }
         }
@@ -778,7 +778,7 @@
               [[20, 0, 40, 0], [110, 30, 180, 0]],
             ],
           });
-          hitArea(c, 4.2, pid, itemName, 52, { height: 3.2, slow: [2500, 3] });
+          hitArea(c, 4.2, pid, itemName, 18, { height: 3.2, slow: [2500, 3] });
           return { done: true };
         }
         return { value: sleep(2), done: false };
@@ -807,7 +807,7 @@
         ],
       });
     }
-    hitArea(p, 4.8, pid, itemName, 46, { height: 3.2, slow: [2000, 2] });
+    hitArea(p, 4.8, pid, itemName, 18, { height: 3.2, slow: [2000, 2] });
     pushOut(p, 4.8, pid, 1.3, 0.5);
     return true;
   }
@@ -845,7 +845,7 @@
               [[110, 70, 25, 0], [235, 185, 85, 0]],
             ],
           });
-          hitArea(q, 3.8, pid, itemName, 50, { height: 2.8 });
+          hitArea(q, 3.8, pid, itemName, 18, { height: 2.8 });
           pushOut(q, 3.8, pid, 1.4, 0.55);
           return { done: true };
         }
@@ -884,7 +884,7 @@
       for (const id in res.seen) {
         if (!seen[id]) {
           seen[id] = 1;
-          damage(id, 44, pid, itemName);
+          damage(id, 18, pid, itemName);
           impulse(id, dir[0] * 1.2, 0.4, dir[2] * 1.2);
         }
       }
@@ -925,7 +925,7 @@
           const q = posOf(id);
           if (q && dist2(q, p) <= 20.0) {
             seen[id] = 1;
-            damage(id, 52, pid, itemName);
+            damage(id, 18, pid, itemName);
             impulse(id, d[0] * 1.8, 0.65, d[2] * 1.8);
           }
         }
@@ -952,7 +952,7 @@
         [[80, 210, 255, 0], [200, 255, 255, 0]],
       ],
     });
-    hitArea(p, 4.4, pid, itemName, 48, { height: 3.0 });
+    hitArea(p, 4.4, pid, itemName, 18, { height: 3.0 });
     pushOut(p, 4.4, pid, 1.5, 0.55);
     return true;
   }

@@ -165,7 +165,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     const res = t(r, a);
     if (res !== "preventDamage") {
         try {
-            fsM1(r, a);
+            if (fsM1(r, a)) return "preventDamage";
         } catch (t) {
             _t("onPlayerDamagingOtherPlayer.fsM1", t);
         }
@@ -180,7 +180,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         _t("onPlayerDamagingMob.recordDamager", t);
     }
     try {
-        fsM1(t, r);
+        if (fsM1(t, r)) return "preventDamage";
     } catch (t) {
         _t("onPlayerDamagingMob.fsM1", t);
     }

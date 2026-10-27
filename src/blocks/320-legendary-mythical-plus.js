@@ -368,7 +368,7 @@
       ],
     });
     pullIn(p, 5.5, pid, 1.1, 0.25);
-    const hits = hitArea(p, 5.5, pid, itemName, 72, { height: 3.2, slow: [3500, 3] });
+    const hits = hitArea(p, 5.5, pid, itemName, 32, { height: 3.2, slow: [3500, 3] });
     if (hits > 0) heal(pid, Math.min(35, hits * 14));
     return true;
   }
@@ -386,7 +386,7 @@
         [[255, 120, 225, 0], [120, 255, 185, 0]],
       ],
     });
-    hitArea(c, 4.4, pid, itemName, 76, { height: 3.4 });
+    hitArea(c, 4.4, pid, itemName, 32, { height: 3.4 });
     pushOut(c, 4.4, pid, 1.4, 1.0);
     return true;
   }
@@ -411,7 +411,7 @@
         [[30, 140, 240, 0], [255, 190, 40, 0]],
       ],
     });
-    hitArea(p, 4.4, pid, itemName, 72, { height: 3.4 });
+    hitArea(p, 4.4, pid, itemName, 32, { height: 3.4 });
     return true;
   }
 
@@ -446,7 +446,7 @@
           const q = posOf(id);
           if (q && dist2(q, p) <= 20.0) {
             seen[id] = 1;
-            damage(id, 80, pid, itemName);
+            damage(id, 32, pid, itemName);
             impulse(id, d[0] * 1.5, 0.65, d[2] * 1.5);
           }
         }
@@ -472,7 +472,7 @@
         [[30, 130, 240, 0], [255, 180, 30, 0]],
       ],
     });
-    hitArea(p, 5.4, pid, itemName, 92, { height: 3.8 });
+    hitArea(p, 5.4, pid, itemName, 32, { height: 3.8 });
     pushOut(p, 5.4, pid, 1.8, 0.75);
     return true;
   }
@@ -498,7 +498,7 @@
       const q = posOf(id);
       if (q && dist2(q, c) <= 28.0) {
         teleport(id, c[0], c[1] + 5.5, c[2]);
-        damage(id, 82, pid, itemName);
+        damage(id, 32, pid, itemName);
         eff(id, "Slowness", 2500, { inbuiltLevel: 3 });
       }
     }
@@ -534,7 +534,7 @@
         [[80, 20, 170, 0], [70, 180, 230, 0]],
       ],
     });
-    hitArea(tgt, 4.0, pid, itemName, 86, { height: 3.4 });
+    hitArea(tgt, 4.0, pid, itemName, 32, { height: 3.4 });
     return true;
   }
 
@@ -629,7 +629,7 @@
         [[255, 200, 30, 0], [80, 180, 255, 0]],
       ],
     });
-    hitArea(p, 5.0, pid, itemName, 82, { height: 3.4, slow: [3000, 4] });
+    hitArea(p, 5.0, pid, itemName, 32, { height: 3.4, slow: [3000, 4] });
     pushOut(p, 5.0, pid, 1.6, 0.6);
     return true;
   }
@@ -655,7 +655,7 @@
         ],
       });
     }
-    const res = hitSeg(a, b, 1.9, pid, itemName, 78);
+    const res = hitSeg(a, b, 1.9, pid, itemName, 32);
     for (const id in res.seen) {
       impulse(id, d[0] * 2.0, 0.65, d[2] * 2.0);
     }
@@ -690,7 +690,7 @@
             ],
           });
           sound.at(c, "cannonFire1", 1.0, 0.55, 28);
-          hitArea(c, 6.0, pid, itemName, 95, { height: 4.0 });
+          hitArea(c, 6.0, pid, itemName, 32, { height: 4.0 });
           pushOut(c, 6.0, pid, 2.4, 0.9);
           return { done: true };
         }
@@ -716,7 +716,7 @@
         [[200, 25, 65, 0], [255, 150, 180, 0]],
       ],
     });
-    hitArea(p, 4.4, pid, itemName, 72, { height: 3.0 });
+    hitArea(p, 4.4, pid, itemName, 32, { height: 3.0 });
     pushOut(p, 4.6, pid, 2.3, 0.75);
     return true;
   }
@@ -867,7 +867,7 @@
           const q = posOf(id);
           if (q && dist2(q, p) <= 25.0) {
             seen[id] = 1;
-            damage(id, 98, pid, itemName);
+            damage(id, 40, pid, itemName);
             impulse(id, d[0] * 2.1, 0.95, d[2] * 2.1);
           }
         }
@@ -926,7 +926,7 @@
         [[95, 65, 35, 0], [210, 175, 120, 0]],
       ],
     });
-    hitArea(c, 4.2, pid, itemName, 92, { height: 3.8 });
+    hitArea(c, 4.2, pid, itemName, 40, { height: 3.8 });
     pushOut(c, 4.2, pid, 1.4, 1.35);
     return true;
   }
@@ -954,7 +954,7 @@
       });
     }
     const center = [p[0] + d[0] * 4.4, p[1] + 1.2 + d[1] * 2.0, p[2] + d[2] * 4.4];
-    hitArea(center, 5.4, pid, itemName, 90, { height: 3.8, slow: [3500, 3] });
+    hitArea(center, 5.4, pid, itemName, 40, { height: 3.8, slow: [3500, 3] });
     pushOut(center, 5.4, pid, 2.2, 0.75);
     return true;
   }
@@ -984,7 +984,7 @@
               [[70, 50, 25, 0], [245, 225, 185, 0]],
             ],
           });
-          hitArea(p, 6.4, pid, itemName, 118, { height: 4.0, slow: [3500, 3] });
+          hitArea(p, 6.4, pid, itemName, 40, { height: 4.0, slow: [3500, 3] });
           pushOut(p, 6.4, pid, 2.3, 1.0);
         }
         const r = step * 2.3;
@@ -1055,7 +1055,7 @@
         [[30, 0, 0, 0], [220, 30, 30, 0]],
       ],
     });
-    hitArea(c, 4.4, pid, itemName, 102, { height: 3.4, slow: [2500, 3] });
+    hitArea(c, 4.4, pid, itemName, 40, { height: 3.4, slow: [2500, 3] });
     return true;
   }
 
@@ -1078,7 +1078,7 @@
         ],
       });
     }
-    hitArea(p, 4.8, pid, itemName, 92, { height: 3.2 });
+    hitArea(p, 4.8, pid, itemName, 40, { height: 3.2 });
     pushOut(p, 4.8, pid, 2.3, 0.75);
     return true;
   }
@@ -1138,7 +1138,7 @@
       const q = posOf(id);
       if (q && dist2(q, p) <= 49) {
         markUntil(id, pid, exp);
-        damage(id, 90, pid, itemName);
+        damage(id, 40, pid, itemName);
         eff(id, "Slowness", 3500, { inbuiltLevel: 3 });
       }
     }
@@ -1167,7 +1167,7 @@
             [[35, 0, 0, 0], [255, 130, 40, 0]],
           ],
         });
-        hitArea(c, 4.0, pid, itemName, f === 4 ? 42 : 26, { height: 3.2 });
+        hitArea(c, 4.0, pid, itemName, f === 4 ? 18 : 10, { height: 3.2 });
         if (f === 4) pushOut(c, 4.4, pid, 2.0, 0.8);
         f++;
         return { value: sleep(2), done: false };
@@ -1250,7 +1250,7 @@
           const q = posOf(id);
           if (q && dist2(q, p) <= 22.0) {
             seen[id] = 1;
-            damage(id, 96, pid, itemName);
+            damage(id, 40, pid, itemName);
             eff(id, "Slowness", 3200, { inbuiltLevel: 3 });
           }
         }
@@ -1394,7 +1394,7 @@
         [[20, 0, 40, 0], [120, 35, 190, 0]],
       ],
     });
-    hitArea(dst, 4.4, pid, itemName, 90, { height: 3.4 });
+    hitArea(dst, 4.4, pid, itemName, 40, { height: 3.4 });
     return true;
   }
 
@@ -1438,7 +1438,7 @@
               [[15, 0, 30, 0], [120, 30, 185, 0]],
             ],
           });
-          hitArea(c, 4.8, pid, itemName, 108, { height: 3.8, slow: [3500, 4] });
+          hitArea(c, 4.8, pid, itemName, 40, { height: 3.8, slow: [3500, 4] });
           return { done: true };
         }
         return { value: sleep(2), done: false };
@@ -1484,8 +1484,8 @@
           },
           st * 0.7,
         );
-        if (st % 3 === 0) {
-          hitArea(ap, 4.6, pid, itemName, 18, { height: 3.6, slow: [2000, 2] });
+        if (st % 12 === 0) {
+          hitArea(ap, 4.6, pid, itemName, 6, { height: 3.6, slow: [2000, 2] });
         }
       },
     });
@@ -1497,7 +1497,7 @@
         [[15, 0, 30, 0], [120, 30, 190, 0]],
       ],
     });
-    hitArea(p, 6.0, pid, itemName, 118, { height: 4.2, slow: [3000, 3] });
+    hitArea(p, 6.0, pid, itemName, 40, { height: 4.2, slow: [3000, 3] });
     pushOut(p, 6.0, pid, 2.1, 0.85);
     return true;
   }
