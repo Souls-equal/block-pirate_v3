@@ -6,6 +6,26 @@ import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../gameplay/
 import { clearFruit } from "../fruit/index";
 import { clearFightingStyle } from "../gameplay/fightingStyles";
 
+/* Vrai seulement si l'id est un joueur actuellement connecté.
+   Certains callbacks (kill, sidebar...) arrivent APRÈS une déconnexion :
+   l'id est alors invalide (ex : "-1") et toute API joueur lève une ApiError. */
+export function isValidPlayerId(playerId) {
+    if (null === playerId || void 0 === playerId) return false;
+    return /^\d+$/.test(String(playerId));
+}
+
+export function isOnlinePlayer(playerId) {
+    if (!isValidPlayerId(playerId)) return false;
+    const id = String(playerId);
+    try {
+        const ids = api.getPlayerIds() || [];
+        for (let i = 0; i < ids.length; i++) {
+            if (String(ids[i]) === id) return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
 resetPlayer = (id) => {
     setLevel(id, 1, true);
     resetStats(id);

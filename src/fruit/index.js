@@ -401,18 +401,17 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
     k = g.get(d);
   if (k && I - k < F) {
     const e = Math.max(1, Math.ceil((k + F - I) / 1e3));
-    return (
-      (!x[d] || I - x[d] > 2e3) &&
-        ((x[d] = I),
-        api.sendMessage(t, [
-          { str: "[", style: { color: "#94a3b8" } },
-          { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-          { str: "] ", style: { color: "#94a3b8" } },
-          { str: "Cooldown: ", style: { color: "#fbbf24" } },
-          { str: e + "s", style: { color: "#fde68a", fontWeight: "700" } },
-        ])),
-      !0
-    );
+    (!x[d] || I - x[d] > 2e3) &&
+      ((x[d] = I),
+      api.sendMessage(t, [
+        { str: "[", style: { color: "#94a3b8" } },
+        { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
+        { str: "] ", style: { color: "#94a3b8" } },
+        { str: "Cooldown: ", style: { color: "#fbbf24" } },
+        { str: e + "s", style: { color: "#fde68a", fontWeight: "700" } },
+      ]));
+    /* "cooldown" => src/index.js enchaîne sur le coup de poing du style. */
+    return "cooldown";
   }
   const N = y.name || y.clicked,
     C = y.displayName || N;

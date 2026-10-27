@@ -1001,7 +1001,9 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
                 { str: rem + "s", style: { color: "#fde68a", fontWeight: "700" } },
             ]);
         } catch (e) {}
-        return true;
+        /* Renvoie un marqueur : le clic ne lance rien, mais src/index.js
+           enchaîne sur le coup de poing du Fighting Style. */
+        return "cooldown";
     }
 
     const cdMs = matched.cooldown || 6000;
@@ -1052,18 +1054,25 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
     return true;
 }
 
-export function handleFightingStyleM1(playerId, targetId) {
+export function handleFightingStyleM1(playerId, targetId, allowHeldItem) {
     const styleName = getFightingStyle(playerId);
     if (!styleName) return false;
     const style = FIGHTING_STYLES[styleName];
     if (!style || typeof style.m1Handler !== "function") return false;
 
-    const { itemName } = getHeldItemAndCustomName(playerId);
-    if (itemName && itemName !== "Air") return false;
-
     const now = Date.now();
     const nextAt = m1Cooldowns.get(playerId) || 0;
+    /* Coup déjà parti : on renvoie true pour que le coup "vanilla" du client
+       ne vienne pas ajouter des dégâts par-dessus ceux du style. */
     if (now < nextAt) return true;
+
+    /* Normalement le M1 se fait à main vide. allowHeldItem = true est utilisé
+       quand une capacité est en cooldown : le clic devient un coup de poing. */
+    if (!allowHeldItem) {
+        const { itemName } = getHeldItemAndCustomName(playerId);
+        if (itemName && itemName !== "Air") return false;
+    }
+
     m1Cooldowns.set(playerId, now + (style.m1Cooldown || 380));
 
     try {

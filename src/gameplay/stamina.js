@@ -193,6 +193,7 @@ export function staminaJoin(playerId) {
 
 export function staminaLeave(playerId) {
     delete players[playerId];
+    delete dashUntil[playerId];
 }
 
 export function tickStamina() {
@@ -218,77 +219,82 @@ export function tickStamina() {
     }
 }
 
+/* DASH ---------------------------------------------------------------- */
+
+/* Verrou anti-coup de poing : après un dash réussi, les dégâts de mêlée
+   (coup de poing / M1 du Fighting Style) sont ignorés pendant quelques ms,
+   pour éviter de dash et frapper en même temps. */
+const dashUntil = {};
+
+export const DASH_MELEE_LOCK_MS = 320;
+
+export function isDashing(playerId) {
+    const until = dashUntil[playerId];
+    if (!until) return false;
+    if (Date.now() >= until) {
+        delete dashUntil[playerId];
+        return false;
+    }
+    return true;
+}
+
 export function tryDash(id) {
-    if (trySpendStamina(id, STAMINA_CONFIG.dashCost)) {
-        let info = api.getPlayerFacingInfo(id);
-        if (!info || !info.dir) return;
-        dashAnim(id)
-        api.applyImpulse(id, info.dir[0] * 30, 4, info.dir[2] * 30);
-    }
+    if (!STAMINA_CONFIG.enabled) return false;
+
+    let info = null;
+    try { info = api.getPlayerFacingInfo(id); } catch (e) { info = null; }
+    if (!info || !info.dir) return false;
+
+    /* Pas assez de stamina => pas de dash (le coup de poing reste possible). */
+    if (!trySpendStamina(id, STAMINA_CONFIG.dashCost)) return false;
+
+    dashUntil[id] = Date.now() + DASH_MELEE_LOCK_MS;
+    dashAnim(id);
+    try { api.applyImpulse(id, info.dir[0] * 30, 4, info.dir[2] * 30); } catch (e) {}
+    return true;
 }
 
-
+/* Petite animation : les mains partent en arrière puis reviennent. */
 function dashAnim(playerId) {
-api.animateEntity(playerId, {
-    animationDurationMs: 1200,
-    loop: false,
-    nodeAnimations: {
-
-        TorsoNode: { 
-            timeline: [
-                { timeFraction: 0,    rotation: { point: [-0.2, 0, 0] } }, // prépa
-                { timeFraction: 0.1,  rotation: { point: [0.5, 0, 0] } },  // impulsion
-                { timeFraction: 0.5,  rotation: { point: [0.45, 0, 0] } }, // maintien
-                { timeFraction: 0.85, rotation: { point: [0.4, 0, 0] } },  // léger relâchement
-                { timeFraction: 1,    rotation: { point: [0, 0, 0] } }     // fin
-            ] 
-        },
-
-        HeadMesh: {
-            timeline: [
-                { timeFraction: 0,   rotation: { point: [-0.1, 0, 0] } },
-                { timeFraction: 0.1, rotation: { point: [0.3, 0, 0] } },
-                { timeFraction: 0.6, rotation: { point: [0.25, 0, 0] } },
-                { timeFraction: 1,   rotation: { point: [0, 0, 0] } }
-            ]
-        },
-
-        ArmRightMesh: {
-            timeline: [
-                { timeFraction: 0,    rotation: { point: [0, 0, 1.2] } },
-                { timeFraction: 0.1,  rotation: { point: [0, 0, -0.8] } },
-                { timeFraction: 0.4,  rotation: { point: [0, 0, -0.6] } }, // micro mouvement
-                { timeFraction: 0.7,  rotation: { point: [0, 0, -0.8] } },
-                { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
-            ]
-        },
-
-        ArmLeftMesh: {
-            timeline: [
-                { timeFraction: 0,    rotation: { point: [0, 0, -1.2] } },
-                { timeFraction: 0.1,  rotation: { point: [0, 0, 0.8] } },
-                { timeFraction: 0.4,  rotation: { point: [0, 0, 0.6] } },
-                { timeFraction: 0.7,  rotation: { point: [0, 0, 0.8] } },
-                { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
-            ]
-        },
-        LegRightMesh: {
-            timeline: [
-                { timeFraction: 0,    rotation: { point: [-0.5, 0, 0] } },
-                { timeFraction: 0.1,  rotation: { point: [1.4, 0, 0] } },
-                { timeFraction: 0.5,  rotation: { point: [1.2, 0, 0] } },
-                { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
-            ]
-        },
-
-        LegLeftMesh: {
-            timeline: [
-                { timeFraction: 0,    rotation: { point: [0.5, 0, 0] } },
-                { timeFraction: 0.1,  rotation: { point: [-1.4, 0, 0] } },
-                { timeFraction: 0.5,  rotation: { point: [-1.2, 0, 0] } },
-                { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
-            ]
-        }
-    }
-});
+    try {
+        api.animateEntity(playerId, {
+            animationDurationMs: 400,
+            loop: false,
+            nodeAnimations: {
+                TorsoNode: {
+                    timeline: [
+                        { timeFraction: 0,    rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.22, rotation: { point: [0.40, 0, 0] } },
+                        { timeFraction: 0.62, rotation: { point: [0.30, 0, 0] } },
+                        { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
+                    ]
+                },
+                HeadMesh: {
+                    timeline: [
+                        { timeFraction: 0,    rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.22, rotation: { point: [-0.26, 0, 0] } },
+                        { timeFraction: 0.62, rotation: { point: [-0.16, 0, 0] } },
+                        { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
+                    ]
+                },
+                ArmRightMesh: {
+                    timeline: [
+                        { timeFraction: 0,    rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.20, rotation: { point: [2.45, 0, -0.35] } },
+                        { timeFraction: 0.60, rotation: { point: [2.15, 0, -0.28] } },
+                        { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
+                    ]
+                },
+                ArmLeftMesh: {
+                    timeline: [
+                        { timeFraction: 0,    rotation: { point: [0, 0, 0] } },
+                        { timeFraction: 0.20, rotation: { point: [2.45, 0, 0.35] } },
+                        { timeFraction: 0.60, rotation: { point: [2.15, 0, 0.28] } },
+                        { timeFraction: 1,    rotation: { point: [0, 0, 0] } }
+                    ]
+                }
+            }
+        });
+    } catch (e) {}
 }
+

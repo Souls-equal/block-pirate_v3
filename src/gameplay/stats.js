@@ -1,6 +1,6 @@
 // stats.js
 
-import { addStat, getStat, reconcileSP, setStat } from "../utils/data";
+import { addStat, getStat, isOnlinePlayer, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 
 /* BASE VALUES */
@@ -123,6 +123,7 @@ function spendSP(playerId, amount) {
 
 /* APPLY EFFECTS */
 export function applyStatEffects(playerId) {
+    if (!isOnlinePlayer(playerId)) return;
     const h  = getStatLevel(playerId, "h");
     const d  = getStatLevel(playerId, "d");
     const s  = getStatLevel(playerId, "s");
@@ -146,8 +147,11 @@ export function applyStatEffects(playerId) {
 }
 
 export function fullHeal(playerId) {
-    const max = api.getClientOption(playerId, "maxHealth") || BASE_HP;
-    api.setHealth(playerId, max);
+    if (!isOnlinePlayer(playerId)) return;
+    try {
+        const max = Number(api.getClientOption(playerId, "maxHealth")) || BASE_HP;
+        api.setHealth(playerId, max);
+    } catch (e) {}
 }
 
 /* UPGRADE / RESET */
