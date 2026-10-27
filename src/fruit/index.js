@@ -10,7 +10,7 @@ try {
   } catch (O) {}
 }
 import { FRUIT_ABILITIES as n } from "./abilities";
-import { isFightingStyleAbilityName, restoreFightingStyle } from "../gameplay/fightingStyles";
+import { isFightingStyleAbilityName, isFightingStyleItemName, restoreFightingStyle } from "../gameplay/fightingStyles";
 import {
   FRUITS_BY_RARITY as i,
   FRUIT_RARITIES as c,
@@ -305,24 +305,16 @@ function k(t) {
     if (r && r.giveditems)
       for (const o of r.giveditems) {
         const r = F(o);
-        if (r) e[r] = !0;
+        if (r && !e[r] && !isFightingStyleItemName(r)) {
+          e[r] = !0;
+          try {
+            const e = api.getInventoryItemAmount(t, r);
+            "number" == typeof e && e > 0 && api.removeItemName(t, r, e);
+          } catch (t) {
+            f("clearFruitCallbacks.removeAll", t, r);
+          }
+        }
       }
-  }
-  for (let slot = 0; slot <= 50; slot++) {
-    let item = null;
-    try {
-      item = api.getItemSlot(t, slot);
-    } catch (t) {
-      item = null;
-    }
-    if (!item || !item.name || !e[item.name]) continue;
-    const cName = item.attributes && item.attributes.customDisplayName;
-    if (isFightingStyleAbilityName(cName)) continue;
-    try {
-      api.setItemSlot(t, slot, "Air");
-    } catch (t) {
-      f("clearFruitCallbacks.removeSlot", t, item.name);
-    }
   }
 }
 function N(t, e, o) {
@@ -377,7 +369,7 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
   const p = n[s];
   if (!p) return !1;
   const customName = u.attributes && u.attributes.customDisplayName;
-  if (isFightingStyleAbilityName(customName)) return !1;
+  if (isFightingStyleAbilityName(customName) || isFightingStyleItemName(u.name)) return !1;
   const y = (function (t, e, cName) {
     if (cName) {
       for (const o in t) {
