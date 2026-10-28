@@ -79,6 +79,35 @@ export function getRarityFromFruitName(t) {
   const e = getFruitInfo(t);
   return e ? e.rarity : null;
 }
+
+/* Description "par defaut" d'un fruit : c'est elle qui s'affiche dans le
+   tooltip de l'item, et celle que l'on enregistre comme description de base
+   (voir itemJoin dans gameplay/customItem.js). */
+export function fruitDescription(fruitName) {
+  const info = getFruitInfo(fruitName);
+  if (!info) return "A mysterious " + fruitName + " fruit";
+  const desc = info.desc ? String(info.desc) : "";
+  return "\u25cf " + info.rarity + " Fruit \u25cf\n" + desc + "\n[Sneak + Click to consume]";
+}
+
+/* Attributs complets a passer a api.giveItem() pour un fruit : nom, description
+   et surtout le TIER d'enchantement (c'est lui qui colore le nom et le glint).
+   Le moteur ne lit le tier que dans customAttributes.enchantmentTier : un tier
+   place a la racine des attributs est ignore. */
+export function fruitItemAttributes(fruitName) {
+  const info = getFruitInfo(fruitName);
+  const name = (info && info.name) || fruitName;
+  const tier = (info && info.enchantTier) || "Tier 1";
+  return {
+    customDisplayName: name,
+    customDescription: fruitDescription(name),
+    customAttributes: {
+      enchantmentTier: tier,
+      isFruitBlock: true,
+      fruitRpName: name,
+    },
+  };
+}
 !(function () {
   for (const t in n) {
     const e = n[t];
@@ -130,10 +159,7 @@ export function pickupFruit(t, e, o, r) {
   if (a && a.baseItem) {
     const e = a.baseItem.type;
     try {
-      api.giveItem(t, e, 1, {
-        customDisplayName: c.fruitName,
-        customDescription: "A mysterious " + c.fruitName + " fruit",
-      });
+      api.giveItem(t, e, 1, fruitItemAttributes(c.fruitName));
     } catch (t) {
       f("pickupFruit.giveItem", t);
     }
@@ -730,10 +756,7 @@ function E(t, o, r) {
                   D(t, "exp_levelup", 0.75, 1),
                   w(t, [r, r, r], "✦ JACKPOT ✦", i.price, i.level, P(r, "#86efac")));
                 try {
-                  const e = api.giveItem(t, a, 1, {
-                    customDisplayName: r,
-                    customDescription: "A mysterious " + r + " fruit",
-                  });
+                  const e = api.giveItem(t, a, 1, fruitItemAttributes(r));
                   if ("number" == typeof e && e < 1) throw new Error("Inventory is full");
                 } catch (e) {
                   return (
