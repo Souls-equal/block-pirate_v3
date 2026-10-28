@@ -972,12 +972,27 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
             }
         }
     }
-    if (!matched && itemName) {
+    /* Le NOM de l'item est la seule source fiable. Plusieurs items de style
+       partageaient leur ancien type de base avec une capacite de fruit (ex.
+       "Red Quick Paintball Explosive Item" = Crimson Beam du Flame ET ancien
+       Grapple Rush de Combat) : un clic sur le Crimson Beam lançait le dash de
+       Combat. Un item qui porte un AUTRE nom n'appartient donc pas au style et
+       on rend la main au fruit. Le repli par type ne sert plus qu'aux vieux
+       items sans nom personnalise. */
+    if (!matched && !customName && itemName) {
         for (let i = 0; i < style.abilities.length; i++) {
-            const ab = style.abilities[i];
-            if (ab.itemType === itemName || (ab.legacyItemType && ab.legacyItemType === itemName)) {
-                matched = ab;
+            if (style.abilities[i].itemType === itemName) {
+                matched = style.abilities[i];
                 break;
+            }
+        }
+        if (!matched) {
+            for (let i = 0; i < style.abilities.length; i++) {
+                const ab = style.abilities[i];
+                if (ab.legacyItemType && ab.legacyItemType === itemName) {
+                    matched = ab;
+                    break;
+                }
             }
         }
     }
