@@ -12,7 +12,7 @@ import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isF
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
-import { clearPlayerEffects as V } from "./utils/combat";
+import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -134,7 +134,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     Gt("rank", () => G(t)), Gt("sp", () => _(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t));
 }, onPlayerLeave = t => {
-    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t);
+    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t);
     try {
         lt(t);
     } catch (t) {
@@ -143,7 +143,8 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     bt(t), dt(t), Jt(t);
     for (const r of Xt.keys()) if (r.startsWith(String(t) + ":")) Xt.delete(r);
 }, onRespawnRequest = t => {
-    Gt("hakiRespawn", () => Lt(t)), Gt("restoreFruit", () => g(t)),
+    /* Protection PvP : 5 min contre le joueur qui vient de la tuer. */
+    Gt("pvpShield", () => pvShield(t)), Gt("hakiRespawn", () => Lt(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
     Gt("sidebar", () => K(t));
     try {
@@ -209,6 +210,13 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     if (A(r)) return "preventDamage";
 }, onPlayerDamagingOtherPlayer = (r, a, i, e) => {
     if (A(a)) return "preventDamage";
+    /* Protection PvP : le tueur ne peut pas toucher sa victime juste apres son
+       respawn ; si c'est la victime qui attaque, pvpGuard retire la protection. */
+    try {
+        if (pvGuard(r, a)) return "preventDamage";
+    } catch (t) {
+        _t("onPlayerDamagingOtherPlayer.pvpGuard", t);
+    }
     try {
         ft(a, r, Vt(e));
     } catch (t) {
@@ -245,6 +253,14 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
        attaquant — a lire AVANT de l'oublier. Le tueur doit etre un joueur en
        vie (les mobs et l'environnement ne volent rien). */
     let bKiller = r || null;
+    /* Une invocation (golem...) appartient a un joueur : c'est lui le tueur,
+       et c'est lui qui se verra opposer la protection PvP au respawn. */
+    if (bKiller) try {
+        const owner = globalThis.__resolveKillOwner ? globalThis.__resolveKillOwner(bKiller) : null;
+        if (owner) bKiller = owner;
+    } catch (e) {
+        _t("onAttemptKillPlayer.resolveOwner", e);
+    }
     if (!bKiller) try {
         const d = st(t);
         bKiller = d && d.killerId || null;
@@ -256,7 +272,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         try {
             isPlayer = gt().indexOf(bKiller) !== -1;
         } catch (e) {}
-        isPlayer && bKill(bKiller, t);
+        isPlayer && (Gt("pvpDeath", () => pvDeath(t, bKiller)), bKill(bKiller, t));
     });
     try {
         lt(t);
@@ -371,7 +387,7 @@ doPeriodicSave = () => {
         }
     } ]);
 }, tick = t => {
-    ht(), W(), Gt("stamina", () => et()), Gt("prune", () => {
+    ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("prune", () => {
         kt(), pt();
     });
 }, R(() => {

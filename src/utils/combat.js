@@ -117,6 +117,131 @@ export function heal(id, amount) {
    - recordDamager AVANT applyHealthChange (déjà présent)
    - détection de mort robuste même si hpAfter null
    ───────────────────────────────────────────────────────────── */
+/* ---------- PROTECTION PVP APRES RESPAWN ---------- */
+/* Un joueur tue -> sa victime retient le tueur. Au respawn, la victime est
+   protegee pendant 5 minutes CONTRE CE JOUEUR PRECIS : il ne peut plus lui
+   faire de degats (corps a corps comme capacites). Des que la victime attaque
+   son tueur, la protection tombe. Tout reste en memoire de session. */
+const PVP_PROTECT_MS = 5 * 60 * 1000;
+/* Une victime doit se faire tuer puis respawner : au dela de 2 min, on oublie. */
+const PVP_PENDING_MS = 2 * 60 * 1000;
+/* Anti-spam du message "il est protege" (par paire tueur/victime). */
+const PVP_NOTICE_MS = 4000;
+
+const PVP_PENDING = {}; /* victimId -> { killerId, at } */
+const PVP_SHIELD = {};  /* victimId -> { killerId: expiresAt } */
+const PVP_NOTICE = {};  /* "killer|victim" -> dernier message */
+
+function pvpSay(playerId, text, color) {
+    try {
+        api.sendMessage(playerId, [ { str: text, style: { color: color } } ]);
+    } catch (e) {}
+}
+
+function pvpName(id) {
+    const n = safeEntityName(id);
+    return n && n !== "Unknown" ? n : String(id);
+}
+
+/* Mort par un joueur : la victime se souviendra du tueur pour son respawn. */
+export function notePvPDeath(victimId, killerId) {
+    if (!victimId || !killerId || victimId === killerId) return false;
+    PVP_PENDING[victimId] = { killerId: killerId, at: Date.now() };
+    return true;
+}
+
+/* Appele au respawn : accorde 5 min de protection contre le tueur. */
+export function grantPvPShield(victimId) {
+    if (!victimId) return 0;
+    const pending = PVP_PENDING[victimId];
+    if (!pending) return 0;
+    delete PVP_PENDING[victimId];
+    if (!pending.killerId || pending.killerId === victimId) return 0;
+    if (Date.now() - pending.at > PVP_PENDING_MS) return 0;
+    let shields = PVP_SHIELD[victimId];
+    if (!shields) shields = PVP_SHIELD[victimId] = {};
+    shields[pending.killerId] = Date.now() + PVP_PROTECT_MS;
+    pvpSay(victimId, "[PvP] Protected from " + pvpName(pending.killerId) + " for 5 minutes. Attacking them cancels it.", "#7dd3fc");
+    return PVP_PROTECT_MS;
+}
+
+export function isPvPShielded(victimId, attackerId) {
+    if (!victimId || !attackerId) return false;
+    const shields = PVP_SHIELD[victimId];
+    if (!shields) return false;
+    const until = shields[attackerId];
+    if (!until) return false;
+    if (Date.now() >= until) {
+        delete shields[attackerId];
+        return false;
+    }
+    return true;
+}
+
+/* La victime protegee attaque son tueur : la protection saute. */
+export function dropPvPShield(attackerId, victimId) {
+    if (!attackerId || !victimId) return false;
+    const shields = PVP_SHIELD[attackerId];
+    if (!shields) return false;
+    if (!(victimId in shields)) return false;
+    delete shields[victimId];
+    pvpSay(attackerId, "[PvP] Protection against " + pvpName(victimId) + " cancelled (you attacked them).", "#fbbf24");
+    return true;
+}
+
+/* Point d'entree unique : renvoie true si le coup doit etre ANNULE.
+   Garde aussi la regle "si je l'attaque, je perds ma protection". */
+export function pvpGuard(attackerId, victimId) {
+    if (!attackerId || !victimId || attackerId === victimId) return false;
+    if (isPvPShielded(victimId, attackerId)) {
+        const now = Date.now();
+        const key = attackerId + "|" + victimId;
+        if (!PVP_NOTICE[key] || now - PVP_NOTICE[key] > PVP_NOTICE_MS) {
+            PVP_NOTICE[key] = now;
+            const left = Math.ceil((PVP_SHIELD[victimId][attackerId] - now) / 1000);
+            pvpSay(attackerId, "[PvP] " + pvpName(victimId) + " is protected from you (" + left + "s left).", "#f87171");
+        }
+        return true;
+    }
+    dropPvPShield(attackerId, victimId);
+    return false;
+}
+
+/* Deconnexion : on oublie tout pour ce joueur. */
+export function clearPvPFor(playerId) {
+    if (!playerId) return;
+    delete PVP_PENDING[playerId];
+    delete PVP_SHIELD[playerId];
+    const prefix = playerId + "|";
+    for (const key in PVP_NOTICE) {
+        if (key.indexOf(prefix) === 0 || key.indexOf("|" + playerId) !== -1) delete PVP_NOTICE[key];
+    }
+}
+
+/* Appele a chaque tick : purge les protections terminees (et previent le
+   joueur), ainsi que les morts trop anciennes jamais suivies d'un respawn. */
+export function tickPvPShield() {
+    const now = Date.now();
+    for (const victimId in PVP_SHIELD) {
+        const shields = PVP_SHIELD[victimId];
+        let left = 0;
+        for (const killerId in shields) {
+            if (now < shields[killerId]) {
+                left++;
+                continue;
+            }
+            delete shields[killerId];
+            if (isAliveId(victimId)) {
+                pvpSay(victimId, "[PvP] Protection against " + pvpName(killerId) + " has expired.", "#94a3b8");
+            }
+        }
+        if (!left) delete PVP_SHIELD[victimId];
+    }
+    for (const victimId in PVP_PENDING) {
+        if (now - PVP_PENDING[victimId].at > PVP_PENDING_MS) delete PVP_PENDING[victimId];
+    }
+}
+
 export function damage(target, rawAmount, caster, itemName) {
     try {
         if (!target || !caster || target === caster) return false;
@@ -158,6 +283,9 @@ export function damage(target, rawAmount, caster, itemName) {
         if (!isAliveId(effectiveCaster) && !isAliveId(caster)) {
             if (isAliveId(caster)) effectiveCaster = caster;
         }
+        // Protection PvP : un tueur ne peut pas retoucher sa victime protegee.
+        // pvpGuard annule aussi la protection si c'est la victime qui attaque.
+        if (pvpGuard(effectiveCaster, target)) return false;
 
         let amt = Math.round(Math.abs(rawAmount) * strengthMult(effectiveCaster) * 1.5);
         if (amt < 1) amt = 1;
