@@ -20,7 +20,7 @@ import { forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobT
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
 import { tickLayer as Ct, onPlayerJoinLayer as Dt, onPlayerClickLayer as At } from "./build/layer";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
-import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/plane";
+import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
@@ -121,7 +121,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         _t("killCredit.forgetDamager", t);
     }
     dt(r);
-}), onPlayerJoin = t => {
+}), onPlayerJoin = t => {St(t) //sphere
     if (qt(t)) return;
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
@@ -153,7 +153,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
             Gt("abilities", () => P(t)), Gt("sidebar", () => K(t));
         }, 5);
     } catch (t) {}
-}, onPlayerClick = (t, r, a, i, e, o, m) => {
+}, onPlayerClick = (t, r, a, i, e, o, m) => { Nt(t, r, a, i, e, o, m)
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
     if (m && isNPCEntity(m)) {
@@ -389,7 +389,7 @@ doPeriodicSave = () => {
             color: "lightblue"
         }
     } ]);
-}, tick = t => {
+}, tick = t => {Mt(t);//sphere
     ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("prune", () => {
         kt(), pt();
     });
