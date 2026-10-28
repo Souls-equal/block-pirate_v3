@@ -1,6 +1,10 @@
 // customItem.js
 
-import { FRUITS_BY_RARITY } from "../fruit/index";
+import { FRUITS_BY_RARITY, fruitDescription, getRarityEnchantTier } from "../fruit/index";
+
+/* Le tier d'enchantement n'est peut-etre pas modifiable via setItemStat :
+   on tente une fois, et si le moteur refuse on ne reessaie plus jamais. */
+let tierStatUnsupported = false;
 
 /* ARMES À FEU */
 
@@ -104,10 +108,23 @@ export function itemJoin(playerId) {
         reloadTime:4000,
         reloadBulletsIndividually:false,
     })
+    /* Description par defaut des fruits : c'est le filet de securite pour les
+       items donnes SANS attributs (give manuel, codes, items deja en banque).
+       Le tier, lui, doit etre pose a chaque giveItem (customAttributes), voir
+       fruitItemAttributes() dans fruit/index.js. */
     for (const rarity in FRUITS_BY_RARITY) {
         for (const fruit of FRUITS_BY_RARITY[rarity]) {
-            api.setItemStat(playerId, fruit.itemName, "displayName", fruit.rpName);
-            api.setItemStat(playerId, fruit.itemName, "description", fruit.rpDesc);
+            try {
+                api.setItemStat(playerId, fruit.itemName, "displayName", fruit.rpName);
+                api.setItemStat(playerId, fruit.itemName, "description", fruitDescription(fruit.rpName));
+            } catch (e) {}
+            if (!tierStatUnsupported) {
+                try {
+                    api.setItemStat(playerId, fruit.itemName, "enchantmentTier", getRarityEnchantTier(rarity));
+                } catch (e) {
+                    tierStatUnsupported = true;
+                }
+            }
         }
     }
 }
