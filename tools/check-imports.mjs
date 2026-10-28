@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
 
 // Modules référencés par src/index.js mais absents du dépôt (voir src/build/README.md).
-const KNOWN_MISSING = new Set(["./build/layer", "./build/path", "./build/plane"]);
+const KNOWN_MISSING = new Set(["./build/layer", "./build/path", "./build/plane", "./build/sphere"]);
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

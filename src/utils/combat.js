@@ -127,6 +127,12 @@ const PVP_PROTECT_MS = 5 * 60 * 1000;
 const PVP_PENDING_MS = 2 * 60 * 1000;
 /* Anti-spam du message "il est protege" (par paire tueur/victime). */
 const PVP_NOTICE_MS = 4000;
+/* Le respawn est automatique dans ce monde (autoRespawn + secsToRespawn 0),
+   donc onRespawnRequest n'est pas forcement appele : on surveille le retour
+   a la vie frame par frame. Delai minimal pour laisser le moteur tuer. */
+const PVP_ARM_DELAY_MS = 250;
+/* Si la vie reste illisible (entite absente), on accorde quand meme. */
+const PVP_ARM_MAX_MS = 3000;
 
 const PVP_PENDING = {}; /* victimId -> { killerId, at } */
 const PVP_SHIELD = {};  /* victimId -> { killerId: expiresAt } */
@@ -143,10 +149,27 @@ function pvpName(id) {
     return n && n !== "Unknown" ? n : String(id);
 }
 
+/* Vie du joueur, ou null si elle est illisible (entite absente). */
+function pvpHealth(id) {
+    try {
+        const h = api.getHealth(id);
+        return typeof h === "number" && Number.isFinite(h) ? h : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 /* Mort par un joueur : la victime se souviendra du tueur pour son respawn. */
 export function notePvPDeath(victimId, killerId) {
     if (!victimId || !killerId || victimId === killerId) return false;
-    PVP_PENDING[victimId] = { killerId: killerId, at: Date.now() };
+    const now = Date.now();
+    const prev = PVP_PENDING[victimId];
+    PVP_PENDING[victimId] = { killerId: killerId, at: now };
+    /* Deux callbacks de mort peuvent arriver pour le meme kill :
+       on ne repete pas le message. */
+    if (!prev || prev.killerId !== killerId || now - prev.at > 2000) {
+        pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". 5 min of protection against them once you respawn (cancelled if you attack them).", "#7dd3fc");
+    }
     return true;
 }
 
@@ -238,7 +261,19 @@ export function tickPvPShield() {
         if (!left) delete PVP_SHIELD[victimId];
     }
     for (const victimId in PVP_PENDING) {
-        if (now - PVP_PENDING[victimId].at > PVP_PENDING_MS) delete PVP_PENDING[victimId];
+        const pending = PVP_PENDING[victimId];
+        const elapsed = now - pending.at;
+        if (elapsed > PVP_PENDING_MS) {
+            delete PVP_PENDING[victimId];
+            continue;
+        }
+        /* Respawn automatique : on accorde des que le joueur est de nouveau
+           en vie (ou si sa vie reste illisible apres le delai de secours). */
+        if (elapsed < PVP_ARM_DELAY_MS) continue;
+        const hp = pvpHealth(victimId);
+        if (hp !== null && hp <= 0) continue;
+        if (hp === null && elapsed < PVP_ARM_MAX_MS) continue;
+        grantPvPShield(victimId);
     }
 }
 

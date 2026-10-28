@@ -280,6 +280,15 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         _t("onAttemptKillPlayer.forgetDamager", t);
     }
     dt(t);
+}, onPlayerKilledOtherPlayer = (t, r, a, i) => {
+    /* Selon le chemin de mort, le moteur peut passer par ici plutot que par
+       onAttemptKillPlayer : on memorise le tueur dans les deux cas, sinon la
+       protection PvP ne serait jamais armee. */
+    try {
+        if (t && r && t !== r) Gt("pvpDeath", () => pvDeath(r, t));
+    } catch (e) {
+        _t("onPlayerKilledOtherPlayer.pvpDeath", e);
+    }
 }, onPlayerKilledMob = (t, r, a, i) => {
     let e = t;
     if (!e) try {
