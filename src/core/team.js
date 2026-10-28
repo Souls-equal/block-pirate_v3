@@ -688,6 +688,19 @@ function bountySay(playerId, text, color) {
     } catch (e) {}
 }
 
+/* La prime et l'argent sont affiches dans la leaderboard : on rafraichit les
+   deux joueurs concernes apres un kill (jamais bloquant). */
+function refreshBountyUi(killerId, victimId) {
+    try {
+        refreshLeaderboardPlayer(killerId);
+    } catch (e) {}
+    if (victimId && victimId !== killerId) {
+        try {
+            refreshLeaderboardPlayer(victimId);
+        } catch (e) {}
+    }
+}
+
 export function getBounty(playerId) {
     const n = Math.floor(Number(getStat(playerId, "bounty", 0)));
     return n > 0 ? n : 0;
@@ -726,6 +739,7 @@ export function handleBountyKill(killerId, victimId) {
         setBounty(victimId, 0);
         giveMoney(killerId, payout);
         bountySay(killerId, "\u2693 Bounty collected: $" + payout + " (" + safeName(victimId) + ")", "#3b82f6");
+        refreshBountyUi(killerId, victimId);
         return { type: "payout", amount: payout, lost: victimBounty - payout, bounty: 0 };
     }
 
@@ -736,5 +750,6 @@ export function handleBountyKill(killerId, victimId) {
     giveMoney(killerId, stolen);
     const bounty = addBounty(killerId, stolen);
     bountySay(killerId, "\u2620 Bounty: +$" + stolen + " (total $" + bounty + ")", "#ef4444");
+    refreshBountyUi(killerId, victimId);
     return { type: "steal", amount: stolen, bounty: bounty };
 }
