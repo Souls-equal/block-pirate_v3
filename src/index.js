@@ -1,6 +1,6 @@
 import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
-import { FRUIT_ABILITIES as h, abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
+import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
@@ -312,10 +312,13 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     const n = api.getEntityName(t);
     if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) || fsItemName(o) ? "preventChange" : void 0;
 }, onPlayerDropItem = (t, r, a, i, e, o, m) => {
+    /* Seuls les items d'habilité sont bloqués : ce sont des items uniques,
+       perdus pour toujours s'ils sont lâchés. Tout le reste peut tomber,
+       y compris un fruit ramassé (customAttributes.isFruitBlock) — c'est le
+       seul moyen de le donner à un autre joueur — et un bloc de construction
+       qui partage son nom avec le fruit équipé (Stone, Ice, Sand, Glass...). */
     const l = "string" == typeof e ? e : e?.name || e?.type;
-    if (C(l) || fsItemName(l)) return "preventDrop";
-    const s = h[n(t)];
-    return s?.baseItem && s.baseItem.type === l ? "preventDrop" : void 0;
+    return l && (C(l) || fsItemName(l)) ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
