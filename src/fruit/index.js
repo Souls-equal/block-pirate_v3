@@ -87,7 +87,8 @@ export function fruitDescription(fruitName) {
   const info = getFruitInfo(fruitName);
   if (!info) return "A mysterious " + fruitName + " fruit";
   const desc = info.desc ? String(info.desc) : "";
-  return "\u25cf " + info.rarity + " Fruit \u25cf\n" + desc + "\n[Sneak + Click to consume]";
+  /* Le fruit se donne en le lachant : on le dit dans la description. */
+  return "\u25cf " + info.rarity + " Fruit \u25cf\n" + desc + "\n[Sneak + Click to consume | Drop to give away]";
 }
 
 /* Attributs complets a passer a api.giveItem() pour un fruit : nom, description
