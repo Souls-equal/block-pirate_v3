@@ -152,13 +152,13 @@ function bountyOf(playerId){
 export function setupLeaderboard(playerId){
     try {
         api.setClientOption(playerId, "lobbyLeaderboardInfo", {
-            name:  { displayName: "Name",  sortPriority: 5 },
+            name:  { displayName: "Name",  sortPriority: 11 },
             level: { displayName: "Level", sortPriority: 0 },
             xp:    { displayName: "XP %",  sortPriority: 2 },
             money: { displayName: "Money", sortPriority: 1 },
-            team:  { displayName: "Team",  sortPriority: 4 },
-            crew:  { displayName: "Crew",  sortPriority: 3 },
-            bounty: { displayName: "Bounty", sortPriority: 6 },
+            bounty: { displayName: "Bounty", sortPriority: 3 },
+            team:  { displayName: "Team",  sortPriority: 9 },
+            crew:  { displayName: "Crew",  sortPriority: 10 },
         });
     } catch (e) {}
 }
