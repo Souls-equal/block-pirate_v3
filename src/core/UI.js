@@ -142,6 +142,12 @@ function drawSidebar(playerId){
     } catch (e) {}
 }
 
+/* Prime d'un joueur (0 si absente ou illisible). */
+function bountyOf(playerId){
+    const n = Math.floor(Number(getStat(playerId, "bounty", 0)));
+    return n > 0 ? n : 0;
+}
+
 /* SETUP TABLE STRUCTURE */
 export function setupLeaderboard(playerId){
     try {
@@ -152,7 +158,7 @@ export function setupLeaderboard(playerId){
             money: { displayName: "Money", sortPriority: 1 },
             team:  { displayName: "Team",  sortPriority: 4 },
             crew:  { displayName: "Crew",  sortPriority: 3 },
-            fruit: { displayName: "Fruit", sortPriority: 6 },
+            bounty: { displayName: "Bounty", sortPriority: 6 },
         });
     } catch (e) {}
 }
@@ -165,7 +171,9 @@ export function updateLeaderboard(playerId){
     const xp = getStat(playerId, "xp", 0);
     const crew = getCrewName(playerId) || "NONE";
     const team = getStat(playerId, "team", "NONE");
-    const fruit = getFruit(playerId) || "NONE";
+    /* Prime : lue directement en DB (pas d'import croise avec team.js,
+       sinon un fichier non recopie casserait tout le module UI). */
+    const bounty = bountyOf(playerId);
     const xpNeeded = xpToNext(lvl);
     const xpPercent = xpNeeded > 0 ? Math.floor((xp / xpNeeded) * 100) : 0;
 
@@ -178,7 +186,7 @@ export function updateLeaderboard(playerId){
             xp: xpPercent,
             team: team,
             crew: crew,
-            fruit: fruit,
+            bounty: bounty,
         });
     } catch (e) {}
 }
@@ -228,13 +236,13 @@ export function refreshLeaderboardAll(){
         const xp = getStat(id, "xp", 0);
         const xpNeeded = xpToNext(lvl);
         const xpPercent = xpNeeded > 0 ? Math.floor((xp / xpNeeded) * 100) : 0;
-        const fruit = getFruit(id) || "NONE";
+        const bounty = bountyOf(id);
         return {
             id,
             lvl,
             money,
             xp: xpPercent,
-            fruit: fruit,
+            bounty: bounty,
         }
     });
     /* SORT BY LEVEL (BLOX FRUITS STYLE) */
