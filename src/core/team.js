@@ -442,21 +442,28 @@ export function handleChat(playerId, message, channel) {
     const all = api.getPlayerIds();
     const online = new Set(all);
 
+    /* Envoie a `ids`, puis aux joueurs qui ont la permission de voir tous les
+       canaux (hors destinataires deja servis) avec un prefixe indiquant le
+       canal. Chaque envoi est isole : un joueur parti ne casse pas les autres. */
     const deliver = (ids, segments, tag) => {
         const done = new Set();
         for (const id of ids) {
             if (!id || done.has(id) || !online.has(id)) continue;
             done.add(id);
-            api.sendMessage(id, segments);
+            try {
+                api.sendMessage(id, segments);
+            } catch (e) {}
         }
         if (tag) {
             for (const id of all) {
                 if (done.has(id) || !online.has(id)) continue;
                 if (!canBypassChatRestriction(id)) continue;
-                api.sendMessage(id, [
-                    { str: "[" + tag + "] ", style: { color: "#888888" } },
-                    ...segments
-                ]);
+                try {
+                    api.sendMessage(id, [
+                        { str: "[" + tag + "] ", style: { color: "#888888" } },
+                        ...segments
+                    ]);
+                } catch (e) {}
             }
         }
     };
@@ -469,20 +476,25 @@ export function handleChat(playerId, message, channel) {
         { str: message, style: { color: msgColor } }
     ];
 
-    /* BYPASS: admins/mods reach everyone regardless of the channel */
-    if (canBypassChatRestriction(playerId)) {
-        deliver(all, buildMsg("#ffffff"));
-        return false;
-    }
+    /* Pas de passe-droit a l'ECRITURE : un admin qui parle dans le canal Team
+       parle a sa team (couleur de sa team), et les joueurs qui ont la
+       permission de voir tous les canaux recoivent la copie prefixee [Team X].
+       La permission sert a LIRE les autres canaux, pas a parler a tout le
+       monde en blanc. */
+
+    /* Le moteur renvoie le nom du canal tel qu'il a ete enregistre, mais on
+       normalise : un canal vide ou avec une autre casse ne doit jamais faire
+       disparaitre le message (il repart alors en Global). */
+    const chan = (typeof channel === "string" ? channel.toUpperCase() : "") || CHAT_CHANNEL.GLOBAL;
 
     /* GLOBAL */
-    if (channel === CHAT_CHANNEL.GLOBAL) {
+    if (chan === CHAT_CHANNEL.GLOBAL) {
         deliver(all, buildMsg("#ffffff"));
         return false;
     }
 
     /* TEAM */
-    if (channel === CHAT_CHANNEL.TEAM) {
+    if (chan === CHAT_CHANNEL.TEAM) {
         const myTeam = getPlayerTeam(playerId);
         deliver(
             all.filter(id => getPlayerTeam(id) === myTeam),
@@ -493,7 +505,7 @@ export function handleChat(playerId, message, channel) {
     }
 
     /* CREW */
-    if ((channel || "").toUpperCase() === CHAT_CHANNEL.CREW) {
+    if (chan === CHAT_CHANNEL.CREW) {
         const crewName = getCrewName(playerId);
         if (!crewName) return false;
 
