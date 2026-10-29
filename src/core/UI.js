@@ -7,7 +7,7 @@ import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
 import { isVanished } from "./admin";
-import { C } from "./theme";
+import { C, fit, measure } from "./theme";
 
 export const dCode = "7WGjmPHZrS"
 
@@ -49,18 +49,37 @@ export function updateSidebarLight(playerId){
     drawSidebar(playerId)
 }
 
+/* --- Sidebar -------------------------------------------------------------
+   Le TEXTE de la sidebar est court ; ce qui pese, c'est le stylage : chaque
+   partie {str|icon, style} coute 40 a 80 caracteres de JSON, et Bloxd refuse
+   un textStyling trop gros (« InternalError: Argument too large », qui remonte
+   en « World code tick: ... »). Regles appliquees ici :
+     - une seule couleur par partie, fontSize reserve au titre ;
+     - segments de meme style fusionnes, lignes regroupees (moins de parties) ;
+     - les textes libres (fruit, style, cible de quete) sont bornes ;
+     - si ca depasse quand meme SIDEBAR_BUDGET, on retire les blocs
+       secondaires en commencant par le moins utile, JAMAIS tout le message.
+   La sidebar ne doit JAMAIS faire planter le tick. */
+
+const SIDEBAR_BUDGET = 1200;
+
+/* Coupe un texte libre trop long (nom de fruit, d'ile, liste de cibles). */
+function short(text, max){
+    const str = String(text === undefined || text === null ? "" : text);
+    return str.length > max ? str.slice(0, Math.max(1, max - 1)) + "~" : str;
+}
+
 function drawSidebar(playerId){
     const money = getStat(playerId, "money", 0);
     const lvl = getStat(playerId, "lvl", 1);
     const xp = getStat(playerId, "xp", 0);
     const sp = getStat(playerId, "sp", 0);
-    const fruit = getFruit(playerId) || "No fruit";
+    const fruit = short(getFruit(playerId) || "No fruit", 20);
     const styleName = getFightingStyle(playerId);
     const styleInfo = getFightingStyleInfo(styleName);
-    const styleLabel = styleName || "No style";
+    const styleLabel = short(styleName || "No style", 18);
     const styleColor = (styleInfo && styleInfo.color) || "#94a3b8";
     const xpNeeded = xpToNext(lvl);
-
     const xpData = makeXpBar(xp, xpNeeded);
 
     const stValue = getStamina(playerId);
@@ -72,75 +91,87 @@ function drawSidebar(playerId){
     const quest = playerQuest[playerId];
     const progress = questProgress[playerId] || 0;
 
-    let questLines = [];
+    /* Blocs dans l'ordre d'affichage. `optional` = peut etre retire sous
+       pression du budget ; `priority` = ordre de sacrifice (petit = garde). */
+    const blocks = [];
+    const block = (parts, optional, priority) => {
+        if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority || 9 });
+    };
+
+    block([
+        { icon: "fa-solid fa-skull", style: { color: C.PIRATE } },
+        { str: " BLOCK PIRATES\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title } },
+    ]);
+    block([
+        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
+        { str: " " + money + "\n", style: { color: C.MONEY } },
+    ]);
+    block([
+        { icon: "Hunger", style: { color: C.PIRATE } },
+        { str: " " + fruit + "\n", style: { color: C.PIRATE } },
+    ]);
+    block([
+        { icon: "fa-solid fa-hand-fist", style: { color: styleColor } },
+        { str: " " + styleLabel + "\n", style: { color: styleColor } },
+    ]);
+    block([
+        { icon: "fa-solid fa-angle-double-up", style: { color: C.MONEY } },
+        { str: " LVL " + lvl + "\n", style: { color: C.MONEY } },
+    ]);
+    block([
+        { str: "XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", style: { color: C.XP } },
+        { str: xpData.bar + "\n\n", style: { color: C.XP } },
+    ], true, 2);
+    block([
+        { icon: "fa-solid fa-bolt", style: { color: C.XP } },
+        { str: " " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", style: { color: C.XP } },
+        { str: stData.bar + "\n\n", style: { color: C.XP } },
+    ], true, 3);
+    block([
+        { icon: "fa-solid fa-star", style: { color: C.SUCCESS } },
+        { str: " Stat Points " + sp + "\n\n", style: { color: C.SUCCESS } },
+    ], true, 4);
 
     if (quest) {
-        const targetText = Array.isArray(quest.targetMob)
-            ? quest.targetMob.join(" / ")
-            : quest.targetMob;
-        const percent = Math.floor((progress / quest.killAmount) * 100);
-        questLines = [
-            { icon: "fa-solid fa-globe", style: { color: C.MARINE, fontSize: title2 } },
-            { str: " QUEST\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title2 } },
-            { str: targetText + "\n", style: { color: C.INFO, fontWeight: "bold", fontSize:text } },
-            { str: progress + "/" + quest.killAmount + " ", style: { color: C.INFO, fontSize:text  } },
-            { str: "(" + percent + "%)\n", style: { color: C.XP, fontWeight: "bold", fontSize:text  } },
-            { str: quest.island + "\n\n", style: { color: C.INFO, fontSize:text  } }
-        ];
+        const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
+        const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
+        block([
+            { icon: "fa-solid fa-globe", style: { color: C.MARINE } },
+            { str: " QUEST " + targetText + "\n", style: { color: C.MARINE } },
+            { str: progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n\n", style: { color: C.INFO } },
+        ], true, 1);
     } else {
-        questLines = [
-            { icon: "fa-solid fa-globe", style: { color: C.MARINE, fontSize: title2 } },
-            { str: " QUEST\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title2 } },
-            { str: "No active quest\n\n", style: { color: C.INFO, fontSize:text  } }
-        ];
+        block([
+            { icon: "fa-solid fa-globe", style: { color: C.MARINE } },
+            { str: " QUEST  no active quest\n\n", style: { color: C.INFO } },
+        ], true, 8);
     }
-    const sidebarText = [
-        { icon: "fa-solid fa-skull", style: { color: C.PIRATE, fontSize: title } },
-        { str: " BLOCK PIRATES\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title } },
 
-        /* MONEY */
-        { icon: "fa-solid fa-coins", style: { color: C.MONEY, fontSize: title2 } },
-        { str: money + "\n", style: { color: C.MONEY, fontSize:title2  } },
+    /* Budget : les blocs obligatoires passent toujours, puis les secondaires
+       sont ajoutes du plus utile au moins utile tant que ca tient, et
+       reassembles dans l'ordre d'affichage. */
+    const kept = [];
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.optional) continue;
+        for (let j = 0; j < b.parts.length; j++) kept.push(b.parts[j]);
+    }
+    const optional = blocks.filter((b) => b.optional).sort((a, b) => a.priority - b.priority);
+    for (let i = 0; i < optional.length; i++) {
+        const trial = kept.concat(optional[i].parts);
+        if (measure(trial) > SIDEBAR_BUDGET) continue;
+        optional[i].keptUnderBudget = true;
+    }
 
-        /* FRUIT */
-        { icon:"Hunger", style:{ fontSize: title2, fontWeight: "bold" } },
-        { str: fruit + "\n", style: { color: C.PIRATE, fontWeight: "bold", fontSize:title2  } },
+    const parts = [];
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.optional && !b.keptUnderBudget) continue;
+        for (let j = 0; j < b.parts.length; j++) parts.push(b.parts[j]);
+    }
 
-        /* FIGHTING STYLE */
-        { icon: "fa-solid fa-hand-fist", style: { color: styleColor, fontSize: title2 } },
-        { str: " " + styleLabel + "\n\n", style: { color: styleColor, fontWeight: "bold", fontSize: title2 } },
-
-        /* LEVEL */
-        { icon: "fa-solid fa-angle-double-up", style: { color: C.MONEY, fontSize: title2} },
-        { str: " LVL: ", style: { color: C.MONEY, fontWeight: "bold", fontSize: title2 } },
-        { str: lvl + "\n", style: { color: C.INFO, fontWeight: "bold", fontSize:title2  } },
-
-        /* XP TEXT */
-        { str: "XP: ", style: { color: C.XP, fontSize:text } },
-        { str: xp + "/" + xpNeeded + "\n", style: { color: C.XP, fontSize:text } },
-        { str: xpData.bar + " " + xpData.percent + "%\n\n", style: { color: C.XP, fontWeight: "bold", fontSize:text } },
-
-        ...(function(){
-            try {
-                const v = Number.isFinite(stData.value) ? stData.value : 0;
-                const m = Number.isFinite(stData.max) && stData.max > 0 ? stData.max : 100;
-                return [
-                { icon: "fa-solid fa-bolt", style: { color: C.XP, fontSize:text } },
-                {str: " " + Math.round(v) + "/" + Math.round(m) + "\n"+ stData.bar + " " + stData.percent + "%\n\n",style: { color: C.XP, fontWeight: "bold", fontSize: text }}
-                ];
-            } catch (e) { return []; }
-        })(),
-
-        /* STAT POINTS */
-        { icon: "fa-solid fa-star", style: { color: C.MONEY, fontSize:text } },
-        { str: " Stat Points\n", style: { color: C.SUCCESS, fontWeight: "bold", fontSize:text } },
-        { str: sp + "\n\n", style: { color: C.SUCCESS, fontWeight: "bold", fontSize:text  } },
-
-        ...questLines,
-
-    ];
     try {
-        api.setClientOption(playerId, "RightInfoText", sidebarText);
+        api.setClientOption(playerId, "RightInfoText", fit(parts, SIDEBAR_BUDGET));
     } catch (e) {}
 }
 

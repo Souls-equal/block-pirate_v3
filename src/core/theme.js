@@ -296,6 +296,142 @@ function outStyle(style) {
     return copy === style ? style : copy;
 }
 
+/* --- Budget de taille -----------------------------------------------------
+   Bloxd refuse un textStyling trop gros : le moteur leve
+   « InternalError: Argument too large » et l'erreur remonte au handler
+   (d'ou « World code tick: ... »). La limite se situe autour de la taille de
+   la sidebar ; on prend donc une marge confortable et on DEGRADE au lieu de
+   jeter : fusion, simplification des styles, puis troncature.
+
+   Trois paliers :
+     BUDGET_SIDEBAR : textes "collés" a l'ecran (RightInfoText, middleText*),
+                      envoyes a chaque tick -> budget serre ;
+     BUDGET         : messages ordinaires (chat, boutiques, textes flottants) ;
+     BUDGET_SHOP    : panneaux de boutique, ou l'on accepte un peu plus gros. */
+export const BUDGET_SIDEBAR = 1200;
+export const BUDGET = 1400;
+export const BUDGET_SHOP = 1500;
+
+/* Taille serialisee d'un payload : c'est elle que le moteur compte. */
+export function measure(value) {
+    if (value === undefined || value === null) return 0;
+    try { return JSON.stringify(value).length; } catch (e) { return 0; }
+}
+
+function styleKey(style) {
+    if (!style || typeof style !== "object") return "";
+    try { return JSON.stringify(style); } catch (e) { return ""; }
+}
+
+/* Parties voisines de meme style -> une seule partie. Le rendu est identique
+   et chaque partie economisee coute ~40 a 80 caracteres de JSON. */
+function mergeNeighbours(parts) {
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const last = out[out.length - 1];
+        if (
+            last && typeof last.str === "string" &&
+            part && typeof part.str === "string" &&
+            styleKey(last.style) === styleKey(part.style)
+        ) {
+            out[out.length - 1] = { str: last.str + part.str, style: last.style };
+            continue;
+        }
+        out.push(part);
+    }
+    return out;
+}
+
+/* fontSize / fontWeight pesent lourd et ne servent qu'aux titres : on garde
+   le style complet de la plus grande police (les titres) et des premieres
+   parties, et on allege tout le reste. */
+function stripHeavyStyles(parts) {
+    let maxSize = 0;
+    for (let i = 0; i < parts.length; i++) {
+        const style = parts[i] && parts[i].style;
+        const size = style && style.fontSize !== undefined ? parseFloat(style.fontSize) : 0;
+        if (size > maxSize) maxSize = size;
+    }
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!part || typeof part !== "object" || !part.style) {
+            out.push(part);
+            continue;
+        }
+        const size = part.style.fontSize !== undefined ? parseFloat(part.style.fontSize) : 0;
+        const isTitle = maxSize > 0 && size >= maxSize;
+        if (isTitle) {
+            out.push(part);
+            continue;
+        }
+        const keepBold = i < 3;
+        if (!part.style.fontSize && (!part.style.fontWeight || !keepBold)) {
+            out.push(part);
+            continue;
+        }
+        const style = {};
+        for (const key in part.style) {
+            if (key === "fontSize") continue;
+            if (key === "fontWeight" && !keepBold) continue;
+            style[key] = part.style[key];
+        }
+        out.push(Object.assign({}, part, { style: style }));
+    }
+    return out;
+}
+
+function strOf(part) {
+    return part && typeof part.str === "string" ? part.str : "";
+}
+
+/* Dernier recours : on garde les parties entieres qui tiennent, on coupe la
+   suivante au caractere pres et on termine par une ellipse. Le rendu reste
+   lisible et on ne depasse JAMAIS le budget. */
+function truncateToBudget(parts, limit) {
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (measure(out.concat([part])) <= limit) {
+            out.push(part);
+            continue;
+        }
+        const text = strOf(part);
+        if (text) {
+            for (let keep = text.length; keep > 0; keep -= 4) {
+                const candidate = { str: (keep > 3 ? text.slice(0, keep - 3) : "") + "...", style: part.style };
+                if (measure(out.concat([candidate])) <= limit) {
+                    out.push(candidate);
+                    break;
+                }
+            }
+        }
+        break;
+    }
+    if (!out.length) {
+        const first = parts[0];
+        out.push(first && typeof first.str === "string" ? { str: first.str.slice(0, 32) + "...", style: first.style } : { str: "..." });
+    }
+    return out;
+}
+
+/* Ramene un payload sous le budget, en gardant le sens du message. */
+export function fit(message, budget) {
+    const limit = budget || BUDGET;
+    if (message === undefined || message === null) return message;
+    if (typeof message === "string") {
+        if (message.length + 4 <= limit) return message;
+        return message.slice(0, Math.max(1, limit - 8)) + "...";
+    }
+    if (!Array.isArray(message)) return message;
+    let out = mergeNeighbours(message);
+    if (measure(out) <= limit) return out;
+    out = stripHeavyStyles(out);
+    if (measure(out) <= limit) return out;
+    return truncateToBudget(out, limit);
+}
+
 /* Messages. say() = un joueur, shout() = tout le monde.
    On garde l'acces d'origine a l'API pour ne pas formater deux fois. */
 const native = {};
@@ -310,13 +446,13 @@ function nativeBroadcast() {
 
 export function say(playerId, message, style) {
     try {
-        nativeSend()(playerId, format(message, style), outStyle(style));
+        nativeSend()(playerId, fit(format(message, style), BUDGET), outStyle(style));
     } catch (e) {}
 }
 
 export function shout(message, style) {
     try {
-        nativeBroadcast()(format(message, style), outStyle(style));
+        nativeBroadcast()(fit(format(message, style), BUDGET), outStyle(style));
     } catch (e) {}
 }
 
@@ -351,7 +487,7 @@ function formatShopOptions(options) {
     for (let i = 0; i < SHOP_TEXT_KEYS.length; i++) {
         const key = SHOP_TEXT_KEYS[i];
         if (!options[key]) continue;
-        const value = format(options[key]);
+        const value = fit(format(options[key]), BUDGET_SHOP);
         if (value === options[key]) continue;
         if (!copy) copy = Object.assign({}, options);
         copy[key] = value;
@@ -375,14 +511,14 @@ export function installTheme() {
         native.sendMessage = original.sendMessage;
         native.broadcastMessage = original.broadcastMessage;
         api.sendMessage = function (playerId, message, style) {
-            return original.sendMessage(playerId, format(message, style), outStyle(style));
+            return original.sendMessage(playerId, fit(format(message, style), BUDGET), outStyle(style));
         };
         api.broadcastMessage = function (message, style) {
-            return original.broadcastMessage(format(message, style), outStyle(style));
+            return original.broadcastMessage(fit(format(message, style), BUDGET), outStyle(style));
         };
         if (original.sendOverShopInfo) {
             api.sendOverShopInfo = function (playerId, parts) {
-                return original.sendOverShopInfo(playerId, format(parts));
+                return original.sendOverShopInfo(playerId, fit(format(parts), BUDGET_SHOP));
             };
         }
         if (original.createShopItemForPlayer) {
@@ -397,13 +533,13 @@ export function installTheme() {
         }
         if (original.sendFlyingMiddleMessage) {
             api.sendFlyingMiddleMessage = function (playerId, message, distance, lifetime) {
-                return original.sendFlyingMiddleMessage(playerId, format(message), distance, lifetime);
+                return original.sendFlyingMiddleMessage(playerId, fit(format(message), BUDGET), distance, lifetime);
             };
         }
         if (original.setClientOption) {
             api.setClientOption = function (playerId, key, value) {
                 if (TEXT_OPTIONS[key] && value !== undefined && value !== null && value !== "") {
-                    value = format(value);
+                    value = fit(format(value), BUDGET_SIDEBAR);
                 }
                 return original.setClientOption(playerId, key, value);
             };
@@ -415,7 +551,7 @@ export function installTheme() {
                     for (const key in TEXT_OPTIONS) {
                         const value = options[key];
                         if (value === undefined || value === null || value === "") continue;
-                        const next = format(value);
+                        const next = fit(format(value), BUDGET_SIDEBAR);
                         if (next === value) continue;
                         if (!copy) copy = Object.assign({}, options);
                         copy[key] = next;

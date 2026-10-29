@@ -54,6 +54,32 @@ Dans le code : `import { C, say, shout } from "./theme"` puis `say(id, [...])`,
 > `index.js`, `core/team.js`, `core/UI.js`, `fruit/index.js`, `gameplay/*` et `utils/*`.
 > Sans lui, aucun de ces fichiers ne se charge.
 
+### Budget de taille (erreur `InternalError: Argument too large`)
+
+Bloxd refuse un `textStyling` trop gros : le moteur lève alors
+`InternalError: Argument too large`, qui remonte en `World code tick: …` et peut
+couper un handler entier. Un message court peut donc casser si **le stylage**
+pèse trop lourd (chaque partie `{str|icon, style}` coûte 40 à 80 caractères de
+JSON, et la limite se situe autour de la taille de la sidebar).
+
+`fit()` (dans `theme.js`) est appliqué à **tous** les envois (`say`, `shout`,
+`sendMessage`, `broadcastMessage`, boutiques, options client) et dégrade au lieu
+de jeter :
+
+1. fusion des parties voisines de même style ;
+2. suppression de `fontSize` / `fontWeight` hors titres ;
+3. troncature avec `...` en dernier recours.
+
+Budgets : `BUDGET_SIDEBAR` = 1 200 caractères (textes collés à l'écran :
+`RightInfoText`, `middleText*`), `BUDGET` = 1 400 (chat, textes flottants),
+`BUDGET_SHOP` = 1 500 (panneaux de boutique). `measure()` donne la taille
+sérialisée d'un payload.
+
+La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
+caractères : une seule couleur par partie, `fontSize` réservé au titre, textes
+libres (fruit, style, cible de quête) bornés, et blocs secondaires retirés un à
+un si nécessaire — jamais tout le message.
+
 ---
 
 ## Arborescence
