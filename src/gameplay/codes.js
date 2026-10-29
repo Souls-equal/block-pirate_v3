@@ -33,7 +33,6 @@ addCode(
     [{ name: "Speed", duration:null }],
     99,
 )
-
 addCode(
     "IMINTHEDISCORD",
     "500 Money and speed for 1h! Tysm to joining it!",
@@ -41,7 +40,6 @@ addCode(
     [{ name: "Speed", duration: 60 * 60 * 1000 }],
     500,
 )
-
 addCode(
     "BLADEFRUITFORFREE",
     "Blade??!?!",
@@ -49,13 +47,19 @@ addCode(
     [],
     0,
 )
-
 addCode(
     "VIP200",
     "200 Money + Health Regen for 30 minutes. Thanks for supporting the server!",
     [{ item: "Apple", qte: 10 }],
     [{ name: "Health Regen", duration: 60 * 30 * 1000 }],
     200,
+)
+addCode(
+    "TYFOR40MEMBERS",
+    "500 Money, apples and Damage for 60 minutes. Thanks for supporting the server!",
+    [{ item: "Apple", qte: 50 }],
+    [{ name: "Damage", duration: 60 * 60 * 1000 }],
+    500,
 )
 
 export const refreshInfoCase = (playerId) => {
