@@ -7,8 +7,9 @@
   "scripts": {
     "build:blocks": "node tools/build-blocks.mjs",
     "build:world": "node tools/build-world.mjs",
-    "build": "npm run build:blocks && npm run build:world",
-    "check": "node tools/check-imports.mjs && node tools/check-handlers.mjs && node tools/check-blocks.mjs"
+    "build": "npm run build:blocks && npm run build:world && npm run build:src",
+    "check": "node tools/check-imports.mjs && node tools/check-handlers.mjs && node tools/check-blocks.mjs",
+    "build:src": "node tools/build-sources.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

@@ -27,6 +27,15 @@ import {
 import { setTimeout } from "./timer";
 import { C, say } from "../core/theme";
 export const summonOwner = {};
+/* Garde d'equipe (marines entre eux, meme crew). Posee par index.js avec
+   canDamage() de core/team : l'import direct creerait un cycle
+   team -> customItem -> combat. */
+let teamGuard = null;
+export function setTeamGuard(fn) { teamGuard = fn; }
+function blockedByTeam(caster, target) {
+    if (!teamGuard) return false;
+    try { return teamGuard(caster, target) === "preventDamage"; } catch (e) { return false; }
+}
 // expose for killAttribution without circular import
 try { globalThis.__combatSummonOwner = summonOwner; } catch (e) {}
 
@@ -319,6 +328,9 @@ export function damage(target, rawAmount, caster, itemName) {
         if (!isAliveId(effectiveCaster) && !isAliveId(caster)) {
             if (isAliveId(caster)) effectiveCaster = caster;
         }
+        // Equipe / crew : une capacite ne touche pas un allie (le corps a corps
+        // est deja filtre par onPlayerDamagingOtherPlayer).
+        if (!isMob && effectiveCaster !== target && blockedByTeam(effectiveCaster, target)) return false;
         // Protection PvP : un tueur ne peut pas retoucher sa victime protegee.
         // pvpGuard annule aussi la protection si c'est la victime qui attaque.
         if (pvpGuard(effectiveCaster, target)) return false;

@@ -12,7 +12,7 @@ import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isF
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
-import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear } from "./utils/combat";
+import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -29,6 +29,13 @@ import { installTheme as installTheme, shout } from "./core/theme";
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
 installTheme();
+
+/* Les capacites (fruit, armes d'habilete) passent par combat.damage() et non
+   par le handler du moteur : sans ce branchement un marine pouvait toucher un
+   autre marine. */
+try {
+    setTeamGuard(t);
+} catch (e) {}
 
 const xt = {};
 
@@ -49,16 +56,6 @@ function _t(t, r, a) {
     if (Yt[i] = (Yt[i] || 0) + 1, Yt[i] <= 5) try {
         api.log("[" + t + "][err] " + (a ? a + " : " : "") + (r && r.message ? r.message : r));
     } catch (t) {}
-}
-
-function zt(t) {
-    try {
-        const r = api.getEntityName(t);
-        if (r) return r;
-    } catch (t) {
-        _t("getEntityName", t);
-    }
-    return String(t);
 }
 
 function Vt(t) {
@@ -207,8 +204,8 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     let m = null;
     try {
         m = api.getPlayerPhysicsState(t);
-    } catch (t) {
-        m = null, _t("getPlayerPhysicsState", t);
+    } catch (e) {
+        m = null;
     }
     return !m || 1 === m.type || api.getHeldItem(t) || api.isPlayerCrouching(t) || ot(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r) => {
@@ -408,7 +405,16 @@ doPeriodicSave = () => {
         kt(), pt();
     });
 }, R(() => {
+    /* gt() est un cache (80 ms) : un joueur peut avoir quitte entre-temps.
+       Sans ce filtre, getPlayerPhysicsState(getPosition) jettent sur un id
+       mort et l'erreur remontait dans la console du monde. */
+    let online = null;
+    try { online = api.getPlayerIds(); } catch (e) { online = null; }
     for (const t of gt()) try {
+        if (online && online.indexOf(t) === -1) {
+            try { dt(t); } catch (e) {}
+            continue;
+        }
         if (1 === api.getPlayerPhysicsState(t).type) continue;
         let [r, a, i] = api.getPosition(t), e = "Water";
         if (api.getBlock(r, a, i) === e || api.getBlock(r, a - 1, i) === e) {
@@ -425,7 +431,8 @@ doPeriodicSave = () => {
             }
         }
     } catch (r) {
-        _t("water.tick", r, zt(t));
+        /* id disparu en cours de route : on l'oublie, sans bruit. */
+        try { dt(t); } catch (e) {}
     }
 }, 20), onClose = () => {
     Bt();

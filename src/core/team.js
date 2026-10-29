@@ -532,18 +532,35 @@ export function handleChat(playerId, message, channel) {
     return false;
 }
 
-/* DAMAGE CHECK */
+/* DAMAGE CHECK
+   Appele par le corps a corps (onPlayerDamagingOtherPlayer) ET par les
+   capacites (combat.damage via setTeamGuard) : un marine ne peut pas toucher
+   un marine, et deux membres d'un meme equipage ne se touchent pas non plus. */
+const TEAM_NOTICE = {};
+const TEAM_NOTICE_MS = 4000;
+
+function warnFriendly(attacker) {
+    const now = Date.now();
+    if (TEAM_NOTICE[attacker] && now - TEAM_NOTICE[attacker] < TEAM_NOTICE_MS) return;
+    TEAM_NOTICE[attacker] = now;
+    say(attacker, "You can't attack your own teammates.", { color: C.MONEY });
+}
+
 export function canDamage(attacker, target) {
+    if (!attacker || !target || attacker === target) return;
 
     const A = getCrewName(attacker);
     const B = getCrewName(target);
-    if (A && B && A === B) return "preventDamage";
+    if (A && B && A === B) {
+        warnFriendly(attacker);
+        return "preventDamage";
+    }
 
     const teamA = getPlayerTeam(attacker);
     const teamB = getPlayerTeam(target);
-    if (teamA && teamB && teamA === "MARINES" && teamB === "MARINES") {
-        say(attacker, "As a marine, you cant attack another marine player.", {color:"orange"});
-        return "preventDamage"
+    if (teamA === "MARINES" && teamB === "MARINES") {
+        warnFriendly(attacker);
+        return "preventDamage";
     }
     return;
 }
