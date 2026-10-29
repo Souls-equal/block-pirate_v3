@@ -24,6 +24,11 @@ import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
+import { installTheme as installTheme, shout } from "./core/theme";
+
+/* Palette unique + emojis remplaces par des icones Bloxd : on branche le
+   normalisateur de textes avant tout le reste. */
+installTheme();
 
 const xt = {};
 
@@ -387,7 +392,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 let $t = 0;
 
 doPeriodicSave = () => {
-    $t++, $t % 2 == 0 && api.broadcastMessage([ {
+    $t++, $t % 2 == 0 && shout([ {
         str: "if you have any problems, bugs or glitch, report it on the discord!",
         style: {
             color: "orange"

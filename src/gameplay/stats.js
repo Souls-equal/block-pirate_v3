@@ -2,6 +2,7 @@
 
 import { addStat, getStat, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
+import { C, say } from "../core/theme";
 
 /* BASE VALUES */
 const BASE_HP = 100;
@@ -250,7 +251,7 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
 
     if (itemKey === "upg_reset") {
         const refund = resetStats(playerId);
-        api.sendMessage(playerId, [
+        say(playerId, [
             { str: "Stats reset! (" + refund + " Stat Points recovered)", style: { color: "lime", fontWeight: "bold" } }
         ]);
         return true;
@@ -262,12 +263,13 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
     const amt = Math.max(1, parseInt(input) || 1);
 
     if (!upgStat(playerId, stat, amt)) {
-        api.sendMessage(playerId, [
+        say(playerId, [
             { str: "Not enough Stat Points! (Have: " + getStat(playerId, "sp", 0) + ", Need: " + amt + ")", style: { color: "red" } }
         ]);
     } else {
-        api.sendMessage(playerId, [
-            { str: "✅ " + STAT_CONFIG[stat].name + " +" + amt, style: { color: "lime", fontWeight: "bold" } }
+        say(playerId, [
+            { icon: "fa-solid fa-circle-check", style: { color: C.SUCCESS } },
+            { str: " " + STAT_CONFIG[stat].name + " +" + amt, style: { color: C.SUCCESS, fontWeight: "bold" } }
         ]);
     }
 

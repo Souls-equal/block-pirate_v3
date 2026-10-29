@@ -33,6 +33,7 @@ import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { INVENTORY_SLOT_MAX } from "./customItem";
 import { getTotalMoney, payMoney } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
+import { C, say } from "../core/theme";
 
 const FS_DB_KEY = "fs";
 
@@ -825,8 +826,8 @@ export function equipFightingStyle(playerId, styleName, silent = false) {
             api.playSound(playerId, "exp_levelup", 1, 1.15);
         } catch (e) {}
         try {
-            api.sendMessage(playerId, [
-                { str: "🥋 You learned the ", style: { color: "#e2e8f0", fontWeight: "bold" } },
+            say(playerId, [
+                { icon: "fa-solid fa-hand-fist", style: { color: "#e2e8f0", fontWeight: "bold" } }, { str: " You learned the ", style: { color: "#e2e8f0", fontWeight: "bold" } },
                 { str: style.name, style: { color: style.color, fontWeight: "bold" } },
                 { str: " Fighting Style!\n", style: { color: "#e2e8f0", fontWeight: "bold" } },
                 { str: "• Empty-hand clicks now use ", style: { color: "#94a3b8" } },
@@ -872,8 +873,8 @@ export function buyFightingStyle(playerId, styleName) {
         removeFightingStyleItems(playerId, null);
         giveFightingStyleItems(playerId, styleName);
         try {
-            api.sendMessage(playerId, [
-                { str: "🥋 You already use ", style: { color: "#cbd5e1" } },
+            say(playerId, [
+                { icon: "fa-solid fa-hand-fist", style: { color: "#cbd5e1" } }, { str: " You already use ", style: { color: "#cbd5e1" } },
                 { str: style.name, style: { color: style.color, fontWeight: "bold" } },
                 { str: "! (Your ability items have been refreshed.)", style: { color: "#cbd5e1" } },
             ]);
@@ -888,8 +889,8 @@ export function buyFightingStyle(playerId, styleName) {
     const money = getTotalMoney(playerId);
     if (money < style.price) {
         try {
-            api.sendMessage(playerId, [
-                { str: "💰 Not enough Coins to learn ", style: { color: "#ff5555", fontWeight: "bold" } },
+            say(playerId, [
+                { icon: "fa-solid fa-coins", style: { color: "#ff5555", fontWeight: "bold" } }, { str: " Not enough Coins to learn ", style: { color: "#ff5555", fontWeight: "bold" } },
                 { str: style.name, style: { color: style.color, fontWeight: "bold" } },
                 { str: ": " + money + "/" + style.price, style: { color: "#fbbf24", fontWeight: "bold" } },
             ]);
@@ -902,8 +903,8 @@ export function buyFightingStyle(playerId, styleName) {
     if (!pending || pending.style !== styleName || now > pending.until) {
         confirmPurchase.set(playerId, { style: styleName, until: now + 5000 });
         try {
-            api.sendMessage(playerId, [
-                { str: "🥋 Click ", style: { color: "#e2e8f0" } },
+            say(playerId, [
+                { icon: "fa-solid fa-hand-fist", style: { color: "#e2e8f0" } }, { str: " Click ", style: { color: "#e2e8f0" } },
                 { str: style.npc, style: { color: style.color, fontWeight: "bold" } },
                 { str: " again within 5s to learn ", style: { color: "#e2e8f0" } },
                 { str: style.name, style: { color: style.color, fontWeight: "bold" } },
@@ -1008,7 +1009,7 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
     if (now < cdEnd) {
         const rem = Math.max(1, Math.ceil((cdEnd - now) / 1000));
         try {
-            api.sendMessage(playerId, [
+            say(playerId, [
                 { str: "[", style: { color: "#94a3b8" } },
                 { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
                 { str: "] ", style: { color: "#94a3b8" } },
@@ -1055,11 +1056,11 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
                 api.sendFlyingMiddleMessage(
                     playerId,
                     [
-                        { str: "✦ ", style: { color: "#facc15", fontWeight: "700" } },
+                        { icon: "fa-solid fa-sparkle", style: { color: "#facc15", fontWeight: "700" } },
                         { str: "Ability ", style: { color: "#cbd5e1", fontWeight: "600" } },
                         { str: matched.name, style: { color: "#67e8f9", fontWeight: "700" } },
                         { str: " is ready!", style: { color: "#86efac", fontWeight: "700" } },
-                        { str: " ✦", style: { color: "#facc15", fontWeight: "700" } },
+                        { icon: "fa-solid fa-sparkle", style: { color: C.MONEY } },
                     ],
                     100,
                 );

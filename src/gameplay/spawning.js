@@ -2,6 +2,7 @@
 
 import { updateSidebar } from "../core/UI";
 import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
+import { C, say } from "../core/theme";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},
@@ -181,7 +182,7 @@ export function spawnEnemy(callerId, pos, type, name, amount, level, rank) {
 
     const effect = api.getEffects(callerId);
     if (effect.includes("Spawning Cooldown")) {
-        api.sendMessage(callerId, "Wait before spawning more mobs", {color:"red"})
+        say(callerId, "Wait before spawning more mobs", {color:"red"})
         return true
     }
     api.applyEffect(callerId, "Spawning Cooldown", 10000, {displayName:"Spawning Cooldown", icon:"Updraft" })
@@ -244,16 +245,17 @@ export function spawnEnemy(callerId, pos, type, name, amount, level, rank) {
 
         api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
           subtitle: [
-            { str: rank === 3 ? "🔥 BOSS" : rank === 2 ? "👤 TIER 2" : "👤 NORMAL", style: {color: rank === 3 ? "#ff4444" : rank === 2 ? "#ffcc00" : "#aaaaaa", fontWeight: "bold"} },
-            { str: "  |  ", style: {color: "gray"} },
-            { str: "Lvl " + level, style: {color: "#00bfff"} }
+            { icon: rank === 3 ? "fa-solid fa-fire" : "fa-solid fa-user", style: { color: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO } },
+            { str: rank === 3 ? " BOSS" : rank === 2 ? " TIER 2" : " NORMAL", style: { color: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO, fontWeight: "bold" } },
+            { str: "  |  ", style: { color: C.INFO } },
+            { str: "Lvl " + level, style: { color: C.MARINE } }
           ],
           healthbar: {
               display: "always",
               height: "13px"
           },
           border: {
-            colour: rank === 3 ? "#ff0000" : rank === 2 ? "#ffaa00" : "#666666",
+            colour: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO,
             applyTo: "nametag",
             style: "double"
           }
@@ -350,8 +352,9 @@ export function killdMob(playerId, mobId) {
     try { changeMoney(realPlayerId, money); } catch (e) {}
 
     try {
-        api.sendMessage(realPlayerId,[
-            {str:"✨ +"+xp+" XP  ",style:{color:"#00ffff"}},
+        say(realPlayerId,[
+            {icon:"fa-solid fa-sparkle",style:{color:C.XP}},
+            {str:" +"+xp+" XP  ",style:{color:C.XP}},
         ]);
     } catch (e) {}
 

@@ -36,12 +36,12 @@ let time = 0;
 const timers: Timer[] = [];
 const coroutines: Coroutine[] = [];
 
-// 🩹 un callback qui throw est arrêté après ce nombre d'échecs consécutifs
+// un callback qui throw est arrêté après ce nombre d'échecs consécutifs
 const MAX_FAILURES = 4;
-// 🩹 nombre max de logs par timer (anti-flood)
+// nombre max de logs par timer (anti-flood)
 const MAX_LOGS = 3;
 
-// 🩹 log sécurisé : ne throw JAMAIS, même si api.log casse.
+// log sécurisé : ne throw JAMAIS, même si api.log casse.
 function logError(tag: string, e: unknown) {
     const msg = (e && ((e as any).message || e)) || "unknown error";
     try { api.log("[" + tag + "] " + msg); } catch (e2) {}
@@ -119,7 +119,7 @@ export function step(): void {
 
         if (time < timer.t) continue;
 
-        // 🩹 Isolé : une exception ici n'empêche PAS les timers suivants de tourner.
+        // Isolé : une exception ici n'empêche PAS les timers suivants de tourner.
         let threw = false;
         try {
             timer.fn();
@@ -132,7 +132,7 @@ export function step(): void {
             }
         }
 
-        // 🩹 Après trop d'échecs, on arrête proprement le timer pour ne pas le
+        // Après trop d'échecs, on arrête proprement le timer pour ne pas le
         // laisser tourner à vide (DoT sur une cible déjà morte, etc.).
         if (timer.failures > MAX_FAILURES) {
             timer.active = false;
@@ -143,7 +143,7 @@ export function step(): void {
         if (!timer.active || timer.i === 0) {
             timers.splice(i, 1);
         } else {
-            // 🩹 même si le callback a throw, un interval continue normalement :
+            // même si le callback a throw, un interval continue normalement :
             // la cible peut être revenue, et on ne bloque pas les prochains ticks.
             timer.t = time + timer.i;
             if (threw) {

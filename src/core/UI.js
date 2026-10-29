@@ -7,6 +7,7 @@ import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
 import { isVanished } from "./admin";
+import { C } from "./theme";
 
 export const dCode = "7WGjmPHZrS"
 
@@ -79,60 +80,61 @@ function drawSidebar(playerId){
             : quest.targetMob;
         const percent = Math.floor((progress / quest.killAmount) * 100);
         questLines = [
-            { icon: "fa-solid fa-globe", style: { color: "#00BFFF", fontSize: title2 } },
-            { str: " QUEST\n", style: { color: "#00BFFF", fontWeight: "bold", fontSize: title2 } },
-            { str: targetText + "\n", style: { color: "#FFFFFF", fontWeight: "bold", fontSize:text } },
-            { str: progress + "/" + quest.killAmount + " ", style: { color: "#AAAAAA", fontSize:text  } },
-            { str: "(" + percent + "%)\n", style: { color: "#00FFFF", fontWeight: "bold", fontSize:text  } },
-            { str: quest.island + "\n\n", style: { color: "#888888", fontSize:text  } }
+            { icon: "fa-solid fa-globe", style: { color: C.MARINE, fontSize: title2 } },
+            { str: " QUEST\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title2 } },
+            { str: targetText + "\n", style: { color: C.INFO, fontWeight: "bold", fontSize:text } },
+            { str: progress + "/" + quest.killAmount + " ", style: { color: C.INFO, fontSize:text  } },
+            { str: "(" + percent + "%)\n", style: { color: C.XP, fontWeight: "bold", fontSize:text  } },
+            { str: quest.island + "\n\n", style: { color: C.INFO, fontSize:text  } }
         ];
     } else {
         questLines = [
-            { icon: "fa-solid fa-globe", style: { color: "#00BFFF", fontSize: title2 } },
-            { str: " QUEST\n", style: { color: "#00BFFF", fontWeight: "bold", fontSize: title2 } },
-            { str: "No active quest\n\n", style: { color: "#AAAAAA", fontSize:text  } }
+            { icon: "fa-solid fa-globe", style: { color: C.MARINE, fontSize: title2 } },
+            { str: " QUEST\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title2 } },
+            { str: "No active quest\n\n", style: { color: C.INFO, fontSize:text  } }
         ];
     }
     const sidebarText = [
-        { str: "╔ BLOCK PIRATES ╗\n", style: { color: "#00BFFF", fontWeight: "bold", fontSize: title } },
+        { icon: "fa-solid fa-skull", style: { color: C.PIRATE, fontSize: title } },
+        { str: " BLOCK PIRATES\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title } },
 
         /* MONEY */
-        { icon: "fa-solid fa-coins", style: { color: "#FFD700", fontSize: title2 } },
-        { str: money + "\n", style: { color: "#FFD700", fontSize:title2  } },
+        { icon: "fa-solid fa-coins", style: { color: C.MONEY, fontSize: title2 } },
+        { str: money + "\n", style: { color: C.MONEY, fontSize:title2  } },
 
         /* FRUIT */
         { icon:"Hunger", style:{ fontSize: title2, fontWeight: "bold" } },
-        { str: fruit + "\n", style: { color: "#E84759", fontWeight: "bold", fontSize:title2  } },
+        { str: fruit + "\n", style: { color: C.PIRATE, fontWeight: "bold", fontSize:title2  } },
 
         /* FIGHTING STYLE */
         { icon: "fa-solid fa-hand-fist", style: { color: styleColor, fontSize: title2 } },
         { str: " " + styleLabel + "\n\n", style: { color: styleColor, fontWeight: "bold", fontSize: title2 } },
 
         /* LEVEL */
-        { icon: "fa-solid fa-angle-double-up", style: { color: "#FF8C00", fontSize: title2} },
-        { str: " LVL: ", style: { color: "#FF8C00", fontWeight: "bold", fontSize: title2 } },
-        { str: lvl + "\n", style: { color: "#FFFFFF", fontWeight: "bold", fontSize:title2  } },
+        { icon: "fa-solid fa-angle-double-up", style: { color: C.MONEY, fontSize: title2} },
+        { str: " LVL: ", style: { color: C.MONEY, fontWeight: "bold", fontSize: title2 } },
+        { str: lvl + "\n", style: { color: C.INFO, fontWeight: "bold", fontSize:title2  } },
 
         /* XP TEXT */
-        { str: "XP: ", style: { color: "#AAAAAA", fontSize:text } },
-        { str: xp + "/" + xpNeeded + "\n", style: { color: "#AAAAAA", fontSize:text } },
-        { str: xpData.bar + " " + xpData.percent + "%\n\n", style: { color: "#00FFFF", fontWeight: "bold", fontSize:text } },
+        { str: "XP: ", style: { color: C.XP, fontSize:text } },
+        { str: xp + "/" + xpNeeded + "\n", style: { color: C.XP, fontSize:text } },
+        { str: xpData.bar + " " + xpData.percent + "%\n\n", style: { color: C.XP, fontWeight: "bold", fontSize:text } },
 
         ...(function(){
             try {
                 const v = Number.isFinite(stData.value) ? stData.value : 0;
                 const m = Number.isFinite(stData.max) && stData.max > 0 ? stData.max : 100;
                 return [
-                { icon: "fa-solid fa-bolt", style: { color: "#aaddff", fontSize:text } },
-                {str: " " + Math.round(v) + "/" + Math.round(m) + "\n"+ stData.bar + " " + stData.percent + "%\n\n",style: { color: "#aaddff", fontWeight: "bold", fontSize: text }}
+                { icon: "fa-solid fa-bolt", style: { color: C.XP, fontSize:text } },
+                {str: " " + Math.round(v) + "/" + Math.round(m) + "\n"+ stData.bar + " " + stData.percent + "%\n\n",style: { color: C.XP, fontWeight: "bold", fontSize: text }}
                 ];
             } catch (e) { return []; }
         })(),
 
         /* STAT POINTS */
-        { icon: "fa-solid fa-star", style: { color: "#FFDD00", fontSize:text } },
-        { str: " Stat Points\n", style: { color: "#AAAAAA", fontWeight: "bold", fontSize:text } },
-        { str: sp + "\n\n", style: { color: "#FFFFFF", fontWeight: "bold", fontSize:text  } },
+        { icon: "fa-solid fa-star", style: { color: C.MONEY, fontSize:text } },
+        { str: " Stat Points\n", style: { color: C.SUCCESS, fontWeight: "bold", fontSize:text } },
+        { str: sp + "\n\n", style: { color: C.SUCCESS, fontWeight: "bold", fontSize:text  } },
 
         ...questLines,
 
@@ -197,10 +199,10 @@ export function updateLeaderboardColor(playerId){
     const team = getStat(playerId, "team", "NONE");
 
     const colorMap = {
-        PIRATES: "#ff6b6b",
-        MARINES: "#6bb6ff",
-        REVOLUTIONARIES: "#7cff7c",
-        NONE: "#aaaaaa"
+        PIRATES: C.PIRATE,
+        MARINES: C.MARINE,
+        REVOLUTIONARIES: C.SUCCESS,
+        NONE: C.INFO
     };
 
     try {
@@ -261,8 +263,8 @@ export function onPlayerJoinLeaderboard(playerId){
 export function joinUI(playerId) {
     api.setClientOption(playerId, "headerChips", [
         { content: [{ str: "Discord:", style: { color: "#5865F2", fontWeight: "bold" } }], showBackground: true },
-        { content: [{ str: ["discord.", "gg", "/",dCode].join(""), style: { color: "#FFFFFF" } }], showBackground: true },
-        { content: [{ str: " Join Now! ", style: { color: "#FFD700", fontWeight: "bold" } }], showBackground: false }
+        { content: [{ str: ["discord.", "gg", "/",dCode].join(""), style: { color: C.INFO } }], showBackground: true },
+        { content: [{ icon: "fa-solid fa-discord", style: { color: C.MARINE } }, { str: " Join Now! ", style: { color: C.MONEY, fontWeight: "bold" } }], showBackground: false }
     ]);
 
     if (api.getEntityName(playerId)==="K4miNoK4mi") {

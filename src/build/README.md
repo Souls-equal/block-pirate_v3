@@ -6,7 +6,7 @@
 | --- | --- |
 | `layer.js` | `tickLayer`, `onPlayerJoinLayer`, `onPlayerClickLayer` |
 | `path.js` | `tickPath`, `onPlayerJoinPath`, `onPlayerClickPath` |
-| `plane.js` | `tick1`, `onPlayerJoin1`, `onPlayerClick1` |
+| `sphere.js` | `tick1`, `onPlayerJoin1`, `onPlayerClick1` |
 
 Ces trois fichiers **ne sont pas présents dans le dépôt** : ils étaient déjà absents avant
 le rangement (rien n'a été supprimé) et ils ne peuvent pas être reconstruits à partir du

@@ -1,4 +1,5 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
+import { C as THEME, say } from "../core/theme";
 let o = function () {},
   r = function () {};
 try {
@@ -38,7 +39,7 @@ function m(t) {
 }
 function p(t, e, o) {
   try {
-    api.sendMessage(t, e);
+    say(t, e);
   } catch (t) {
     f("sendMessage", t, o);
   }
@@ -430,7 +431,7 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
     const e = Math.max(1, Math.ceil((k + F - I) / 1e3));
     (!x[d] || I - x[d] > 2e3) &&
       ((x[d] = I),
-      api.sendMessage(t, [
+      say(t, [
         { str: "[", style: { color: "#94a3b8" } },
         { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
         { str: "] ", style: { color: "#94a3b8" } },
@@ -451,11 +452,11 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
               api.sendFlyingMiddleMessage(
                 t,
                 [
-                  { str: "✦ ", style: { color: "#facc15", fontWeight: "700" } },
+                  { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
                   { str: "Ability ", style: { color: "#cbd5e1", fontWeight: "600" } },
                   { str: e, style: { color: "#67e8f9", fontWeight: "700" } },
                   { str: " is ready!", style: { color: "#86efac", fontWeight: "700" } },
-                  { str: " ✦", style: { color: "#facc15", fontWeight: "700" } },
+                  { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
                 ],
                 100,
               );
@@ -681,7 +682,7 @@ function P(t, e = "#f8fafc") {
 function w(t, e, o, r, n, i = "#facc15") {
   const c = [
       { str: "╔════════════════════════════════╗\n", style: { color: "#facc15", fontWeight: "700", fontSize: "20px" } },
-      { str: "        ✦  FRUIT MACHINE  ✦\n\n", style: { color: i, fontWeight: "700", fontSize: "26px" } },
+      { str: "        FRUIT MACHINE\n\n", style: { color: i, fontWeight: "700", fontSize: "26px" } },
       { str: "      ║  ", style: { color: "#94a3b8", fontWeight: "700", fontSize: "20px" } },
     ],
     a = e.map((t) => ({ str: "  " + S(t) + "  ", style: { color: P(t), fontWeight: "700", fontSize: "24px" } }));
@@ -755,7 +756,7 @@ function E(t, o, r) {
                   );
                 (D(t, "cashRegister", 0.9, 1),
                   D(t, "exp_levelup", 0.75, 1),
-                  w(t, [r, r, r], "✦ JACKPOT ✦", i.price, i.level, P(r, "#86efac")));
+                  w(t, [r, r, r], "JACKPOT", i.price, i.level, P(r, "#86efac")));
                 try {
                   const e = api.giveItem(t, a, 1, fruitItemAttributes(r));
                   if ("number" == typeof e && e < 1) throw new Error("Inventory is full");
@@ -777,7 +778,7 @@ function E(t, o, r) {
                       t,
                       [
                         { str: "[", style: { color: "#94a3b8" } },
-                        { str: "✦", style: { color: "#facc15", fontWeight: "700" } },
+                        { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
                         { str: "] You received ", style: { color: "#cbd5e1" } },
                         { str: r, style: { color: (l && l.color) || "#ffffff", fontWeight: "700" } },
                         { str: " fruit for ", style: { color: "#cbd5e1" } },
@@ -851,7 +852,7 @@ export function rollFruit(t, e = 1) {
           t,
           [
             { str: "[", style: { color: "#94a3b8" } },
-            { str: "✖", style: { color: "#ef4444", fontWeight: "700" } },
+            { icon: "fa-solid fa-xmark", style: { color: "#ef4444", fontWeight: "700" } },
             { str: "] Not enough money. Price: ", style: { color: "#cbd5e1" } },
             { str: String(o), style: { color: "#fbbf24", fontWeight: "700" } },
             { str: ". You have: ", style: { color: "#cbd5e1" } },

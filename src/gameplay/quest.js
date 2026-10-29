@@ -3,6 +3,7 @@
 import { addStat, addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data";
 import { updateSidebar } from "../core/UI";
 import { computeQuestReward, spawnEnemy } from "./spawning";
+import { C, say } from "../core/theme";
 
 export const quests = {
     "Starter Island": {
@@ -343,8 +344,14 @@ function questMessage(quest, resolved) {
 
     const n = count > 1 ? count + " " : "";
     return {
-        start: "⚔️ Eliminate " + n + name + "!",
-        complete: "🎉 " + (count > 1 ? count + " " : "") + name + " defeated!"
+        start: [
+            { icon: "fa-solid fa-swords", style: { color: C.INFO } },
+            { str: " Eliminate " + n + name + "!", style: { color: C.INFO } }
+        ],
+        complete: [
+            { icon: "fa-solid fa-party-horn", style: { color: C.SUCCESS } },
+            { str: " " + (count > 1 ? count + " " : "") + name + " defeated!", style: { color: C.SUCCESS } }
+        ]
     };
 }
 
@@ -412,8 +419,8 @@ function getPlayerTeam(playerId) {
 spawnQuestMob = (playerId, questId) => {
     const quest = getQuestById(questId) || getQuestForLevel(getStat(playerId, "lvl", 1));
     if (!quest) {
-        api.sendMessage(playerId, [
-            { str: "❌ Unknown quest / no quest for your level", style: { color: "#ff4444" } }
+        say(playerId, [
+            { icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Unknown quest / no quest for your level", style: { color: "#ff4444" } }
         ]);
         return false;
     }
@@ -455,8 +462,10 @@ export function startQuest(playerId) {
     const quest = getQuestForLevel(lvl);
 
     if (!quest) {
-        api.sendMessage(playerId, [
-            { str: "Woww... ❌ No quest available...", style: { color: "#ff4444" } }
+        say(playerId, [
+            { str: "Woww... ", style: { color: C.DANGER } },
+            { icon: "fa-solid fa-xmark", style: { color: C.DANGER } },
+            { str: " No quest available...", style: { color: C.DANGER } }
         ]);
         return;
     }
@@ -469,16 +478,16 @@ export function startQuest(playerId) {
     questProgress[playerId] = 0;
     saveQuest(playerId, resolved, 0);
 
-    api.sendMessage(playerId, [
-        { str: "📜 QUEST STARTED\n", style: { color: "#00BFFF", fontWeight: "bold" } },
-        { str: msg.start, style: { color: "#FFFFFF" } }
+    say(playerId, [
+        { icon: "fa-solid fa-file-lines", style: { color: "#00BFFF", fontWeight: "bold" } }, { str: " QUEST STARTED\n", style: { color: "#00BFFF", fontWeight: "bold" } },
+        ...msg.start
     ]);
 
     api.setDirectionArrow(
         playerId,
         resolved.id,
         resolved.position,
-        "📍 Quest Location",
+        "Quest Location",
         true,
         { color: "red", fontSize: "17px", fontWeight: "bold" }
     );
@@ -509,14 +518,14 @@ export function restorePlayerQuest(playerId) {
                 playerId,
                 resolved.id,
                 resolved.position,
-                "📍 Quest Location",
+                "Quest Location",
                 true,
                 { color: "red", fontSize: "17px", fontWeight: "bold" }
             );
 
             const label = resolved.targetMob.join(" / ");
-            api.sendMessage(playerId, [
-                { str: "📜 Quest restored!\n", style: { color: "#00BFFF" } },
+            say(playerId, [
+                { icon: "fa-solid fa-file-lines", style: { color: "#00BFFF" } }, { str: " Quest restored!\n", style: { color: "#00BFFF" } },
                 { str: label + " (" + savedProgress + "/" + quest.killAmount + ")", style: { color: "#FFFFFF" } }
             ]);
             restored = true;
@@ -554,8 +563,9 @@ export function onQuestKill(playerId, mobName) {
     const progress = questProgress[playerId];
     const targetLabel = quest.targetMob.join(" / ");
 
-    api.sendMessage(playerId, [
-        { str: "☠️ " + progress + "/" + quest.killAmount + " ", style: { color: "#AAAAAA" } },
+    say(playerId, [
+        { icon: "fa-solid fa-skull", style: { color: C.INFO } },
+            { str: " " + progress + "/" + quest.killAmount + " ", style: { color: C.INFO } },
         { str: targetLabel + " defeated", style: { color: "#00FFAA" } }
     ]);
 
@@ -584,9 +594,9 @@ function completeQuest(playerId) {
 
     const msg = questMessage(quest, quest);
 
-    api.sendMessage(playerId, [
-        { str: "🏆 QUEST COMPLETE!\n", style: { color: "#FFD700", fontWeight: "bold" } },
-        { str: msg.complete, style: { color: "#FFFFFF" } },
+    say(playerId, [
+        { icon: "fa-solid fa-trophy", style: { color: "#FFD700", fontWeight: "bold" } }, { str: " QUEST COMPLETE!\n", style: { color: "#FFD700", fontWeight: "bold" } },
+        ...msg.complete,
         { str: "\nYou gained: ", style: { color: "#B3B3B3" } },
         { str: "+" + reward.money, style: { color: "#ECC727" } },
         { str: " Money\n", style: { color: "#ECC727" } },
@@ -630,8 +640,8 @@ export function resetQuest(playerId) {
         try { api.clearDirectionArrow(playerId, qid); } catch (e) {}
     }
 
-    api.sendMessage(playerId, [
-        { str: "❌ Quest cancelled", style: { color: "#ff4444", fontWeight: "bold" } }
+    say(playerId, [
+        { icon: "fa-solid fa-xmark", style: { color: "#ff4444", fontWeight: "bold" } }, { str: " Quest cancelled", style: { color: "#ff4444", fontWeight: "bold" } }
     ]);
     updateSidebar(playerId);
 }

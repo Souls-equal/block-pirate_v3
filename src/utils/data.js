@@ -16,6 +16,7 @@ resetPlayer = (id) => {
     api.clearInventory(id);
 }
 
+import { C, say } from "../core/theme";
 export function getStat(playerId, key, def=0){
     if (!playerId) return def;
     let v;
@@ -58,7 +59,7 @@ export function changeMoney(playerId, amount, showMessage=true){
     addStat(playerId, "money", amount);
     if (showMessage) {
         const color = amount > 0 ? "#FFD700" : "#ff4444";
-        api.sendMessage(playerId,[{ str:"💰 "+amount+" Coins",style:{color:color} }]);
+        say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" "+amount+" Coins",style:{color:color} }]);
     }
 }
 
@@ -67,7 +68,7 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     if (!attributes.customDescription) attributes.customDescription = ""
     const money = getStat(playerId, "money", 0);
     if (money < price) {
-        api.sendMessage(playerId,[{ str:"💰You don't have enough Coins: "+money+"/"+price,style:{color:"orange"} }]);
+        say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" You don't have enough Coins: "+money+"/"+price,style:{color:C.DANGER} }]);
         return;
     }
     if (api.hasEffect(playerId, "verif")) {
@@ -75,10 +76,10 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         changeMoney(playerId, -price);
 
         api.giveItem(playerId, item, amount, attributes)
-        api.sendMessage(playerId, "You bough "+amount+" '"+attributes.customDisplayName+"'.", {color:"lime"})
+        say(playerId, "You bough "+amount+" '"+attributes.customDisplayName+"'.", {color:"lime"})
     } else {
         api.applyEffect(playerId, "verif", 2000, {displayName:"Are you sure? Click to buy!", icon:"NaN"})
-        api.sendMessage(playerId, [
+        say(playerId, [
             {str:"Are you sure you want to buy "+amount+" '"+attributes.customDisplayName+"' for "+price+" Coins?\nIf yeah: ", style:{color:"lightgray"}},
             {str:"Click another times to valid! (be fast)",style:{color:"lime"}}
         ])
@@ -151,8 +152,9 @@ export function addXP(playerId, amount){
         fullHeal(playerId);
         applyStatEffects(playerId);
         checkQuestValidity(playerId);
-        api.sendMessage(playerId,[
-            {str:"✨ LEVEL UP! ",style:{color:"#00ff00",fontWeight:"bold"}},
+        say(playerId,[
+            {icon:"fa-solid fa-sparkle",style:{color:C.SUCCESS}},
+        {str:" LEVEL UP! ",style:{color:C.SUCCESS,fontWeight:"bold"}},
             {str:"Level "+lvl,style:{color:"white"}}
         ]);
 
@@ -177,8 +179,9 @@ export function setLevel(playerId, newLevel, resetXP = true){
     reconcileSP(playerId);
     applyStatEffects(playerId);
     fullHeal(playerId);
-    api.sendMessage(playerId, [
-        {str:"📈 Level set to ", style:{color:"#AAAAAA"}},
+    say(playerId, [
+        {icon:"fa-solid fa-ranking-star",style:{color:C.INFO}},
+        {str:" Level set to ", style:{color:C.INFO}},
         {str:String(newLevel), style:{color:"#00FF00", fontWeight:"bold"}}
     ]);
 }
@@ -197,13 +200,13 @@ export function reconcileSP(playerId) {
     setStat(playerId, "sp", expected);
 
     if (diff > 0) {
-        api.sendMessage(playerId, [
-            { str: "✨ SP recovered: ", style: { color: "#00ff00", fontWeight: "bold" } },
+        say(playerId, [
+            { icon: "fa-solid fa-sparkle", style: { color: "#00ff00", fontWeight: "bold" } }, { str: " SP recovered: ", style: { color: "#00ff00", fontWeight: "bold" } },
             { str: "+" + diff, style: { color: "white" } }
         ]);
     } else {
-        api.sendMessage(playerId, [
-            { str: "⚠️ SP corrected: ", style: { color: "#ff9900", fontWeight: "bold" } },
+        say(playerId, [
+            { icon: "fa-solid fa-triangle-exclamation", style: { color: "#ff9900", fontWeight: "bold" } }, { str: " SP corrected: ", style: { color: "#ff9900", fontWeight: "bold" } },
             { str: String(diff), style: { color: "white" } }
         ]);
     }

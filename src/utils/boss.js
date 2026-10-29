@@ -1,5 +1,6 @@
 //utils/boss.js
 import { setTimeout, setInterval, sleep, run } from "./timer";
+import { say } from "../core/theme";
 
 // config
 
@@ -119,7 +120,7 @@ function chat(text, color, pId) {
   const id = pId || fighterId();
   if (!id) return;
   try {
-    api.sendMessage(id, text, { color: color || "#ffffff" });
+    say(id, text, { color: color || "#ffffff" });
   } catch (_) {}
 }
 

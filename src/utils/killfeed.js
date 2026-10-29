@@ -1,6 +1,7 @@
 import { safeEntityName as e } from "./lifeform";
+import { C } from "../core/theme";
 const t = {},
-  l = { PIRATES: "#ef4444", MARINES: "#3b82f6" };
+  l = { PIRATES: C.PIRATE, MARINES: C.MARINE };
 let i = !1;
 function n(e) {
   let t = null;
@@ -9,7 +10,7 @@ function n(e) {
   } catch (e) {
     t = null;
   }
-  return l[t] || "#facc15";
+  return l[t] || C.MONEY;
 }
 export function noteUncreditedKill(l, i, r, o, c) {
   if (!l || !i || l === i) return;
