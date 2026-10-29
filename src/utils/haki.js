@@ -4,6 +4,7 @@ import { point, TEX } from "./fx";
 import { isMobEntityType, posOf } from "./lifeform";
 import { getTotalMoney, payMoney } from "./data";
 
+import { say } from "../core/theme";
 const HK_CLICK = "Small Black Pod";
 const HK_TOLL = "Black Carpet", HK_PRICE = 14000;
 const HK_BOOST = 1.25;
@@ -13,7 +14,7 @@ const HK_ARMS = [["ArmLeftMesh", [0.05, -0.55, 0]], ["ArmRightMesh", [-0.05, -0.
 const HK_HARD = [18, 18, 22], HK_GLOW = [150, 90, 220];
 const hkArmed = {};
 
-function hk_say(pid, lines) { try { api.sendMessage(pid, lines) } catch (e) {} }
+function hk_say(pid, lines) { try { say(pid, lines) } catch (e) {} }
 function hk_has(pid) { return pid !== null && pid !== undefined }
 
 const hkOwnedDb = {};
@@ -215,13 +216,13 @@ function hakiBossStart(playerId, posA, posB) {
         }
     }
 
-    // ❌ Si un autre joueur est déjà là → refuser
+    // Si un autre joueur est déjà là → refuser
     if (playersInZone.length > 0 && !playersInZone.includes(playerId)) {
-        api.sendMessage(playerId, "A player is already fighting the boss.");
+        say(playerId, "A player is already fighting the boss.");
         return;
     }
 
-    // 🧹 Cleanup mobs SEULEMENT si personne dans la zone
+    // Cleanup mobs SEULEMENT si personne dans la zone
     if (playersInZone.length === 0) {
         for (const entity of api.getEntitiesInRect(posA, posB)) {
             if (isMobEntityType(api.getEntityType(entity))) {
@@ -232,14 +233,14 @@ function hakiBossStart(playerId, posA, posB) {
         }
     }
 
-    // ⛏️ Fix underground
+    // Fix underground
     playerPos = getSafePosition(getRandomPosition(posA, posB));
     bossPos = getSafePosition(getRandomPosition(posA, posB));
 
-    // 🚀 TP joueur
+    // TP joueur
     api.setPosition(playerId, playerPos);
 
-    // 👹 Spawn boss
+    // Spawn boss
     spawnBoss(bossPos);
 }
 

@@ -28,6 +28,34 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
 
 ---
 
+## Couleurs & icônes (`src/core/theme.js`)
+
+Un seul fichier décide de l'apparence de **tous** les textes du jeu. Chaque message
+passe par `say()` / `shout()` (ou par le patch de l'API posé au démarrage), qui :
+
+* remplace toute couleur par une des **7 couleurs** de la palette ;
+* remplace tout **emoji** par une **icône Bloxd** (`fa-solid …` ou icône du jeu).
+
+| Élément | Couleur | Valeur |
+| --- | --- | --- |
+| Pirates | rouge corail | `#FF7F50` |
+| Marines | bleu clair | `#7DD3FC` |
+| Argent | jaune doré | `#FFD700` |
+| XP | cyan | `#22D3EE` |
+| Succès | vert | `#4ADE80` |
+| Danger | rouge | `#EF4444` |
+| Information | gris clair | `#CBD5E1` |
+
+Dans le code : `import { C, say, shout } from "./theme"` puis `say(id, [...])`,
+`say(id, "texte", { color: C.MONEY })` ou `{ icon: "fa-solid fa-coins" }`.
+`themeColor()` est idempotent : une couleur déjà palette revient identique.
+
+> **À créer une fois dans le World Code** (dossier `core/`) : `theme.js` est importé par
+> `index.js`, `core/team.js`, `core/UI.js`, `fruit/index.js`, `gameplay/*` et `utils/*`.
+> Sans lui, aucun de ces fichiers ne se charge.
+
+---
+
 ## Arborescence
 
 ```
@@ -35,6 +63,7 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
 ├── src/
 │   ├── index.js                  # point d'entrée du World Code
 │   ├── core/                     # UI, équipages, grades, admin
+│   │   └── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)

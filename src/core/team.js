@@ -5,6 +5,7 @@ import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
+import { C, say, shout } from "./theme";
 function safeName(id) {
     if (!id) return "Unknown";
     try { return api.getEntityName(id) || "Unknown"; } catch (e) { return "Unknown"; }
@@ -15,21 +16,21 @@ export const TEAM = {
     NONE: {
         id: "NONE",
         name: "No Team",
-        color: "lightgray",
+        color: C.INFO,
         prefix: "[NoTeam]",
         chatLetter: " N"
     },
     PIRATES: {
         id: "PIRATES",
         name: "Pirates",
-        color: "#ff6b6b",
+        color: C.PIRATE,
         prefix: "[Pirate]",
         chatLetter: " P"
     },
     MARINES: {
         id: "MARINES",
         name: "Marines",
-        color: "#6bb6ff",
+        color: C.MARINE,
         prefix: "[Marine]",
         chatLetter: " M"
     }
@@ -126,8 +127,8 @@ setPlayerTeam = (playerId, teamId) => {
     if (oldTeam !== teamId) {
         const replacedCount = replaceTeamWeapons(playerId, teamId);
         if (replacedCount > 0) {
-            api.sendMessage(playerId, [
-                { str: "⚔️ Team changed! Your weapons have been updated to ", style: { color: "#00BFFF" } },
+            say(playerId, [
+                { icon: "fa-solid fa-swords", style: { color: "#00BFFF" } }, { str: " Team changed! Your weapons have been updated to ", style: { color: "#00BFFF" } },
                 { str: getTeamData(teamId).name, style: { color: getTeamData(teamId).color, fontWeight: "bold" } },
                 { str: " weapons. (" + replacedCount + " items replaced)", style: { color: "#AAAAAA" } }
             ]);
@@ -236,17 +237,17 @@ export function syncCrewFromDB(playerId) {
 function createCrew(playerId, name) {
 
     if (!name) {
-        api.sendMessage(playerId, [{ str: "❌ Usage: /crew create <name>", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Usage: /crew create <name>", style: { color: "#ff4444" } }]);
         return;
     }
 
     if (getCrewName(playerId)) {
-        api.sendMessage(playerId, [{ str: "❌ You are already in a crew. Leave it first (/crew leave).", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are already in a crew. Leave it first (/crew leave).", style: { color: "#ff4444" } }]);
         return;
     }
 
     if (CREWS[name]) {
-        api.sendMessage(playerId, [{ str: "❌ A crew with this name already exists", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " A crew with this name already exists", style: { color: "#ff4444" } }]);
         return;
     }
 
@@ -258,7 +259,7 @@ function createCrew(playerId, name) {
     setCrew(playerId, name, "CAPTAIN");
     setupChatChannels(playerId);
 
-    api.broadcastMessage([
+    shout([
         { str: api.getEntityName(playerId) + " created the crew: ", style: { color: "#00bfff" } },
         { str: name, style: { color: "#ffffff", fontWeight: "bold" } }
     ]);
@@ -283,8 +284,8 @@ function joinCrew(playerId, name) {
     setCrew(playerId, name, "MEMBER");
     setupChatChannels(playerId);
 
-    api.sendMessage(playerId, [
-        { str: "✅ Joined crew ", style: { color: "#00ff88" } },
+    say(playerId, [
+        { icon: "fa-solid fa-circle-check", style: { color: "#00ff88" } }, { str: " Joined crew ", style: { color: "#00ff88" } },
         { str: name, style: { color: "#ffffff" } }
     ]);
 
@@ -299,7 +300,7 @@ function leaveCrew(playerId) {
 
     const name = getCrewName(playerId);
     if (!name) {
-        api.sendMessage(playerId, [{ str: "❌ You are not in a crew", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are not in a crew", style: { color: "#ff4444" } }]);
         return;
     }
 
@@ -307,8 +308,8 @@ function leaveCrew(playerId) {
     clearCrew(playerId);
     setupChatChannels(playerId);
 
-    api.sendMessage(playerId, [
-        { str: "🚪 You left crew ", style: { color: "#ffcc00" } },
+    say(playerId, [
+        { icon: "fa-solid fa-sign-out-alt", style: { color: "#ffcc00" } }, { str: " You left crew ", style: { color: "#ffcc00" } },
         { str: name, style: { color: "#ffffff" } }
     ]);
 
@@ -335,8 +336,8 @@ function disbandCrew(name) {
         clearCrew(id);
         setupChatChannels(id);
 
-        api.sendMessage(id, [
-            { str: "💥 Crew disbanded: ", style: { color: "#ff4444" } },
+        say(id, [
+            { icon: "fa-solid fa-fire", style: { color: "#ff4444" } }, { str: " Crew disbanded: ", style: { color: "#ff4444" } },
             { str: name, style: { color: "#ffffff" } }
         ]);
 
@@ -355,35 +356,35 @@ function invitePlayer(senderId, targetName) {
     const role = getCrewRole(senderId);
 
     if (role !== "CAPTAIN") {
-        api.sendMessage(senderId, [{ str: "❌ Only the captain can invite", style: { color: "#ff4444" } }]);
+        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Only the captain can invite", style: { color: "#ff4444" } }]);
         return;
     }
 
     if (!targetName) {
-        api.sendMessage(senderId, [{ str: "❌ Usage: /crew invite <player>", style: { color: "#ff4444" } }]);
+        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Usage: /crew invite <player>", style: { color: "#ff4444" } }]);
         return;
     }
 
     const targetId = api.getPlayerId(targetName);
     if (!targetId) {
-        api.sendMessage(senderId, [{ str: "❌ Player not found (or offline)", style: { color: "#ff4444" } }]);
+        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Player not found (or offline)", style: { color: "#ff4444" } }]);
         return;
     }
 
     if (getCrewName(targetId)) {
-        api.sendMessage(senderId, [{ str: "❌ Player already in a crew", style: { color: "#ff4444" } }]);
+        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Player already in a crew", style: { color: "#ff4444" } }]);
         return;
     }
 
     setStat(targetId, "crew:invite", crewName);
 
-    api.sendMessage(targetId, [
-        { str: "📩 Crew invite from ", style: { color: "#00bfff" } },
+    say(targetId, [
+        { icon: "fa-solid fa-bell", style: { color: "#00bfff" } }, { str: " Crew invite from ", style: { color: "#00bfff" } },
         { str: crewName, style: { color: "#ffffff" } },
         { str: " — type /crew accept " + crewName, style: { color: "#888888" } }
     ]);
 
-    api.sendMessage(senderId, [{ str: "✅ Invite sent", style: { color: "#00ff88" } }]);
+    say(senderId, [{ icon: "fa-solid fa-circle-check", style: { color: "#00ff88" } }, { str: " Invite sent", style: { color: "#00ff88" } }]);
 }
 
 /* ACCEPT */
@@ -391,7 +392,7 @@ function acceptInvite(playerId, name) {
 
     const invite = getStat(playerId, "crew:invite", null);
     if (invite !== name) {
-        api.sendMessage(playerId, [{ str: "❌ No invite from this crew", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " No invite from this crew", style: { color: "#ff4444" } }]);
         return;
     }
 
@@ -399,7 +400,7 @@ function acceptInvite(playerId, name) {
     if (ok) {
         deleteStat(playerId, "crew:invite");
     } else {
-        api.sendMessage(playerId, [{ str: "❌ Could not join the crew (full / disbanded / already in one)", style: { color: "#ff4444" } }]);
+        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Could not join the crew (full / disbanded / already in one)", style: { color: "#ff4444" } }]);
     }
 }
 
@@ -420,7 +421,7 @@ export function normalizeCaps(message) {
 
 export function handleChat(playerId, message, channel) {
     if (isVanished(playerId)) {
-        api.sendMessage(playerId, [
+        say(playerId, [
             { str: "[Vanish] ", style: { color: "#cef3ff", fontWeight: "bold" } },
             { str: "Message not sent : ", style: { color: "#ff4444", fontWeight: "bold" } },
             { str: "you are vanished (fully invisible for other players).", style: { color: "#ffffff" } },
@@ -451,7 +452,7 @@ export function handleChat(playerId, message, channel) {
             if (!id || done.has(id) || !online.has(id)) continue;
             done.add(id);
             try {
-                api.sendMessage(id, segments);
+                say(id, segments);
             } catch (e) {}
         }
         if (tag) {
@@ -459,7 +460,7 @@ export function handleChat(playerId, message, channel) {
                 if (done.has(id) || !online.has(id)) continue;
                 if (!canBypassChatRestriction(id)) continue;
                 try {
-                    api.sendMessage(id, [
+                    say(id, [
                         { str: "[" + tag + "] ", style: { color: "#888888" } },
                         ...segments
                     ]);
@@ -541,7 +542,7 @@ export function canDamage(attacker, target) {
     const teamA = getPlayerTeam(attacker);
     const teamB = getPlayerTeam(target);
     if (teamA && teamB && teamA === "MARINES" && teamB === "MARINES") {
-        api.sendMessage(attacker, "As a marine, you cant attack another marine player.", {color:"orange"});
+        say(attacker, "As a marine, you cant attack another marine player.", {color:"orange"});
         return "preventDamage"
     }
     return;
@@ -573,7 +574,7 @@ export function crewCommands(playerId, command) {
             if (getCrewRole(playerId) === "CAPTAIN") {
                 disbandCrew(getCrewName(playerId));
             } else {
-                api.sendMessage(playerId, [{ str: "❌ Only the captain can disband the crew", style: { color: "#ff4444" } }]);
+                say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Only the captain can disband the crew", style: { color: "#ff4444" } }]);
             }
             break;
         }
@@ -593,8 +594,8 @@ function crewInfo(playerId) {
     const crewName = getCrewName(playerId);
 
     /* HELP HEADER */
-    api.sendMessage(playerId, [
-        { str: "⚔️ ===== CREW COMMANDS =====\n", style: { color: "#ffd700", fontWeight: "bold" } },
+    say(playerId, [
+        { icon: "fa-solid fa-swords", style: { color: "#ffd700", fontWeight: "bold" } }, { str: " ===== CREW COMMANDS =====\n", style: { color: "#ffd700", fontWeight: "bold" } },
 
         { str: "/crew create <name> ", style: { color: "#ffffff" } },
         { str: "- Create a crew\n", style: { color: "#888888" } },
@@ -614,8 +615,8 @@ function crewInfo(playerId) {
 
     /* IF NO CREW */
     if (!crewName) {
-        api.sendMessage(playerId, [
-            { str: "❌ You are not in a crew\n", style: { color: "#ff4444" } }
+        say(playerId, [
+            { icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are not in a crew\n", style: { color: "#ff4444" } }
         ]);
         return true;
     }
@@ -623,8 +624,8 @@ function crewInfo(playerId) {
     const crew = CREWS[crewName];
 
     if (!crew) {
-        api.sendMessage(playerId, [
-            { str: "⚠️ Crew not found in memory (rejoin to resync)\n", style: { color: "#ffcc00" } }
+        say(playerId, [
+            { icon: "fa-solid fa-triangle-exclamation", style: { color: "#ffcc00" } }, { str: " Crew not found in memory (rejoin to resync)\n", style: { color: "#ffcc00" } }
         ]);
         return true;
     }
@@ -636,8 +637,8 @@ function crewInfo(playerId) {
         ? safeName(crew.captainId)
         : "Unknown";
 
-    api.sendMessage(playerId, [
-        { str: "⚔️ ===== YOUR CREW =====\n", style: { color: "#00bfff", fontWeight: "bold" } },
+    say(playerId, [
+        { icon: "fa-solid fa-swords", style: { color: "#00bfff", fontWeight: "bold" } }, { str: " ===== YOUR CREW =====\n", style: { color: "#00bfff", fontWeight: "bold" } },
         { str: crewName + "\n", style: { color: "#ffd700" } },
 
         { str: "Owner: ", style: { color: "#ffffff", fontWeight: "bold" } },
@@ -651,7 +652,7 @@ function crewInfo(playerId) {
         const role = getCrewRole(id) || "MEMBER";
         const mName = safeName(id);
 
-        api.sendMessage(playerId, [
+        say(playerId, [
             { str: "- ", style: { color: "#888888" } },
             {
                 str: mName + " ",
@@ -679,10 +680,19 @@ function crewInfo(playerId) {
 const BOUNTY_STEAL_RATE = 0.1;
 const BOUNTY_STEAL_MAX = 1000;
 const BOUNTY_MARINE_MAX = 10000;
+/* Ecart de niveau au-dela duquel la cible est "trop faible" : plus de vol
+   d'argent (anti farm des petits joueurs), juste une prime reduite. */
+const BOUNTY_WEAK_GAP = 40;
+const BOUNTY_WEAK_RATE = 0.05;
 /* Le moteur peut signaler une meme mort deux fois : on ignore un second
    traitement pour la meme victime pendant ce delai. */
 const BOUNTY_LOCK_MS = 3000;
 const BOUNTY_LAST = {};
+
+function levelOf(playerId) {
+    const n = Math.floor(Number(getStat(playerId, "lvl", 1)));
+    return n > 0 ? n : 1;
+}
 
 function moneyOf(playerId) {
     const n = Math.floor(Number(getStat(playerId, "money", 0)));
@@ -695,9 +705,7 @@ function giveMoney(playerId, amount) {
 }
 
 function bountySay(playerId, text, color) {
-    try {
-        api.sendMessage(playerId, [ { str: text, style: { color: color } } ]);
-    } catch (e) {}
+    say(playerId, [ { str: text, style: { color: color } } ]);
 }
 
 /* La prime et l'argent sont affiches dans la leaderboard : on rafraichit les
@@ -750,9 +758,24 @@ export function handleBountyKill(killerId, victimId) {
         const payout = Math.min(victimBounty, BOUNTY_MARINE_MAX);
         setBounty(victimId, 0);
         giveMoney(killerId, payout);
-        bountySay(killerId, "\u2693 Bounty collected: $" + payout + " (" + safeName(victimId) + ")", "#3b82f6");
+        bountySay(killerId, "Bounty collected: $" + payout + " (" + safeName(victimId) + ")", C.MARINE);
         refreshBountyUi(killerId, victimId);
         return { type: "payout", amount: payout, lost: victimBounty - payout, bounty: 0 };
+    }
+
+    /* Cible trop faible (40 niveaux d'ecart ou plus) : on ne prend RIEN a la
+       victime. Le tueur gagne seulement 5 % de ce qu'il aurait pu voler, en
+       prime — de quoi eviter le farm de petits joueurs sans supprimer l'interet
+       du combat. */
+    if (levelOf(killerId) - levelOf(victimId) >= BOUNTY_WEAK_GAP) {
+        const weak = Math.min(Math.floor(moneyOf(victimId) * BOUNTY_WEAK_RATE), BOUNTY_STEAL_MAX);
+        if (weak <= 0) return { type: "none", amount: 0, bounty: getBounty(killerId) };
+        const weakBounty = addBounty(killerId, weak);
+        bountySay(killerId,
+            "Target too weak (40+ levels below): no money stolen, bounty +$" + weak + " (total $" + weakBounty + ")",
+            C.PIRATE);
+        refreshBountyUi(killerId, victimId);
+        return { type: "weak", amount: 0, bounty: weakBounty };
     }
 
     /* Pirate (ou sans equipe) : vol de 10 % de l'argent de la victime. */
@@ -761,7 +784,7 @@ export function handleBountyKill(killerId, victimId) {
     giveMoney(victimId, -stolen);
     giveMoney(killerId, stolen);
     const bounty = addBounty(killerId, stolen);
-    bountySay(killerId, "\u2620 Bounty: +$" + stolen + " (total $" + bounty + ")", "#ef4444");
+    bountySay(killerId, "Bounty: +$" + stolen + " (total $" + bounty + ")", C.PIRATE);
     refreshBountyUi(killerId, victimId);
     return { type: "steal", amount: stolen, bounty: bounty };
 }

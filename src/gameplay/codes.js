@@ -2,6 +2,7 @@
 
 import { changeMoney, getStat, setStat } from "../utils/data";
 import { applyEffect } from "../utils/combat";
+import { say } from "../core/theme";
 
 const CATEGORY_KEY = "code"
 const CLAIMED_KEY = "codeRedeem"
@@ -156,7 +157,7 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
             { icon: "fa-solid fa-xmark", style: { color: "red" } },
             { str: "  Invalid code. Check the spelling and try again!", style: { color: "red" } }
         ])
-        api.sendMessage(playerId, [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
+        say(playerId, [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
             "That code does not exist (or no longer does)."], { color: "red" })
         return
     }
@@ -175,7 +176,7 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
             { icon: "fa-solid fa-check", style: { color: "gray" } },
             { str: "  You have already Redeemed this code!", style: { color: "gray" } }
         ])
-        api.sendMessage(playerId, [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
+        say(playerId, [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
             "You have already Redeemed the code " + code.name + "."], { color: "gray" })
         return
     }
@@ -188,7 +189,7 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
         { str: "  Code accepted! Reward received.", style: { color: "lightgreen" } }
     ])
 
-    api.sendMessage(playerId,
+    say(playerId,
         [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
          { icon: "fa-solid fa-gift", style: { color: "hotpink" } },
          { str: " Code " + code.name + " Redeemed! ", style: { color: "lightgreen", fontWeight: "bold" } },

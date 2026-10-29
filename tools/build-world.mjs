@@ -4,7 +4,7 @@
 // Bundle + minifie le World Code (src/index.js) pour le coller dans le monde.
 // Les sources RESTENT lisibles : seule la sortie dist/world.js est compacte.
 //
-// Les 3 modules src/build/{layer,path,plane}.js sont absents du dépôt. S'ils
+// Les 3 modules src/build/{layer,path,sphere}.js sont absents du dépôt. S'ils
 // manquent, on injecte des stubs vides (uniquement pour ce build) avec un
 // avertissement : mettre les vrais fichiers dans src/build/ pour les activer.
 //
@@ -20,14 +20,14 @@ const WORLD_LIMIT = 512_000;
 const STUB_EXPORTS = {
   layer: ["tickLayer", "onPlayerJoinLayer", "onPlayerClickLayer"],
   path: ["tickPath", "onPlayerJoinPath", "onPlayerClickPath"],
-  plane: ["tick1", "onPlayerJoin1", "onPlayerClick1"],
+  sphere: ["tick1", "onPlayerJoin1", "onPlayerClick1"],
 };
 const missing = new Set();
 
 const stubPlugin = {
   name: "build-modules-optionnels",
   setup(build) {
-    build.onResolve({ filter: /\.\/build\/(layer|path|plane)$/ }, (args) => {
+    build.onResolve({ filter: /\.\/build\/(layer|path|sphere|plane)$/ }, (args) => {
       const real = path.resolve(args.resolveDir, args.path + ".js");
       if (fs.existsSync(real)) return null; // laisser esbuild résoudre le vrai module
       const name = path.basename(args.path);

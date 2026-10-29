@@ -25,7 +25,7 @@ export function clearPlayerEffects(playerId) {
 }
 
 export function applyEffect(targetId, effectId, duration, opts = {}) {
-    // 🩹 plus jamais d'appel API sur une entité morte / despawn :
+    // plus jamais d'appel API sur une entité morte / despawn :
     // getEntityType et applyEffect THROW comme isAlive sur un id invalide.
     if (!targetId || !isAliveId(targetId)) return false;
 
@@ -92,7 +92,7 @@ function scheduleEffectRestore(playerId, effectId, duration) {
 
     setTimeout(() => {
         try {
-            // 🩹 REMPLACE api.isAlive(playerId) qui throw sur une entité morte :
+            // REMPLACE api.isAlive(playerId) qui throw sur une entité morte :
             // c'était la source exacte de "[Timer error] isAlive didn't work".
             // isStillAlive = cache des ids vivants + test de santé.
             if (!isStillAlive(playerId)) return;
@@ -113,7 +113,7 @@ function scheduleEffectRestore(playerId, effectId, duration) {
                 try { api.removeEffect(playerId, effectId); } catch (e2) {}
             }
         } catch (e) {
-            // 🩹 un throw ici tuait le timer (et logguait à chaque tick).
+            // un throw ici tuait le timer (et logguait à chaque tick).
             // On avale : la restauration d'un effet n'est jamais critique.
         }
     }, delayTicks);
