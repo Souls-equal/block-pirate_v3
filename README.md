@@ -4,7 +4,7 @@ Code source du jeu (One Piece / voxel) : un « moteur » en modules ES sous `src
 et les capacités des fruits empaquetées sous `code-blocks/`.
 
 > **En une phrase** : les sources restent **lisibles** dans `src/`, et le jeu reçoit des
-> **copies compactes** (`dist/world-src/`, même arborescence, ~43 % plus petites — voir
+> **copies compactes** (`world-code/`, même arborescence, ~43 % plus petites — voir
 > [World Code : la limite des 512 000 caractères](#world-code--la-limite-des-512-000-caractères)) ;
 > les 36 modules de capacités des 41 fruits sont regroupés en **8 Code Blocks**
 > (`code-blocks/pack-01.js` … `pack-08.js`, sans aucun motif censuré par Bloxd.io).
@@ -12,6 +12,11 @@ et les capacités des fruits empaquetées sous `code-blocks/`.
 ---
 
 ## Démarrage rapide (copier-coller dans Bloxd.io)
+
+> **Où trouver les fichiers à coller ?** Dans **[`world-code/`](world-code/)** :
+> même arborescence que `src/`, en version compacte (53 % de la limite au lieu de
+> 94 %). `src/` reste la version lisible pour travailler, `dist/` est ignoré par git.
+> Détail : [World Code : la limite des 512 000 caractères](#world-code--la-limite-des-512-000-caractères).
 
 Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à mettre à jour :
 
@@ -36,7 +41,8 @@ fichiers collés**. Les sources de `src/` sont écrites pour être lues (comment
 indentation, noms explicites) : ~481 000 caractères à elles seules, donc la limite est
 atteinte dès qu'on ajoute un fichier `src/build/*`.
 
-`npm run build:src` produit donc **`dist/world-src/`** : la même arborescence, fichier
+`npm run build:src` produit donc **`world-code/`** (versionné dans git, tu peux le
+parcourir directement sur GitHub) : la même arborescence, fichier
 par fichier, mais compactée pour le collage — commentaires et espaces retirés
 (`minifyWhitespace`), code simplifié (`minifySyntax`), **noms locaux raccourcis**
 (`minifyIdentifiers`).
@@ -44,7 +50,7 @@ par fichier, mais compactée pour le collage — commentaires et espaces retiré
 | | Caractères | Limite |
 | --- | --- | --- |
 | Sources lisibles (`src/`) | ~481 000 | 94 % |
-| **`dist/world-src/` (à coller)** | **~273 000** | **53 %** |
+| **`world-code/` (à coller)** | **~273 000** | **53 %** |
 
 Ce qui n'est **jamais** modifié, parce que le jeu s'appuie dessus :
 

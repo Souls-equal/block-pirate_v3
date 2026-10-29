@@ -8,8 +8,9 @@
 // caracteres a elles seules, donc la limite est atteinte des qu'on ajoute
 // deux fichiers de build.
 //
-// Ce script produit donc `dist/world-src/` : la MEME arborescence, fichier par
-// fichier, mais compactee pour le collage dans le jeu :
+// Ce script produit donc `world-code/` (versionne dans git, comme
+// `code-blocks/`, pour que tu puisses le copier depuis GitHub) : la MEME
+// arborescence, fichier par fichier, mais compactee pour le collage :
 //   - commentaires et espaces supprimes (minifyWhitespace) ;
 //   - code simplifie (minifySyntax : ternaires, constantes, blocs) ;
 //   - noms LOCAUX raccourcis (minifyIdentifiers).
@@ -29,7 +30,9 @@ import * as esbuild from "esbuild";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src");
-const OUT = path.join(ROOT, "dist", "world-src");
+/* Versionne (pas dans dist/, ignore par git) : c'est le dossier que tu
+   ouvres sur GitHub pour copier chaque fichier dans le World Code. */
+const OUT = path.join(ROOT, "world-code");
 const WORLD_LIMIT = 512_000;
 /* Seul `blocks/` ne part pas dans le World Code : ce sont les Code Blocks
    (voir build-blocks.mjs). `build/` est compacté s'il existe chez toi
@@ -114,7 +117,51 @@ const saved = Math.round((1 - total / sourceChars) * 100);
 console.log(`World Code compact  : ${total.toLocaleString("fr-FR")} car. ` +
   `(${pct} % des ${WORLD_LIMIT.toLocaleString("fr-FR")} autorisés, -${saved} % vs sources)`);
 console.log(`Sources lisibles    : ${sourceChars.toLocaleString("fr-FR")} car.`);
-console.log(`→ ${path.relative(ROOT, OUT)}/${rows.length} fichiers, même arborescence que src/`);
+/* README du dossier : dit quoi copier, où, et ce qui change. */
+const readme = [
+  "# world-code/ - World Code compact (genere, NE PAS EDITER A LA MAIN)",
+  "",
+  "Sources lisibles : `src/`. Regenerer : `npm run build:src`.",
+  "",
+  `**${rows.length} fichiers, ${total.toLocaleString("fr-FR")} caracteres** ` +
+    `(${pct} % de la limite de ${WORLD_LIMIT.toLocaleString("fr-FR")} du World Code, ` +
+    `-${saved} % par rapport aux sources lisibles).`,
+  "",
+  "## Comment coller",
+  "",
+  "Recopie **chaque fichier dans le fichier de meme nom** de ton World Code",
+  "(l'arborescence est identique a `src/`) : `index.js`, `core/*`, `gameplay/*`,",
+  "`utils/*`, `fruit/fruitData.js`, et - si tu les utilises - tes",
+  "`build/layer.js`, `build/path.js`, `build/sphere.js`.",
+  "",
+  "`blocks/` n'est PAS ici : ses modules partent dans les Code Blocks",
+  "(`code-blocks/pack-XX.js`).",
+  "",
+  "## Ce qui change (et ce qui ne change pas)",
+  "",
+  "- Supprimes : commentaires, indentation, espaces inutiles, parentheses et",
+  "  code redondant (memes regles qu'un minifieur).",
+  "- Raccourcis : les noms **locaux** (variables de fonction, parametres).",
+  "- **Intacts** : les noms exportes (donc les `import { ... }` entre",
+  "  fichiers), les affectations de globals (`onPlayerClick = ...`,",
+  "  `globalThis.FA_*`) et les noms de proprietes (`api.sendMessage`,",
+  "  `FA.c.damage`, `{ str, style }`). Le jeu s'appuie dessus.",
+  "- Chaque fichier est transforme **isolement** : aucun bundling, les imports",
+  "  et l'arborescence restent ceux du jeu.",
+  "",
+  "## Fichiers",
+  "",
+  "| Fichier | Caracteres | Source lisible |",
+  "| --- | --- | --- |",
+];
+for (const r of rows.slice().sort((a, b) => a.rel.localeCompare(b.rel)))
+  readme.push(`| \`${r.rel}\` | ${r.after.toLocaleString("fr-FR")} | ${r.before.toLocaleString("fr-FR")} |`);
+readme.push("", "## Controle", "",
+  "Le script verifie que les points d'entree (`onPlayerClick`, `onPlayerJoin`,",
+  "`tick`, `onClose`, ...) et les ponts `globalThis.FA*` ont survecu.", "");
+fs.writeFileSync(path.join(OUT, "README.md"), readme.join("\n"), "utf8");
+
+console.log(`-> ${path.relative(ROOT, OUT)}/ : ${rows.length} fichiers, meme arborescence que src/`);
 const buildMods = rows.filter((r) => r.rel.startsWith("build/")).map((r) => r.rel);
 if (buildMods.length)
   console.log(`   modules build/ compactés : ${buildMods.join(", ")}`);
