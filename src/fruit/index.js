@@ -29,12 +29,11 @@ function f(t, e, o) {
     } catch (t) {}
 }
 function m(t) {
+  /* Un id deja parti n'est pas une erreur : pas de log. */
   try {
     const e = api.getEntityName(t);
     if (e) return e;
-  } catch (t) {
-    f("getEntityName", t);
-  }
+  } catch (e) {}
   return String(t);
 }
 function p(t, e, o) {

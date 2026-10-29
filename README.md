@@ -3,14 +3,20 @@
 Code source du jeu (One Piece / voxel) : un « moteur » en modules ES sous `src/`,
 et les capacités des fruits empaquetées sous `code-blocks/`.
 
-> **En une phrase** : le World Code garde son **format multi-fichiers lisible** dans `src/`
-> (seuls `src/fruit/abilities.js`, `src/fruit/func-abilities.js` et `src/fruit/index.js` changent en jeu), et les
-> 36 modules de capacités des 41 fruits sont regroupés en **7 Code Blocks** (`code-blocks/pack-01.js` … `pack-07.js`,
-> ~200 k au total pour 196 handlers, sans aucun motif censuré par Bloxd.io).
+> **En une phrase** : les sources restent **lisibles** dans `src/`, et le jeu reçoit des
+> **copies compactes** (`world-code/`, même arborescence, ~43 % plus petites — voir
+> [World Code : la limite des 512 000 caractères](#world-code--la-limite-des-512-000-caractères)) ;
+> les 36 modules de capacités des 41 fruits sont regroupés en **8 Code Blocks**
+> (`code-blocks/pack-01.js` … `pack-08.js`, sans aucun motif censuré par Bloxd.io).
 
 ---
 
 ## Démarrage rapide (copier-coller dans Bloxd.io)
+
+> **Où trouver les fichiers à coller ?** Dans **[`world-code/`](world-code/)** :
+> même arborescence que `src/`, en version compacte (53 % de la limite au lieu de
+> 94 %). `src/` reste la version lisible pour travailler, `dist/` est ignoré par git.
+> Détail : [World Code : la limite des 512 000 caractères](#world-code--la-limite-des-512-000-caractères).
 
 Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à mettre à jour :
 
@@ -25,6 +31,42 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    `7 pack(s), 197 handlers, 0 manquant(s), 0 erreur(s)`.
 
 *(Si tu modifies les sources de `src/blocks/` plus tard : `npm install && npm run build:blocks && npm run check`.)*
+
+---
+
+## World Code : la limite des 512 000 caractères
+
+Bloxd limite le World Code à **512 000 caractères**, et il compte **le texte brut des
+fichiers collés**. Les sources de `src/` sont écrites pour être lues (commentaires,
+indentation, noms explicites) : ~481 000 caractères à elles seules, donc la limite est
+atteinte dès qu'on ajoute un fichier `src/build/*`.
+
+`npm run build:src` produit donc **`world-code/`** (versionné dans git, tu peux le
+parcourir directement sur GitHub) : la même arborescence, fichier
+par fichier, mais compactée pour le collage — commentaires et espaces retirés
+(`minifyWhitespace`), code simplifié (`minifySyntax`), **noms locaux raccourcis**
+(`minifyIdentifiers`).
+
+| | Caractères | Limite |
+| --- | --- | --- |
+| Sources lisibles (`src/`) | ~481 000 | 94 % |
+| **`world-code/` (à coller)** | **~273 000** | **53 %** |
+
+Ce qui n'est **jamais** modifié, parce que le jeu s'appuie dessus :
+
+* les **exports** et donc les `import { tick1 as Mt }` entre fichiers ;
+* les **affectations de globals** (`onPlayerClick = ...`, `globalThis.FA_*`) ;
+* les **noms de propriétés** (`FA.c.damage`, `api.sendMessage`, `{ str, style }`).
+
+Chaque fichier est transformé **isolément** : aucun bundling, l'arborescence et les
+imports du jeu restent identiques, seul le texte collé change. `src/build/*.js`
+(layer/path/sphere) est compacté aussi **s'il est présent** chez toi : ces fichiers
+comptent dans la limite.
+
+> Les commentaires et les noms longs restent donc dans le dépôt (utiles pour
+> maintenir le code) : ils ne coûtent **rien** dans le jeu, puisqu'ils ne partent
+> jamais tels quels. Le script vérifie à la fin que les points d'entrée
+> (`onPlayerClick`, `tick`, `onClose`, …) et les ponts `globalThis.FA*` ont survécu.
 
 ---
 
