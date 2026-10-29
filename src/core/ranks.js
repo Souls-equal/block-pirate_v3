@@ -93,6 +93,7 @@ export const STAFF = {
     "_Alxrost": "YOUTUBER",
     "KIDDING_MC_VN": "DEV",
     "BLOXD_IO_YT_ZAY":"TESTER",
+    "DlRECTOR":"TESTER",
 };
 
 const playerRankCache = {};
