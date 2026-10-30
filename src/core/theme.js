@@ -476,6 +476,40 @@ export function shout(message, style) {
     } catch (e) {}
 }
 
+/* Annonce brute : AUCUNE normalisation de couleur.
+   Les messages normaux passent par themeColor() (une couleur par role), ce qui
+   ramenerait « <yellow> » a la palette. Une annonce ecrite par un admin doit
+   garder EXACTEMENT la couleur demandee (nom Bloxd ou hexadecimal), donc on
+   envoie les segments tels quels a l'API d'origine. Les emojis sont quand
+   meme convertis en icones Bloxd, et le budget de taille s'applique. */
+export function shoutRaw(message) {
+    try {
+        nativeBroadcast()(fit(toIconsOnly(message), BUDGET));
+    } catch (e) {}
+}
+
+/* Conversion emoji -> icone, sans toucher aux couleurs. */
+function toIconsOnly(message) {
+    if (typeof message === "string") return message;
+    if (!Array.isArray(message)) return message;
+    const out = [];
+    for (let i = 0; i < message.length; i++) {
+        const part = message[i];
+        if (!part || typeof part !== "object" || typeof part.str !== "string" || part.icon) {
+            out.push(part);
+            continue;
+        }
+        const color = part.style && part.style.color ? part.style.color : null;
+        const pieces = splitIcons(part.str, color);
+        for (let j = 0; j < pieces.length; j++) {
+            const piece = pieces[j];
+            if (typeof piece === "string") out.push(part.style ? { str: piece, style: part.style } : { str: piece });
+            else out.push(piece);
+        }
+    }
+    return out;
+}
+
 /* Icone seule, dans la couleur demandee. */
 export function icon(name, color) {
     const part = { icon: name };

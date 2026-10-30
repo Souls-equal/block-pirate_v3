@@ -271,6 +271,38 @@ et dès que l'admin est dans une mer, les quatre boutons remarchent normalement.
 
 ---
 
+## Annonces dans le chat (panneau admin)
+
+Bouton **Announcement** (visible pour **ADMIN+**, `ACTION_PERMISSIONS.announce`), avec une
+zone de texte. Le message part **à tous les joueurs en ligne**, préfixé par
+`[Announcement]`.
+
+**Syntaxe des couleurs** : une zone = du texte entre deux `*`, suivie juste après par
+`<couleur>`.
+
+```
+*New update guys*<yellow>, You can now play the *game*<lime> directly from the menu!
+```
+
+| Élément | Effet |
+| --- | --- |
+| `*texte*<yellow>` | `texte` en jaune (gras) |
+| `*texte*<#FF00AA>` | couleur hexadécimale exacte |
+| texte hors zone | couleur par défaut (blanc) |
+| `*texte*` sans `<couleur>` | affiché littéralement (faute de frappe visible) |
+| `<n'importe quoi>` | ignoré, le texte reste littéral |
+
+Règles : 400 caractères max, retours à la ligne aplatis, couleur acceptée = nom simple
+(`[a-zA-Z]{2,20}`) ou `#rgb` / `#rrggbb`.
+
+**Point technique** : les messages normaux passent par `themeColor()`, qui ramène toute
+couleur à la palette de rôle (un `#FF00AA` deviendrait du rouge Pirates, etc.). Une annonce
+doit garder *exactement* la couleur demandée : elle part donc par **`shoutRaw()`**
+(`src/core/theme.js`), qui utilise l'API d'origine capturée avant le patch du thème. Les
+emojis restent convertis en icônes Bloxd et le budget de taille s'applique.
+
+---
+
 ## Modération : mute (panneau admin)
 
 Le **mute** est un ban gentil : il empêche **seulement de parler**. Le joueur reste
