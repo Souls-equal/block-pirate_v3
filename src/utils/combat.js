@@ -32,6 +32,18 @@ export const summonOwner = {};
    team -> customItem -> combat. */
 let teamGuard = null;
 export function setTeamGuard(fn) { teamGuard = fn; }
+/* Garde de zone (lobby) : aucune capacite ne blesse dans les zones neutres.
+   Posee par index.js avec idInSafeZone() de gameplay/variations. */
+let zoneGuard = null;
+export function setZoneGuard(fn) { zoneGuard = fn; }
+function blockedByZone(caster, target) {
+    if (!zoneGuard) return false;
+    try {
+        return zoneGuard(caster) || zoneGuard(target);
+    } catch (e) {
+        return false;
+    }
+}
 function blockedByTeam(caster, target) {
     if (!teamGuard) return false;
     try { return teamGuard(caster, target) === "preventDamage"; } catch (e) { return false; }
@@ -290,6 +302,9 @@ export function tickPvPShield() {
 export function damage(target, rawAmount, caster, itemName) {
     try {
         if (!target || !caster || target === caster) return false;
+        /* Zone neutre du lobby : ni le lanceur ni la cible ne peuvent etre
+           touches (capacites, invocations, degats de zone...). */
+        if (blockedByZone(caster, target)) return false;
 
         // Toujours assurer mobData même si le cache alive est en retard.
         // Note: api.getEntityType(id) renvoie "Draugr Zombie", "Gorilla", etc. (jamais "MOB").

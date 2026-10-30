@@ -1,4 +1,4 @@
-import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
+import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
@@ -12,7 +12,7 @@ import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isF
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
-import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard } from "./utils/combat";
+import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -25,7 +25,7 @@ import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlay
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { installTheme as installTheme, shout } from "./core/theme";
-import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea } from "./gameplay/variations";
+import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
 /* PONT VERS LES CODE BLOCKS
    En Bloxd, une fonction n'est visible depuis un autre Code Block que si elle
@@ -51,6 +51,13 @@ installTheme();
    autre marine. */
 try {
     setTeamGuard(t);
+} catch (e) {}
+
+/* Zone neutre du lobby (rayon de 100 blocs autour du spawn et des deux hubs) :
+   ni capacites, ni degats. On branche les trois gardes sur la meme fonction. */
+try {
+    setZoneGuard(idInSafeZone);
+    setSafeZoneCheck(idInSafeZone);
 } catch (e) {}
 
 /* Variations : lobby (defaut) + une par mer. Branche la sauvegarde de position
@@ -182,6 +189,9 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         }, 5);
     } catch (t) {}
 }, onPlayerClick = (t, r, a, i, e, o, m) => { Nt(t, r, a, i, e, o, m)
+    /* Zone neutre du lobby : aucune capacite (armement, fruit, style de
+       combat, clic d'attaque). Le dialogue PNJ reste possible. */
+    if (idInSafeZone(t) && !(m && isNPCEntity(m))) return void safeZoneBlocked(t);
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
     if (m && isNPCEntity(m)) {
@@ -236,6 +246,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     return !m || 1 === m.type || api.getHeldItem(t) || api.isPlayerCrouching(t) || ot(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r) => {
     if (A(r)) return "preventDamage";
+    if (idInSafeZone(r)) return "preventDamage";
 }, onPlayerDamagingOtherPlayer = (r, a, i, e) => {
     if (A(a)) return "preventDamage";
     /* Protection PvP : le tueur ne peut pas toucher sa victime juste apres son
@@ -262,6 +273,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     return res;
 }, onPlayerDamagingMob = (t, r, a, i) => {
     if (Et(t, r, a, i) || isNPCEntity(r)) return "preventDamage";
+    if (idInSafeZone(t) || idInSafeZone(r)) return "preventDamage";
     nt(r);
     try {
         ft(r, t, Vt(i));
@@ -361,6 +373,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
     q(t, r, a, i, e), Z(t, r, a, i, e), jt(t, r, a, i, e);
 }, onPlayerUsedThrowable = (t, r, a) => {
+    if (idInSafeZone(t)) return void safeZoneBlocked(t);
     Gt("throwable", () => v(t, r, a));
 }, onPlayerThrowableHitTerrain = (t, r, a) => {
     Gt("throwable", () => I(t, r, a));
