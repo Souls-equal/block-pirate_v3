@@ -1,4 +1,4 @@
-import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, updateNameTag as m } from "./core/team";
+import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, syncMuteIndex as syncMuteIndex, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
@@ -164,6 +164,10 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
        être sautés à cause d'une erreur survenue plus tôt dans le join. */
+    /* Reconstruit l'index des mutes (db lobby) depuis la db du joueur : un
+       redemarrage de lobby efface l'index, pas le mute. Sans ca un joueur
+       reste muet sans apparaitre dans la liste, donc sans pouvoir etre demute. */
+    try { syncMuteIndex(t); } catch (e) {}
     Qt(t), Gt("fruit", () => y(t)), Gt("codes", () => X(t)), Gt("admin", () => Rt(t)),
     Gt("haki", () => Ht(t)), Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
     Gt("nametag", () => m(t)), Gt("weapons", () => i(t)), Gt("chat", () => e(t)),

@@ -947,7 +947,12 @@ function muteExpired(info) {
     return !!info && info.until > 0 && Date.now() >= info.until;
 }
 
-export function getMuteList() {
+/* L'index du lobby n'est qu'un INDEX. La verite, c'est la db joueur ("mt") :
+   elle survit au redemarrage du lobby, pas l'index. Donc un index vide ou
+   abime ne doit JAMAIS rendre un mute impossible a lever -> il se reconstruit
+   tout seul (syncMuteIndex / getMuteList / isMuted). */
+
+function getMuteIndex() {
     const raw = muteLobbyGet("admin_muteList");
     if (!raw) return [];
     return raw.split(",").filter(function (n) {
@@ -957,6 +962,75 @@ export function getMuteList() {
 
 function muteSaveList(list) {
     return muteLobbySet("admin_muteList", list.join(","));
+}
+
+/* Ajoute un nom a l'index s'il n'y est pas deja. */
+function muteIndexAdd(name) {
+    if (!name) return false;
+    const list = getMuteIndex();
+    if (list.indexOf(name) !== -1) return true;
+    list.push(name);
+    return muteSaveList(list);
+}
+
+/* Recopie la db joueur dans l'index du lobby. A appeler des qu'on croise un
+   joueur en ligne : apres un redemarrage de lobby (qui vide la db lobby) le
+   mute reste actif, et le nom doit revenir dans la liste pour pouvoir etre
+   leve. Sans ca : "il est muet mais il n'apparait pas dans la liste". */
+export function syncMuteIndex(playerId) {
+    if (!playerId) return false;
+    const raw = muteDbGet(playerId, "mt");
+    const info = muteParse(raw);
+    if (!info) return false;
+    if (muteExpired(info)) {
+        muteDbDel(playerId, "mt");
+        return false;
+    }
+    const name = muteNameOf(playerId);
+    if (!name) return false;
+    if (muteLobbyGet("admin_mute_" + name) == null) muteLobbySet("admin_mute_" + name, raw);
+    return muteIndexAdd(name);
+}
+
+/* Liste affichee : index nettoye + joueurs mutes EN LIGNE, meme si l'index
+   les a perdus. Les mutes expires disparaissent au passage (plus de
+   "(expired)" qui traine et bloque une nouvelle sanction). */
+export function getMuteList() {
+    const index = getMuteIndex();
+    const list = [];
+    let changed = false;
+
+    for (let i = 0; i < index.length; i++) {
+        const name = index[i];
+        const info = muteParse(muteLobbyGet("admin_mute_" + name));
+        if (info && muteExpired(info)) {
+            /* mute fini : on nettoie, sinon il bloquerait la prochaine sanction
+               ("X is already muted") et resterait affiche pour toujours. */
+            changed = true;
+            muteLobbyDel("admin_mute_" + name);
+            continue;
+        }
+        /* vivant, ou enregistrement du lobby perdu : on garde le nom dans
+           l'index, c'est le seul souvenir du mute pour un joueur hors ligne
+           (et syncMuteIndex remettra la cle a son retour). */
+        list.push(name);
+    }
+
+    /* filet de securite : un joueur muet en ligne est toujours demarquable */
+    const online = muteOnlineIds();
+    for (let i = 0; i < online.length; i++) {
+        const raw = muteDbGet(online[i], "mt");
+        const info = muteParse(raw);
+        if (!info || muteExpired(info)) continue;
+        const name = muteNameOf(online[i]);
+        if (!name || list.indexOf(name) !== -1) continue;
+        list.push(name);
+        muteLobbySet("admin_mute_" + name, raw);
+        changed = true;
+    }
+
+    if (changed) muteSaveList(list);
+    return list;
 }
 
 export function isMutedName(name) {
@@ -970,7 +1044,7 @@ export function isMutedName(name) {
         }
         return true;
     }
-    return getMuteList().indexOf(name) !== -1;
+    return getMuteIndex().indexOf(name) !== -1;
 }
 
 /* Un joueur est-il muet ? (db joueur d'abord, liste du lobby en secours) */
@@ -979,7 +1053,16 @@ export function isMuted(playerId) {
     const raw = muteDbGet(playerId, "mt");
     if (raw) {
         const info = muteParse(raw);
-        if (info && !muteExpired(info)) return true;
+        if (info && !muteExpired(info)) {
+            /* Repare l'index au passage (lobby redemarre, cle perdue...) :
+               c'est ce qui garantit que le joueur reste demarquable. */
+            const name = muteNameOf(playerId);
+            if (name && muteLobbyGet("admin_mute_" + name) == null) {
+                muteLobbySet("admin_mute_" + name, raw);
+                muteIndexAdd(name);
+            }
+            return true;
+        }
         muteDbDel(playerId, "mt");
     }
     return isMutedName(muteNameOf(playerId));
@@ -1040,11 +1123,7 @@ export function muteName(name, byName, durationMs) {
     const info = String(byName || "Admin") + "|" + until;
 
     muteLobbySet("admin_mute_" + name, info);
-    const list = getMuteList();
-    if (list.indexOf(name) === -1) {
-        list.push(name);
-        muteSaveList(list);
-    }
+    muteIndexAdd(name);
 
     /* Le joueur en ligne recoit aussi le drapeau dans sa db (il suit le joueur
        d'une variation a l'autre, contrairement a la db du lobby). */
@@ -1066,8 +1145,9 @@ export function mutePlayer(playerId, byName, durationMs) {
 /* Retire le mute (silencieux = pas de message de succes). */
 export function unmuteName(name, silent) {
     if (!name) return false;
-    const wasThere = getMuteList().indexOf(name) !== -1 || muteLobbyGet("admin_mute_" + name) != null;
-    muteSaveList(getMuteList().filter(function (n) {
+    const index = getMuteIndex();
+    const wasThere = index.indexOf(name) !== -1 || muteLobbyGet("admin_mute_" + name) != null;
+    muteSaveList(index.filter(function (n) {
         return n !== name;
     }));
     muteLobbyDel("admin_mute_" + name);
