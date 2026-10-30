@@ -568,8 +568,24 @@ function warnFriendly(attacker) {
     say(attacker, "You can't attack your own teammates.", { color: C.MONEY });
 }
 
+/* Garde de zone (lobby) : posee par index.js avec idInSafeZone() de
+   gameplay/variations. Evite un import croise team <-> variations. */
+let safeZoneCheck = null;
+export function setSafeZoneCheck(fn) {
+    safeZoneCheck = fn;
+}
+
 export function canDamage(attacker, target) {
     if (!attacker || !target || attacker === target) return;
+
+    /* Zone neutre du lobby : le corps a corps non plus. */
+    if (safeZoneCheck) {
+        let inZone = false;
+        try {
+            inZone = safeZoneCheck(attacker) || safeZoneCheck(target);
+        } catch (e) {}
+        if (inZone) return "preventDamage";
+    }
 
     const A = getCrewName(attacker);
     const B = getCrewName(target);

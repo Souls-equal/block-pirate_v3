@@ -146,6 +146,39 @@ Les mêmes fonctions restent aussi disponibles en objet (`BPSea.launch(...)`,
 code interne ; `launch` / `chooseTeam` / `continueJourney` / `enterSea` sont simplement
 plus courts à appeler depuis un Code Block.
 
+### Zone neutre : ni capacités, ni dégâts
+
+Dans le lobby, **aucune capacité et aucun dégât** ne sont possibles dans un rayon de
+**100 blocs** autour des trois points de passage :
+
+| Point | Coordonnées |
+| --- | --- |
+| Spawn du lobby | `82.5 40 -36.5` |
+| Hub « première sélection de team » | `10 20 10` |
+| Hub « reprise » | `166.5 20 12.5` |
+
+Ce qui est bloqué dans la zone :
+
+- le **clic de capacité** (fruit, style de combat, armement, dash d'item) → message
+  `Safe zone: no abilities, no damage in this area.` ;
+- les **throwables** ;
+- **tous les dégâts** : joueur → joueur (corps à corps **et** capacités), mob → joueur,
+  joueur → mob, invocations et dégâts de zone. Le test se fait des **deux côtés** : si
+  le lanceur *ou* la cible est dans la zone, rien ne passe ;
+- le **dialogue PNJ reste possible** (cliquer un PNJ n'est pas une capacité).
+
+Techniquement, trois gardes branchées au démarrage dans `index.js` :
+
+| Garde | Fichier | Couvre |
+| --- | --- | --- |
+| `setZoneGuard(idInSafeZone)` | `utils/combat.js` | `damage()` : capacités, invocations, dégâts de zone |
+| `setSafeZoneCheck(idInSafeZone)` | `core/team.js` | `canDamage()` : corps à corps joueur → joueur |
+| `idInSafeZone` / `safeZoneBlocked` | `gameplay/variations.js` | clics, throwables, mob → joueur |
+
+La zone n'existe **que dans la variation `default`** : dans une mer, les coordonnées du
+lobby ne veulent rien dire, donc `idInSafeZone` renvoie toujours `false`. Le rayon se
+règle avec `LOBBY.safeRadius` (`0` désactive tout).
+
 **Réglages** (en haut du fichier) : `LOBBY` (spawn, les deux hubs) et `SEAS` (une entrée
 par mer avec ses positions de team). Ajouter la mer 2 = ajouter une entrée
 `2: { id: "sea2", title: "Sea 2", teams: { PIRATES: [...], NONE: [...], MARINES: [...] } }`

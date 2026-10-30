@@ -39,7 +39,10 @@ export const LOBBY = {
     /* Hub "premier passage" (choix de team). */
     hubFirst: [10, 20, 10],
     /* Hub "deja joue" (bouton de reprise). */
-    hubReturning: [166.5, 20, 12.5]
+    hubReturning: [166.5, 20, 12.5],
+    /* Zone neutre : rayon (en blocs) autour de CHAQUE point ci-dessus ou les
+       capacites et les degats sont bloques. 0 = desactive. */
+    safeRadius: 100
 };
 
 /* Les mers. `teams` = position d'arrivee de chaque team dans cette mer. */
@@ -206,6 +209,53 @@ function moveToVariation(playerId, variation) {
     } catch (e) {
         return false;
     }
+}
+
+/* --------------------------------------------------------------- zone sure */
+
+/* Les trois points du lobby ou l'on ne peut ni se battre ni utiliser de
+   capacite : le spawn, le hub de premiere selection de team, et le hub de
+   reprise. Ce sont des points de passage : un joueur qui arrive ne doit pas
+   pouvoir etre tue pendant qu'il choisit. */
+export function safeZoneCenters() {
+    return [LOBBY.spawn, LOBBY.hubFirst, LOBBY.hubReturning];
+}
+
+/* Une position est-elle dans une zone neutre du lobby ? */
+export function posInSafeZone(pos) {
+    if (!pos || pos.length < 3) return false;
+    const radius = LOBBY.safeRadius;
+    if (!(radius > 0)) return false;
+    const zones = safeZoneCenters();
+    for (let i = 0; i < zones.length; i++) {
+        const p = zones[i];
+        if (!p) continue;
+        const dx = pos[0] - p[0];
+        const dy = pos[1] - p[1];
+        const dz = pos[2] - p[2];
+        if (dx * dx + dy * dy + dz * dz <= radius * radius) return true;
+    }
+    return false;
+}
+
+/* Une entite (joueur ou mob) est-elle dans une zone neutre ? Ne s'applique que
+   dans le lobby : les coordonnees ne veulent rien dire dans une mer. */
+export function idInSafeZone(id) {
+    if (!id) return false;
+    if (!(LOBBY.safeRadius > 0)) return false;
+    if (currentVariation() !== LOBBY.variation) return false;
+    return posInSafeZone(positionOf(id));
+}
+
+/* Message (limite a un toutes les 3 s) quand une action est refusee. */
+export function safeZoneBlocked(playerId) {
+    tell(playerId, [
+        { icon: "fa-solid fa-shield-halved", style: { color: C.MARINE } },
+        { str: " Safe zone: ", style: { color: C.INFO } },
+        { str: "no abilities, no damage", style: { color: C.MARINE, fontWeight: "bold" } },
+        { str: " in this area.", style: { color: C.INFO } },
+    ], "safeZone");
+    return true;
 }
 
 /* ---------------------------------------------------------------- parcours */
@@ -430,6 +480,7 @@ export const BPSea = {
     playerSea,
     currentVariation,
     isLobby,
+    inSafeZone: idInSafeZone,
     config: { LOBBY, SEAS }
 };
 
