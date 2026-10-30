@@ -12,7 +12,7 @@ import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isF
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
-import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard } from "./utils/combat";
+import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -38,6 +38,13 @@ import { variationJoin as variationJoin, variationLeave as variationLeave, start
    declaration. NE JAMAIS ecrire `const launch = ...` : le nom redeviendrait
    prive et les Code Blocks ne le verraient plus. */
 launch = (playerId) => bpLaunch(playerId);
+/* Provenance des effets : "which player, which ability". Les effets poses
+   hors du cast (timer, tick, aura) perdent le contexte ; un Code Block peut
+   le rendre explicite :
+       withEffectSource(pid, "gas", () => eff(id, "Slowness", 1200, { inbuiltLevel: 3 }))
+   ou, plus direct encore : eff(id, "Slowness", 1200, {
+       inbuiltLevel: 3, source: "gas", casterId: pid }). */
+withEffectSource = (casterId, abilityId, fn) => bpWithEffectSource(casterId, abilityId, fn);
 chooseTeam = (playerId, teamId) => bpChooseTeam(playerId, teamId);
 continueJourney = (playerId) => bpContinue(playerId);
 enterSea = (playerId, seaNumber) => bpEnterSea(playerId, seaNumber);

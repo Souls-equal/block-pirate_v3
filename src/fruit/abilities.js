@@ -184,7 +184,7 @@ import {
     onPlayerClickDragonTwister,
     onPlayerClickDraconicAscent,
 } from "./func-abilities";
-import { applyEffect } from "../utils/combat";
+import { applyEffect, withEffectSource } from "../utils/combat";
 
 function P(color, kind) {
     if (kind) return color + " " + kind + " Paintball Explosive Item";
@@ -1183,12 +1183,17 @@ for (const fruitName in FRUIT_ABILITY_TABLE) {
             clicked: bind.item,
             name: bind.name,
             cooldown: bind.cd || 900,
+            /* withEffectSource : les effets appliqués par l'abilité
+               héritent de la provenance "joueur|abilité", donc une même
+               abilité ne s'empile pas elle-même (voir utils/combat). */
             onClick: (playerId, isAlt, x, y, z, block, target) =>
-                bind.cast(playerId, bind.item, isAlt, x, y, z, block, target)
+                withEffectSource(playerId, bind.id, () =>
+                    bind.cast(playerId, bind.item, isAlt, x, y, z, block, target))
         };
 
         if (bind.up) attack.onPlayerClickUp = (playerId, isAlt, x, y, z, block, target) =>
-            bind.up(playerId, bind.item, isAlt, x, y, z, block, target);
+            withEffectSource(playerId, bind.id, () =>
+                bind.up(playerId, bind.item, isAlt, x, y, z, block, target));
         entry["attack" + (i + 1)] = attack;
     }
     if (!binds.length) {

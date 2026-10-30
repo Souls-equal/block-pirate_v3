@@ -374,6 +374,57 @@ compétence est détecté par `isAbilityItemName` (`src/fruit/abilities.js`).
 
 ---
 
+## Effets : un même effet ne s'empile que si la provenance change
+
+`applyEffect()` (dans `src/utils/combat.js`) gère les effets de statut : Slowness, Speed,
+Weakness, Health Regen… Avant, **chaque application s'additionnait** : deux Slowness niveau 2
+donnaient un niveau 4, dix donnaient 20 — une même abilité pouvait donc se cumuler avec
+elle-même (deux clics, ou un effet de tick qui repasse).
+
+Aujourd'hui chaque effet temporaire est enregistré dans un **registre de provenance** :
+`cible → effet → { provenance: niveau }`, avec une date d'expiration. La règle est :
+
+| Situation | Résultat |
+| --- | --- |
+| **même provenance** (même joueur + même abilité) | la durée se rafraîchit, le **niveau ne monte pas** ; si la même abilité revient plus fort, on garde le plus fort |
+| **provenances différentes** (autre joueur, ou autre abilité) | les niveaux **s'additionnent** — vrai cumul de groupe |
+| aucune provenance connue | repli sur l'effet lui-même (`fx\|Slowness`) : dans le doute, on **ne cumule pas** |
+
+La provenance est posée par `withEffectSource()` au moment du cast, et il n'y a qu'**un seul
+point de passage par famille d'abilité** :
+
+* `src/fruit/abilities.js` — `onClick` / `onPlayerClickUp` des abilités de fruit (`bind.id`) ;
+* `src/gameplay/fightingStyles.js` — `handler` des capacities (`matched.id`).
+
+```js
+withEffectSource(playerId, abilityId, () => cast(...));   // "joueur|abilité"
+```
+
+Un effet appliqué **hors** du cast (timer, boucle de tick, aura au sol) ne connaît pas de
+provenance. Pour la rendre explicite, deux options :
+
+```js
+withEffectSource(pid, "gas", () => eff(id, "Slowness", 1200, { inbuiltLevel: 3 }));
+eff(id, "Slowness", 1200, { inbuiltLevel: 3, source: "gas", casterId: pid });
+```
+
+`withEffectSource` est aussi exposé comme **nom global** (voir le pont en tête de
+`src/index.js`) pour les Code Blocks.
+
+Détails qui comptent :
+
+* les effets **permanents** (`duration === null`, ex. bonus de fruit) restent le **niveau de
+  base**, et les empilements temporaires se posent par-dessus ; à l'expiration on revient
+  exactement à ce niveau de base ;
+* à l'expiration, on ne remet pas « le niveau de base » à l'aveugle : on **recalcule la somme
+  des empilements encore vivants**, donc si A expire avant B, B reste actif ;
+* `removeEffect()` oublie les empilements de cet effet (sinon le registre le réappliquerait
+  au tick suivant) ; `clearPlayerEffects()` (mort, respawn) vide tout ;
+* l'horloge est celle du scheduler (`nowMs()` dans `src/utils/timer.ts`, 1 tick = 50 ms) :
+  les effets vieillissent au même rythme que les timers, même si le serveur lag.
+
+---
+
 ## Arborescence
 
 ```
