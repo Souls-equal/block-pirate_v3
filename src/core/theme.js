@@ -140,10 +140,30 @@ function roleForRgb(rgb) {
     return best;
 }
 
+/* Exception assumee a la regle « une couleur par role » : les COULEURS
+   D'OBJETS de l'inspection d'inventaire. Ce ne sont pas des roles (equipe,
+   argent, succes...), donc elles gardent leur teinte exacte au lieu d'etre
+   ramenees a la palette :
+     - item normal ...................... gris un peu plus fonce
+     - item normal renomme (nom custom) . gris tres clair
+     - fruit du demon (sneak + click) ... rouge-orange
+     - item de competence ............... bleu-violet */
+export const ITEM_COLOR = {
+    plain: "#8B8F98",
+    custom: "#E5E7EB",
+    fruit: "#FF6B35",
+    ability: "#8B5CF6",
+};
+
+const KEEP_AS_IS = {};
+for (const k in ITEM_COLOR) KEEP_AS_IS[ITEM_COLOR[k].toLowerCase()] = ITEM_COLOR[k];
+
 /* Couleur -> couleur de la palette. Renvoie l'entree inchangee si illisible. */
 export function themeColor(value) {
     if (typeof value !== "string" || !value) return value;
     const key = value.trim().toLowerCase();
+    const keep = KEEP_AS_IS[key];
+    if (keep) return keep;
     const direct = ROLE_OF_VALUE[key];
     if (direct) return C[direct];
     const role = ROLE_OF[key];

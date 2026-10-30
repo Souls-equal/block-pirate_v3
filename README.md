@@ -104,24 +104,41 @@ serveurs. Aucun renommage n'est nécessaire au join : le lobby reste `default`.
 | Connexion dans une mer | tp à la position sauvegardée (ou au spawn de la team) |
 
 **Aucun bloc, aucun pad.** Il n'y a rien à poser dans le monde : ce sont des fonctions
-à appeler depuis tes propres **Code Blocks**, exposées sur `globalThis.BPSea` :
+à appeler depuis tes propres **Code Blocks**.
 
-| Fonction | Effet |
+### ⚠ Règle Bloxd : comment une fonction devient visible depuis un Code Block
+
+En Bloxd, la forme de la déclaration décide de la visibilité :
+
+| Écriture | Visible depuis un autre Code Block ? |
 | --- | --- |
-| `BPSea.launch(playerId)` | envoie au hub (1re fois) ou au hub de reprise |
-| `BPSea.chooseTeam(playerId, "PIRATES" \| "MARINES" \| "NONE")` | fixe la team, envoie en mer 1 au spawn de la team |
-| `BPSea.continueJourney(playerId)` | renvoie dans **sa** mer, à **sa** position |
-| `BPSea.enterSea(playerId, 2)` | envoie dans la mer 2 (si elle est déclarée) |
-| `BPSea.savePosition(playerId)` | force une sauvegarde de position |
-| `BPSea.playerSea(playerId)` | numéro de mer du joueur (`0` = jamais joué) |
-| `BPSea.currentVariation()` | `"default"`, `"sea1"`… |
+| `nom = () => {}` | ✅ oui (affectation globale, sans `const`/`let`) |
+| `export function nom() {}` | ✅ oui (export de module) |
+| `function nom() {}` | ❌ non, privée au fichier |
+
+`variations.js` étant un module, ses fonctions y sont **privées**. `src/gameplay/world-api.js`
+les recopie donc sous leur **nom global, sans déclaration**, exactement au format
+`nom = () => {}`. C'est ce fichier qui rend les appels ci-dessous possibles — **ne jamais**
+y écrire `const launch = …`, sinon le nom redevient privé et tes Code Blocks ne le voient plus.
+
+| Fonction (globale) | Effet |
+| --- | --- |
+| `launch(playerId)` | envoie au hub (1re fois) ou au hub de reprise |
+| `chooseTeam(playerId, "PIRATES" \| "MARINES" \| "NONE")` | fixe la team, envoie en mer 1 au spawn de la team |
+| `continueJourney(playerId)` | renvoie dans **sa** mer, à **sa** position |
+| `enterSea(playerId, 2)` | envoie dans la mer 2 (si elle est déclarée) |
 
 ```js
 // Code Block du couloir (ou d'un bouton) : rien d'autre à faire.
-BPSea.launch(playerId);
+launch(playerId);
 // Puis, dans le hub :
-BPSea.chooseTeam(playerId, "PIRATES");
+chooseTeam(playerId, "PIRATES");
 ```
+
+Les mêmes fonctions restent aussi disponibles en objet (`BPSea.launch(...)`,
+`BPSea.playerSea(...)`, `BPSea.savePosition(...)`, `BPSea.currentVariation()`) pour le
+code interne ; `launch` / `chooseTeam` / `continueJourney` / `enterSea` sont simplement
+plus courts à appeler depuis un Code Block.
 
 **Réglages** (en haut du fichier) : `LOBBY` (spawn, les deux hubs) et `SEAS` (une entrée
 par mer avec ses positions de team). Ajouter la mer 2 = ajouter une entrée
@@ -196,6 +213,25 @@ un si nécessaire — jamais tout le message.
 
 ---
 
+## Panneau admin : téléportations désactivées dans le lobby
+
+La variation `default` est le **lobby**. Pour qu'un admin ne puisse pas en « sortir »
+(ou y faire venir quelqu'un) par erreur, les **quatre boutons de TP** du panneau sont
+refusés tant qu'on est dans le lobby :
+
+| Bouton | Dans le lobby |
+| --- | --- |
+| TP To Player | ❌ refusé |
+| TP Here | ❌ refusé |
+| TP To Position | ❌ refusé |
+| Warp to Island | ❌ refusé |
+
+Le refus est un simple message (`Teleport is disabled in the lobby…`) : rien n'est cassé,
+et dès que l'admin est dans une mer, les quatre boutons remarchent normalement.
+(`canAdminTp` dans `src/core/admin.js`.)
+
+---
+
 ## Modération : mute (panneau admin)
 
 Le **mute** est un ban gentil : il empêche **seulement de parler**. Le joueur reste
@@ -230,6 +266,24 @@ tous les canaux sont couverts (Global, Team, Crew).
 
 ---
 
+## Inspection d'inventaire : couleurs
+
+Dans *View Inventory*, chaque item est coloré par **catégorie d'objet** — ce ne sont pas
+des couleurs de rôle, elles gardent donc leur teinte exacte (`ITEM_COLOR` dans
+`src/core/theme.js`, seule exception assumée à la règle « une couleur par rôle ») :
+
+| Catégorie | Couleur |
+| --- | --- |
+| Item normal | gris un peu plus foncé `#8B8F98` |
+| Item normal renommé (`customDisplayName`) | gris très clair `#E5E7EB` |
+| Fruit du démon (mangeable, sneak + click) | rouge-orange `#FF6B35` |
+| Item de compétence | bleu-violet `#8B5CF6` |
+
+Un fruit rangé sous son nom de bloc est reconnu (table `fruitItemMap`), et un item de
+compétence est détecté par `isAbilityItemName` (`src/fruit/abilities.js`).
+
+---
+
 ## Arborescence
 
 ```
@@ -240,7 +294,8 @@ tous les canaux sont couverts (Global, Team, Crew).
 │   │   ├── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
 │   │   └── mute.js               # ⭐ mute (chat seulement) : liste, durées, unmute
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
-│   │   └── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
+│   │   ├── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
+│   │   └── world-api.js          # ⭐ launch/chooseTeam/... en global (format Bloxd)
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
@@ -421,6 +476,10 @@ des 95 handlers (dont les 8 de Control/Gravity) n'est pas enregistré.
 - `FA.c` = helpers du moteur, `FA.r` = handlers enregistrés par les blocs,
   `FA_BOOT` = boot du chargeur. Ne mets plus d'état de fruit ailleurs que dans
   `globalThis.__CT__` / `__GV__` **à l'intérieur d'un seul pack**.
+- **Fonction appelable depuis un Code Block** : `nom = () => {}` (affectation
+  globale, sans `const`/`let`) ; `export function nom() {}` pour exporter ;
+  `function nom() {}` reste privé au fichier. Toute fonction destinée au monde
+  passe donc par `src/gameplay/world-api.js`.
 - `dist/`, `build-out/`, `node_modules/` sont ignorés par git. Seuls les packs
   de `code-blocks/` sont versionnés car ce sont les fichiers à coller dans le jeu.
 

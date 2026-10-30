@@ -1,0 +1,1 @@
+import{launch as a,chooseTeam as o,continueJourney as u,enterSea as c}from"./variations";launch=e=>a(e),chooseTeam=(e,n)=>o(e,n),continueJourney=e=>u(e),enterSea=(e,n)=>c(e,n);
