@@ -25,7 +25,7 @@ import {
     safePosition,
     targetBlock,
 } from "./lifeform";
-import { setTimeout, nowMs } from "./timer";
+import { setTimeout, nowMs, getActor, withActor } from "./timer";
 import { C, say } from "../core/theme";
 import { isCrowdControlImmune } from "../core/ranks";
 export const summonOwner = {};
@@ -462,24 +462,23 @@ export function inVehicle(id) {
     return !!VEHICLE_TYPES[vehicleTypeOf(id)];
 }
 
-/* Fenetre "je me deplace moi-meme", ouverte a chaque cast du joueur. */
-const selfMoveUntil = {};
-const SELF_MOVE_MS = 2500;
+/* PROVENANCE DU MOUVEMENT — "c'est lui qui bouge" ou "on le deplace" ?
 
-function markSelfMove(casterId) {
-    if (!casterId) return;
-    selfMoveUntil[casterId] = nowMs() + SELF_MOVE_MS;
-}
+   Avant : une fenetre de 2,5 s ouverte a chaque cast. Elle etait fausse dans
+   les deux sens. Un admin qui cliquait une capacite devenait deplacable par
+   n'importe qui pendant 2,5 s (Control Domain en profitait a chaque tick), et
+   une coroutine qui reprenait apres 3 s perdait son droit de bouger.
+
+   Maintenant : l'acteur du code en cours (voir utils/timer). Pendant le cast
+   d'une capacite, l'acteur est son lanceur ; a chaque reprise de coroutine il
+   est restaure. Donc un admin ne bouge QUE pendant son propre code, jamais
+   parce qu'il a clique deux secondes plus tot. */
 
 export function isSelfMoving(id) {
     if (!id) return false;
-    /* Pendant le cast de QUELQU'UN, la seule personne qui a le droit de
-       bouger, c'est le lanceur. C'est ce qui empeche un admin de se faire
-       attraper par Control juste apres avoir lance sa propre capacite. */
-    if (effectCast) return effectCast.caster === String(id);
-    /* Hors cast (partie asynchrone d'une coroutine, ex. Flying Kick) : on
-       retombe sur la fenetre ouverte par le dernier cast du joueur. */
-    return !!selfMoveUntil[id] && selfMoveUntil[id] > nowMs();
+    const who = getActor();
+    if (who) return who === String(id);
+    return !!effectCast && effectCast.caster === String(id);
 }
 
 /* Crowd control bloque ? (immunise ET ce n'est pas son propre deplacement) */
@@ -857,11 +856,11 @@ export function withEffectSource(casterId, abilityId, fn) {
         caster: casterId ? String(casterId) : "",
         ability: abilityId ? String(abilityId) : ""
     };
-    /* le joueur a le droit de se deplacer lui-meme pendant son cast :
-       c'est ce qui distingue un dash d'un crowd control subi. */
-    markSelfMove(effectCast.caster);
+    /* l'acteur du code en cours devient le lanceur : c'est ce qui distingue
+       un dash d'un crowd control subi, y compris dans la coroutine qui
+       reprend apres un sleep(). */
     try {
-        return fn();
+        return withActor(casterId, fn);
     } finally {
         effectCast = prev;
     }

@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**29 fichiers, 294 763 caracteres** (58 % de la limite de 512 000 du World Code, -46 % par rapport aux sources lisibles).
+**29 fichiers, 295 062 caracteres** (58 % de la limite de 512 000 du World Code, -46 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -37,7 +37,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `core/UI.js` | 5 799 | 12 441 |
 | `fruit/abilities.js` | 41 337 | 61 764 |
 | `fruit/fruitData.js` | 4 344 | 5 913 |
-| `fruit/func-abilities.js` | 21 074 | 28 327 |
+| `fruit/func-abilities.js` | 21 150 | 28 739 |
 | `fruit/index.js` | 18 231 | 28 172 |
 | `gameplay/codes.js` | 4 375 | 7 139 |
 | `gameplay/customItem.js` | 1 985 | 4 505 |
@@ -50,14 +50,14 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/variations.js` | 5 818 | 16 889 |
 | `index.js` | 10 727 | 20 775 |
 | `utils/boss.js` | 4 932 | 9 086 |
-| `utils/combat.js` | 13 824 | 41 454 |
+| `utils/combat.js` | 13 816 | 41 557 |
 | `utils/data.js` | 3 754 | 7 056 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 4 605 | 9 581 |
 | `utils/killAttribution.js` | 1 972 | 6 020 |
 | `utils/killfeed.js` | 834 | 1 159 |
 | `utils/lifeform.js` | 3 842 | 7 058 |
-| `utils/timer.ts` | 1 201 | 4 698 |
+| `utils/timer.ts` | 1 432 | 5 761 |
 | `utils/world.js` | 1 355 | 2 481 |
 
 ## Controle

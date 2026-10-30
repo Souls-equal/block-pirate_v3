@@ -11,6 +11,7 @@ type Timer = {
     active: boolean;
     failures: number;
     logged: number;
+    actor: string | null;
 };
 
 type Wait =
@@ -30,11 +31,33 @@ type Coroutine = {
     gen: CoroutineGenerator;
     wait: number;
     cond: (() => boolean) | null;
+    actor: string | null;
 };
 
 let time = 0;
 const timers: Timer[] = [];
 const coroutines: Coroutine[] = [];
+
+/* PROVENANCE — qui execute le code en cours.
+   Pose par withActor() autour du cast d'une capacite, puis restaure a chaque
+   reprise de coroutine. C'est ce qui permet aux primitives (teleport, setVel,
+   setMoveSpeed, forceCameraDir) de distinguer "le joueur se deplace lui-meme"
+   de "quelqu'un le deplace". */
+let actor: string | null = null;
+
+export function getActor(): string | null {
+    return actor;
+}
+
+export function withActor<T>(who: string | number | null | undefined, fn: () => T): T {
+    const prev = actor;
+    actor = who ? String(who) : null;
+    try {
+        return fn();
+    } finally {
+        actor = prev;
+    }
+}
 
 // un callback qui throw est arrêté après ce nombre d'échecs consécutifs
 const MAX_FAILURES = 4;
@@ -56,7 +79,8 @@ export function setTimeout(fn: () => void, delay: number): TimerHandle {
         i: 0,
         active: true,
         failures: 0,
-        logged: 0
+        logged: 0,
+        actor: actor
     };
 
     timers.push(timer);
@@ -77,7 +101,8 @@ export function setInterval(fn: () => void, interval: number): TimerHandle {
         i: interval,
         active: true,
         failures: 0,
-        logged: 0
+        logged: 0,
+        actor: actor
     };
 
     timers.push(timer);
@@ -109,7 +134,10 @@ export function run(gen: CoroutineGenerator): void {
     coroutines.push({
         gen: gen,
         wait: time,
-        cond: null
+        cond: null,
+        // memorise QUI a lance la coroutine : sans ca, un sleep() perd la
+        // provenance et les primitives ne savent plus qui deplace qui.
+        actor: actor
     });
 }
 
@@ -129,7 +157,8 @@ export function step(): void {
         // Isolé : une exception ici n'empêche PAS les timers suivants de tourner.
         let threw = false;
         try {
-            timer.fn();
+            if (timer.actor) withActor(timer.actor, () => timer.fn());
+            else timer.fn();
         } catch (e) {
             threw = true;
             timer.failures++;
@@ -168,7 +197,7 @@ export function step(): void {
         let r: GeneratorResult;
 
         try {
-            r = c.gen.next();
+            r = c.actor ? withActor(c.actor, () => c.gen.next()) : c.gen.next();
         } catch (e) {
             logError("Coroutine error", e);
             coroutines.splice(i, 1);
