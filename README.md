@@ -136,7 +136,7 @@ passe par `say()` / `shout()` (ou par le patch de l'API posé au démarrage), qu
 
 | Élément | Couleur | Valeur |
 | --- | --- | --- |
-| Pirates | rouge | `#E63946` |
+| Pirates | rouge | `#FF5C59` |
 | Marines | bleu clair | `#7DD3FC` |
 | Argent | jaune doré | `#FFD700` |
 | XP | cyan | `#22D3EE` |
