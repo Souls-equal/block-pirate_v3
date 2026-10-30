@@ -15,6 +15,7 @@
       hitArea,
       hitSeg,
       impulse,
+      teleport,
       isAliveId,
       lifeforms,
       markUntil,
@@ -360,9 +361,8 @@
               if (ct_dist(to, [0, 0, 0]) <= 0.6) continue;
               const n = ct_norm(to),
                 step = CT_D_PULL * CT_DT;
-              try {
-                api.setPosition(id, p[0] + n[0] * step, p[1] + n[1] * step, p[2] + n[2] * step);
-              } catch (e) {}
+              /* gardes : ni admin/owner immunise, ni joueur en bateau */
+              teleport(id, p[0] + n[0] * step, p[1] + n[1] * step, p[2] + n[2] * step);
             }
             if (d.homing && st.active) {
               for (let i = 0; i < st.blocks.length; i++) {

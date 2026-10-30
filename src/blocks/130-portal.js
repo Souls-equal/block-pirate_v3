@@ -2,7 +2,7 @@
 // Source lisible. Ce fichier est minifié + empaqueté par `npm run build:blocks`.
 // NE PAS coller ce fichier directement dans un Code Block : utiliser code-blocks/pack-XX.js.
 
-(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
+(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,setVel,teleport,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
 /* Portal — “Portal Step” */
 
 const portal_RANGE = 45, MIN = 3, portal_EYE = 1.62;
@@ -79,7 +79,7 @@ function onPlayerClickPortal(pid, itemName) {
 
     sound.at(p, "futureStrangePulse", 0.8, 1.3, 24);
     portalBurst(p[0], p[1] + 0.8, p[2]);
-    try { api.setPosition(pid, to[0], to[1], to[2]); } catch (e) { return false; }
+    if (!teleport(pid, to[0], to[1], to[2])) return false;
     sound.at(to, "magicAccent3", 0.8, 1.4, 24);
     portalBurst(to[0], to[1] + 0.8, to[2]);
     return true;

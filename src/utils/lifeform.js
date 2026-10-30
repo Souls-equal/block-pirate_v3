@@ -109,6 +109,14 @@ export function isMobAlive(id) {
     return false;
 }
 
+/* Joueur connecte ? Lecture du cache (aucun appel API) : sert aux gardes de
+   mouvement, appelees en boucle sur des tas de cibles. */
+export function isOnlinePlayer(id) {
+    if (!id) return false;
+    refreshAliveCache();
+    return state.players.has(id);
+}
+
 export function isAliveId(id) {
     if (!id || isNpcEntity(id)) return false;
     refreshAliveCache();

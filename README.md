@@ -269,6 +269,23 @@ Le refus est un simple message (`Teleport is disabled in the lobby…`) : rien n
 et dès que l'admin est dans une mer, les quatre boutons remarchent normalement.
 (`canAdminTp` dans `src/core/admin.js`.)
 
+Les points du menu **Warp to Island** (`ISLAND_WARPS` dans `src/core/admin.js`) sont, dans
+l'ordre du menu :
+
+| Nom | x, y, z |
+| --- | --- |
+| Starter Pirate | `-12, -910, 24` |
+| Middle Town | `635, -900, -206` |
+| Starter Marine | `885, -906, -276` |
+| Jungle | `1319, -906, 317` |
+| Pirate Village | `811, -906, 770` |
+| Desert | `650, -913, 1789` |
+| Snow Village | `2502, -915, 664` |
+| Marine Fortress | `2101, -910, -666` |
+| Skylands | `2498, -909, 1247` |
+
+L'ordre du tableau **est** l'ordre du menu : pour ajouter une île, une ligne suffit.
+
 ---
 
 ## Annonces dans le chat (panneau admin)
@@ -440,6 +457,88 @@ Détails qui comptent :
   au tick suivant) ; `clearPlayerEffects()` (mort, respawn) vide tout ;
 * l'horloge est celle du scheduler (`nowMs()` dans `src/utils/timer.ts`, 1 tick = 50 ms) :
   les effets vieillissent au même rythme que les timers, même si le serveur lag.
+
+---
+
+## Stats : la courbe de Regen
+
+`src/gameplay/stats.js` calcule la régénération à partir des points investis :
+
+```js
+const p = 1 - Math.pow(REGEN_DECAY, r);   // 0 -> 1 quand r grandit
+amount   = 5%   + 20%   * p;              // part de vie rendue
+interval = 5000 - 4800  * p;              // ms entre deux soins
+```
+
+`REGEN_DECAY` valait **`1`**, donc `1^r = 1` et `p = 0` **quel que soit le niveau** : tous les
+joueurs affichaient `Regen 5% / 5s`, du premier point au dernier, sans jamais rien gagner.
+Il vaut désormais `0.98` :
+
+| Points | Affichage | Soin réel |
+| --- | --- | --- |
+| 0 | `Regen 5% / 5s` | 5 % toutes les 5 s |
+| 10 | `Regen 8.7% / 4.1s` | |
+| 25 | `Regen 12.9% / 3.1s` | |
+| 50 | `Regen 17.7% / 1.9s` | |
+| 100 | `Regen 22.3% / 837ms` | |
+
+L'affichage, les valeurs envoyées au moteur (`healthRegenAmount` / `healthRegenInterval` /
+`healthRegenStartAfter`) et la courbe sont les mêmes : impossible de voir un chiffre qui ne
+correspond à rien. Sous la seconde, le temps s'affiche en `ms`, sinon deux paliers se
+ressembleraient.
+
+---
+
+## Garde-fous de mouvement : bateau et crowd control
+
+Tous les déplacements « subis » passent par quatre fonctions de `src/utils/combat.js` —
+`impulse()`, `setVel()`, `teleport()` et `applyEffect()` (les blocs les reçoivent via
+`FA.c`, jamais `api.applyImpulse` en direct). Deux gardes y sont branchées.
+
+### 1. Bateau : plus de dash qui propulse l'embarcation
+
+Un bateau est une **physique de joueur** (`api.getPlayerPhysicsState(id).type`) : quand le
+joueur est dedans, la coque suit ses déplacements. Un dash qui posait 18 blocs/s sur le
+joueur emportait donc le bateau à une vitesse absurde.
+
+| Type de physique | Sens | Déplacement bloqué |
+| --- | --- | --- |
+| `0` | à pied | non |
+| `1` | bateau (normal / obsidian / speedboat) | **oui** |
+| `5` | monture | **oui** |
+
+Le joueur est prévenu (`No movement abilities while you are in a boat.`, un message
+toutes les 3 s) — sinon la capacité partait avec son cooldown sans rien faire de visible.
+La lecture de la physique est mise en cache le temps d'un tick (50 ms) : `impulse()` sert
+à des jets de projectiles qui touchent des dizaines d'entités.
+
+Les deux dashs qui appelaient `api.setVelocity` en direct (Blade Dash, Bomb Dash) et le
+blink du portail (`api.setPosition`) passent maintenant par `setVel()` / `teleport()`.
+
+### 2. Crowd control : ADMIN et OWNER intouchables
+
+Chaque rang de `src/core/ranks.js` porte désormais un **flag** :
+
+```js
+immuneToCrowdControl: true,   // OWNER et ADMIN ; false partout ailleurs
+```
+
+Une ligne suffit pour l'étendre à un autre rang. Quand il est actif, le joueur ne peut être :
+
+* ni **poussé / attiré** (`impulse`, les pulls Gravity et Shambles),
+* ni **root** (`setVel(id, 0, 0, 0)`, `jumpAmount` du Gas),
+* ni **téléporté** par une capacité (Grapple Rush, Shambles),
+* ni **ralenti / affaibli** — `Slowness`, `Weakness`, `Blindness`, `Nausea`,
+  `Mining Fatigue`, `Darkness` sont ignorés (`CC_EFFECTS` dans `combat.js`).
+
+Ce qui reste : les **dégâts** (on peut frapper un admin) et les **buffs** (Speed,
+Health Regen…). Et surtout **son propre déplacement** : `withEffectSource()` ouvre une
+fenêtre de 2,5 s autour de chaque cast, donc un admin garde ses dashes. Sans cette
+fenêtre, « immunisé au déplacement » aurait aussi annulé ses propres capacités.
+
+Les **effets** (`Slowness`, `Weakness`…) n'utilisent pas cette fenêtre : ils sont refusés
+pour un rang immunisé dans tous les cas, c'est le point le plus simple à tester
+(`eff(adminId, "Slowness", 3000, { inbuiltLevel: 3 })` ne fait rien).
 
 ---
 

@@ -7,7 +7,7 @@
     R = FA.r,
     F = C.fx,
     V = globalThis.__GV__;
-  const { api, damage, entitiesIn, run, sleep, knockBack, facing } = C;
+  const { api, damage, entitiesIn, run, sleep, knockBack, facing, teleport } = C;
   if (!V || !V.gvVolley) {
     try {
       api.log("[FA] Gravity commun absent avant Gravity(4)");
@@ -145,9 +145,9 @@
         ];
         g.dir = [c[0] - from[0], 0, c[2] - from[2]];
         if (g.kind === "entity") {
-          try {
-            api.setPosition(g.id, g.at[0], g.at[1], g.at[2]);
-          } catch (e) {}
+          /* teleport() = gardes bateau + crowd control : un admin immunise
+             n'est pas aspire, et personne n'est traine en bateau. */
+          teleport(g.id, g.at[0], g.at[1], g.at[2]);
           try {
             api.preventFallDamageNextGrounding(g.id);
           } catch (e2) {}

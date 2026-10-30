@@ -8,6 +8,7 @@ import {
     impulse,
     lifeforms,
     setVel,
+    teleport,
     withEffectSource,
 } from "../utils/combat";
 import {
@@ -268,10 +269,10 @@ export function onPlayerClickCombatGrab(pid, itemName) {
                     if (grabbed) soundAt(front, "critical_hit", 0.85, 0.95, 22);
                 }
                 if (grabbed && isTargetable(grabbed, pid)) {
-                    try {
-                        api.setPosition(grabbed, front[0], p[1] + 0.35, front[2]);
-                        setVel(grabbed, 0, 0, 0);
-                    } catch (e) {}
+                    /* teleport() + setVel() = gardes bateau / crowd control :
+                       on ne traine ni un admin immunise ni un bateau. */
+                    teleport(grabbed, front[0], p[1] + 0.35, front[2]);
+                    setVel(grabbed, 0, 0, 0);
                 }
                 return { value: sleep(1), done: false };
             }
@@ -283,9 +284,7 @@ export function onPlayerClickCombatGrab(pid, itemName) {
             column(slamPos, 3.4, { steps: 6, tex: TEX.crit, life: [0.22, 0.45], size: [0.34, 0.66], colors: COL_COMBAT });
             boom(slamPos, 2.8, { tex: TEX.crit, count: 28, colors: COL_COMBAT });
             if (grabbed && isTargetable(grabbed, pid)) {
-                try {
-                    api.setPosition(grabbed, slamPos[0], p[1], slamPos[2]);
-                } catch (e) {}
+                teleport(grabbed, slamPos[0], p[1], slamPos[2]);
                 damage(grabbed, 16, pid, itemName);
                 impulse(grabbed, d[0] * 4.5, -10.0, d[2] * 4.5);
                 eff(grabbed, "Slowness", 2500, { inbuiltLevel: 3 });

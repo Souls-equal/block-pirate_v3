@@ -19,7 +19,10 @@ const DEF_FLOOR  = 0.2;
 
 const REGEN_BASE_AMOUNT   = 0.05;
 const REGEN_MAX_BONUS     = 0.20;
-const REGEN_DECAY         = 1;
+/* La courbe est exponentielle : chaque point rapproche du maximum sans
+   jamais l'atteindre. REGEN_DECAY = 1 annulait tout (1^r = 1 -> p = 0), donc
+   la regen restait bloquee a 5% / 5s pour TOUS les niveaux. */
+const REGEN_DECAY         = 0.98;
 const REGEN_BASE_INTERVAL = 5000;
 const REGEN_MIN_INTERVAL  = 200;
 const REGEN_BASE_START    = 5000;
@@ -70,7 +73,7 @@ function statEffectText(key, lvl) {
         case "s":  return "Air jumps: " + lvl;
         case "r":  {
             const rg = getRegenInfoForPoints(lvl);
-            return "Regen " + round(rg.amount * 100) + "% / " + round(rg.interval / 1000) + "s";
+            return "Regen " + pct(rg.amount) + " / " + timeText(rg.interval);
         }
         case "df": return "Damage taken: " + round(getDefenseMultiplierForPoints(lvl) * 100) + "%";
     }
@@ -79,6 +82,19 @@ function statEffectText(key, lvl) {
 
 function round(value) {
     return Math.round(value * 100) / 100;
+}
+
+/* "5%" / "12.9%" : une decimale suffit, et 5 reste "5" (pas "5.0"). */
+function pct(fraction) {
+    const v = Math.round(fraction * 1000) / 10;
+    return v + "%";
+}
+
+/* "4.8s" / "820ms" : sous la seconde on affiche les ms, sinon on ne verrait
+   aucune difference entre deux paliers de regen. */
+function timeText(ms) {
+    if (ms < 1000) return Math.round(ms) + "ms";
+    return round(ms / 1000) + "s";
 }
 
 /* STAT LEVELS */
