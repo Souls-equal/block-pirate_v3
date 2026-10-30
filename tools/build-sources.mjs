@@ -99,7 +99,7 @@ const ENTRY_POINTS = [
   "onWorldAttemptDespawnMob", "onPlayerDamagingOtherPlayer", "onPlayerDamagingMob",
   "onAttemptKillPlayer", "onPlayerKilledOtherPlayer", "onPlayerKilledMob", "onMobDamagingPlayer",
   "onPlayerDropItem", "onPlayerBoughtShopItem", "onPlayerUsedThrowable",
-  "onBlockStandStart", "tick", "onClose",
+  "tick", "onClose",
 ];
 for (const name of ENTRY_POINTS) {
   if (!new RegExp("(^|[,;{}\\n])" + name + "\\s*=").test(entry))

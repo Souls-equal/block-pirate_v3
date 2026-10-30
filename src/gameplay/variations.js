@@ -4,7 +4,8 @@
 //
 // Le monde est decoupe en variations :
 //   - "default" : le LOBBY (spawn, couloir de lancement, choix de team) ;
-//   - "sea-1"   : la mer 1 (le jeu) ; "sea-2", "sea-3"... viendront plus tard.
+//   - "sea1"    : la mer 1 (le jeu) ; "sea2", "sea3"... viendront plus tard.
+// Les noms doivent rester dans [A-Za-z0-9_-] et faire 1 a 32 caracteres.
 // Chaque mer est une variation separee : les joueurs n'y voient que ceux de
 // la meme mer, ce qui separe les puissances sans serveur supplementaire.
 //
@@ -38,29 +39,13 @@ export const LOBBY = {
     /* Hub "premier passage" (choix de team). */
     hubFirst: [10, 20, 10],
     /* Hub "deja joue" (bouton de reprise). */
-    hubReturning: [166.5, 20, 12.5],
-    /* Couloir de lancement : les blocs sur lesquels marcher pour "lancer le
-       jeu". Completer avec le nom exact des blocs de ton couloir (ou laisser
-       vide et appeler BPSea.launch(playerId) depuis ton bouton). */
-    launchBlocks: [],
-    /* Pads de choix de team dans le hub : nom du bloc -> team. */
-    teamPads: {
-        "Pirate Pad": "PIRATES",
-        "Marine Pad": "MARINES",
-        "Neutral Pad": "NONE"
-    },
-    /* Pad de reprise ("continuer dans ma mer"). */
-    continueBlocks: ["Continue Pad"],
-    /* Rayon (en blocs) autour des centres du hub : marcher dans la zone
-       revient au meme que marcher sur le pad, si les pads ne sont pas des
-       blocs distincts. 0 = desactive. */
-    padRadius: 2
+    hubReturning: [166.5, 20, 12.5]
 };
 
 /* Les mers. `teams` = position d'arrivee de chaque team dans cette mer. */
 export const SEAS = {
     1: {
-        id: "sea-1",
+        id: "sea1",
         title: "Sea 1",
         teams: {
             PIRATES: [-15, -911, 28],
@@ -68,7 +53,7 @@ export const SEAS = {
             MARINES: [885, -906, -276]
         }
     }
-    /* 2: { id: "sea-2", title: "Sea 2", teams: { ... } }, */
+    /* 2: { id: "sea2", title: "Sea 2", teams: { ... } }, */
 };
 
 /* Sauvegarde de la position dans une mer : toutes les N ticks. */
@@ -185,7 +170,7 @@ export function seaFromVariation(variation) {
     return null;
 }
 
-/* Numero (cle) de la mer d'une variation : "sea-1" -> "1". */
+/* Numero (cle) de la mer d'une variation : "sea1" -> "1". */
 export function seaKeyFromVariation(variation) {
     for (const n in SEAS) if (SEAS[n].id === variation) return n;
     return null;
@@ -422,75 +407,30 @@ export function startVariationLoop() {
     setInterval(saveAll, SAVE_EVERY_TICKS);
 }
 
-/* ------------------------------------------------------- interactions monde */
-
-function samePos(a, b, radius) {
-    if (!a || !b) return false;
-    return Math.abs(a[0] - b[0]) <= radius && Math.abs(a[1] - b[1]) <= radius && Math.abs(a[2] - b[2]) <= radius;
-}
-
-function nearHub(pos, blockX, blockY, blockZ) {
-    return samePos(pos, [blockX, blockY, blockZ], LOBBY.padRadius);
-}
-
-function teamFromBlock(blockName) {
-    if (!blockName) return null;
-    const name = String(blockName);
-    if (LOBBY.teamPads[name]) return LOBBY.teamPads[name];
-    const low = name.toLowerCase();
-    if (low.indexOf("pirate") !== -1) return "PIRATES";
-    if (low.indexOf("marine") !== -1) return "MARINES";
-    if (low.indexOf("neutral") !== -1 || low.indexOf("none") !== -1) return "NONE";
-    return null;
-}
-
-function isContinueBlock(blockName) {
-    if (!blockName) return false;
-    const name = String(blockName);
-    if (LOBBY.continueBlocks.indexOf(name) !== -1) return true;
-    return name.toLowerCase().indexOf("continue") !== -1;
-}
-
-function isLaunchBlock(blockName) {
-    if (!blockName) return false;
-    const name = String(blockName);
-    if (LOBBY.launchBlocks.indexOf(name) !== -1) return true;
-    return name.toLowerCase().indexOf("launch") !== -1;
-}
-
-/* Handler onBlockStandStart : tout le parcours du lobby passe par ici. */
-export function onStand(playerId, x, y, z, blockName) {
-    if (!playerId || !variationsSupported()) return false;
-    if (currentVariation() !== LOBBY.variation) return false;
-
-    const team = teamFromBlock(blockName);
-    if (team) return chooseTeam(playerId, team);
-
-    if (isContinueBlock(blockName)) return continueJourney(playerId);
-
-    if (isLaunchBlock(blockName)) return launch(playerId);
-
-    /* Repli par position : le bloc touche est dans la zone d'un pad connu. */
-    if (LOBBY.padRadius > 0) {
-        if (nearHub([x, y, z], LOBBY.hubReturning[0], LOBBY.hubReturning[1], LOBBY.hubReturning[2])) {
-            return continueJourney(playerId);
-        }
-    }
-    return false;
-}
-
 /* ------------------------------------------------------------ api publique
-   Exposee pour les boutons du monde : BPSea.launch(playerId),
-   BPSea.chooseTeam(playerId, "PIRATES"), BPSea.continueJourney(playerId). */
+   A appeler depuis tes Code Blocks (globalThis.BPSea). Aucun bloc ni pad
+   n'est necessaire : c'est TOI qui decides quand appeler quoi.
+
+     BPSea.launch(playerId)                  -> hub + message (1er passage ou retour)
+     BPSea.chooseTeam(playerId, "PIRATES")   -> team + mer 1, au spawn de la team
+     BPSea.continueJourney(playerId)         -> retour dans SA mer, a sa position
+     BPSea.enterSea(playerId, 2)             -> envoie dans la mer 2 (si declaree)
+     BPSea.savePosition(playerId)            -> force une sauvegarde
+     BPSea.playerSea(playerId)               -> numero de mer (0 = jamais joue)
+     BPSea.currentVariation()                -> "default" / "sea1" ...
+
+   Exemple de Code Block (bouton du couloir) :
+     BPSea.launch(playerId);  // ou BPSea.chooseTeam(playerId, "MARINES") */
 export const BPSea = {
-    launch: launch,
-    chooseTeam: chooseTeam,
-    continueJourney: continueJourney,
-    enterSea: enterSea,
-    savePosition: savePosition,
-    playerSea: playerSea,
-    currentVariation: currentVariation,
-    config: { LOBBY: LOBBY, SEAS: SEAS }
+    launch,
+    chooseTeam,
+    continueJourney,
+    enterSea,
+    savePosition,
+    playerSea,
+    currentVariation,
+    isLobby,
+    config: { LOBBY, SEAS }
 };
 
 try {

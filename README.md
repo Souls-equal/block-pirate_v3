@@ -66,7 +66,7 @@ comptent dans la limite.
 > Les commentaires et les noms longs restent donc dans le dépôt (utiles pour
 > maintenir le code) : ils ne coûtent **rien** dans le jeu, puisqu'ils ne partent
 > jamais tels quels. Le script vérifie à la fin que les points d'entrée
-> (`onPlayerClick`, `tick`, `onBlockStandStart`, `onClose`, …) et les ponts
+> (`onPlayerClick`, `tick`, `onClose`, …) et les ponts
 > `globalThis.FA*` ont survécu.
 
 ### Synchronisation `src/` → `world-code/`
@@ -87,30 +87,46 @@ d'origine sont perdus). Modifie donc toujours `src/` : `world-code/` suit tout s
 
 ## Lobby, mers et variations (`src/gameplay/variations.js`)
 
-Le monde est découpé en **variations** Bloxd : un `default` qui sert de **lobby**, puis
-une variation **par mer** (`sea-1`, `sea-2`…). Deux joueurs de mers différentes ne se
-croisent jamais, ce qui sépare les puissances sans multiplier les serveurs.
+Le monde est découpé en **variations** Bloxd : le `default` (la variation de base) sert
+de **lobby**, puis une variation **par mer** (`sea1`, `sea2`…). Deux joueurs de mers
+différentes ne se croisent jamais, ce qui sépare les puissances sans multiplier les
+serveurs. Aucun renommage n'est nécessaire au join : le lobby reste `default`.
 
 **Parcours**
 
 | Moment | Ce qui se passe |
 | --- | --- |
 | Connexion dans le lobby | tp au spawn `82.5 40 -36.5`, titre « Lobby » |
-| Lancement du jeu (couloir), **1re fois** | tp au hub `10 20 10` + choix de team |
-| Lancement du jeu, **déjà joué** | tp au hub `166.5 20 12.5` + reprise |
-| Choix de team | `setPlayerTeam` puis matchmake vers la mer 1, arrivée au spawn de la team |
-| Reprise | matchmake vers sa mer + tp à la position sauvegardée |
+| `BPSea.launch`, **1re fois** | tp au hub `10 20 10` + message de choix de team |
+| `BPSea.launch`, **déjà joué** | tp au hub `166.5 20 12.5` + message de reprise |
+| `BPSea.chooseTeam(id, team)` | `setPlayerTeam` puis matchmake vers la mer 1, arrivée au spawn de la team |
+| `BPSea.continueJourney(id)` | matchmake vers sa mer + tp à la position sauvegardée |
 | Connexion dans une mer | tp à la position sauvegardée (ou au spawn de la team) |
 
-**Réglages** (en haut du fichier) : `LOBBY` (spawn, les deux hubs, blocs de lancement,
-pads de team, rayon) et `SEAS` (une entrée par mer avec ses positions de team).
-Ajouter la mer 2 = ajouter une entrée `2: { id: "sea-2", title: "Sea 2", teams: {...} }`.
+**Aucun bloc, aucun pad.** Il n'y a rien à poser dans le monde : ce sont des fonctions
+à appeler depuis tes propres **Code Blocks**, exposées sur `globalThis.BPSea` :
 
-**Déclencher depuis le monde** : les boutons du lobby peuvent appeler
-`BPSea.launch(playerId)`, `BPSea.chooseTeam(playerId, "PIRATES" | "MARINES" | "NONE")`,
-`BPSea.continueJourney(playerId)` ou `BPSea.enterSea(playerId, 2)`. Le handler
-`onBlockStandStart` fait la même chose pour les blocs dont le nom contient
-`launch` / `pirate` / `marine` / `continue` (voir `LOBBY.launchBlocks`, `LOBBY.teamPads`).
+| Fonction | Effet |
+| --- | --- |
+| `BPSea.launch(playerId)` | envoie au hub (1re fois) ou au hub de reprise |
+| `BPSea.chooseTeam(playerId, "PIRATES" \| "MARINES" \| "NONE")` | fixe la team, envoie en mer 1 au spawn de la team |
+| `BPSea.continueJourney(playerId)` | renvoie dans **sa** mer, à **sa** position |
+| `BPSea.enterSea(playerId, 2)` | envoie dans la mer 2 (si elle est déclarée) |
+| `BPSea.savePosition(playerId)` | force une sauvegarde de position |
+| `BPSea.playerSea(playerId)` | numéro de mer du joueur (`0` = jamais joué) |
+| `BPSea.currentVariation()` | `"default"`, `"sea1"`… |
+
+```js
+// Code Block du couloir (ou d'un bouton) : rien d'autre à faire.
+BPSea.launch(playerId);
+// Puis, dans le hub :
+BPSea.chooseTeam(playerId, "PIRATES");
+```
+
+**Réglages** (en haut du fichier) : `LOBBY` (spawn, les deux hubs) et `SEAS` (une entrée
+par mer avec ses positions de team). Ajouter la mer 2 = ajouter une entrée
+`2: { id: "sea2", title: "Sea 2", teams: { PIRATES: [...], NONE: [...], MARINES: [...] } }`
+puis créer la variation `sea2` dans le Code Editor.
 
 **Données stockées** — trois clés courtes seulement, aucune clé existante touchée :
 
@@ -136,7 +152,7 @@ passe par `say()` / `shout()` (ou par le patch de l'API posé au démarrage), qu
 
 | Élément | Couleur | Valeur |
 | --- | --- | --- |
-| Pirates | rouge | `#FF5C59` |
+| Pirates | rouge | `#E63946` |
 | Marines | bleu clair | `#7DD3FC` |
 | Argent | jaune doré | `#FFD700` |
 | XP | cyan | `#22D3EE` |

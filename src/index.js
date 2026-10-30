@@ -25,7 +25,7 @@ import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlay
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { installTheme as installTheme, shout } from "./core/theme";
-import { variationJoin as variationJoin, variationLeave as variationLeave, onStand as variationStand, startVariationLoop as startVariationLoop } from "./gameplay/variations";
+import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop } from "./gameplay/variations";
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
@@ -145,8 +145,6 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     /* Dernier : la variation decide de la position d'arrivee (spawn du lobby,
        position sauvegardee dans la mer, ou arrivee en attente). */
     Gt("variation", () => variationJoin(t));
-}, onBlockStandStart = (t, r, a, i, e) => {
-    Gt("variation.stand", () => variationStand(t, r, a, i, e));
 }, onPlayerLeave = t => {
     Gt("variation.leave", () => variationLeave(t));
     k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t);
