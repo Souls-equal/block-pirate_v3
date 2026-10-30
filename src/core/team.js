@@ -419,6 +419,14 @@ export function normalizeCaps(message) {
     return text;
 }
 
+/* Dernier canal utilise par joueur (voir handleChat). */
+const LAST_CHANNEL = {};
+
+/* Appele a la deconnexion : la table ne doit pas grossir sans fin. */
+export function forgetChatChannel(playerId) {
+    delete LAST_CHANNEL[playerId];
+}
+
 export function handleChat(playerId, message, channel) {
     if (isVanished(playerId)) {
         say(playerId, [
@@ -483,10 +491,17 @@ export function handleChat(playerId, message, channel) {
        La permission sert a LIRE les autres canaux, pas a parler a tout le
        monde en blanc. */
 
-    /* Le moteur renvoie le nom du canal tel qu'il a ete enregistre, mais on
-       normalise : un canal vide ou avec une autre casse ne doit jamais faire
-       disparaitre le message (il repart alors en Global). */
-    const chan = (typeof channel === "string" ? channel.toUpperCase() : "") || CHAT_CHANNEL.GLOBAL;
+    /* Le moteur renvoie le nom du canal tel qu'il a ete enregistre. S'il ne
+       le fournit pas (ou avec une casse differente), on reprend le DERNIER
+       canal utilise par ce joueur plutot que de retomber en Global : un
+       message d'equipe ne doit jamais partir a tout le monde. Le passe-droit
+       des admins sert a LIRE les autres canaux, pas a elargir les leurs. */
+    let chan = typeof channel === "string" ? channel.toUpperCase() : "";
+    if (chan !== CHAT_CHANNEL.GLOBAL && chan !== CHAT_CHANNEL.TEAM && chan !== CHAT_CHANNEL.CREW) {
+        chan = LAST_CHANNEL[playerId] || CHAT_CHANNEL.GLOBAL;
+    } else {
+        LAST_CHANNEL[playerId] = chan;
+    }
 
     /* GLOBAL */
     if (chan === CHAT_CHANNEL.GLOBAL) {

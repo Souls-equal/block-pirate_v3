@@ -14,7 +14,7 @@
 
 /* Palette. Une seule teinte par role, partout dans le jeu. */
 export const C = {
-    PIRATE: "#FF7F50", /* Pirates — rouge corail */
+    PIRATE: "#E63946", /* Pirates — rouge (plus rouge que le corail d'origine) */
     MARINE: "#7DD3FC", /* Marines — bleu clair */
     MONEY: "#FFD700", /* Argent — jaune dore */
     XP: "#22D3EE", /* XP — cyan */

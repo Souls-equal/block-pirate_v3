@@ -1,0 +1,49 @@
+name: world-code sync
+
+# Le World Code compresse (world-code/) est genere depuis src/.
+# - push sur main  : on le regenere et on commit tout seul ;
+# - pull request   : on verifie qu'il est a jour (echec sinon).
+# L'inverse (modifier world-code/ a la main) n'est pas reconstruit vers src/ :
+# on ne peut pas « de-minifier » du code, donc la CI le signale au lieu de
+# deviner. Modifie toujours src/, puis `npm run build:src`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer les dependances
+        run: npm ci || npm install
+
+      - name: Regenerer world-code/ (push sur main)
+        if: github.event_name == 'push'
+        run: |
+          node tools/build-sources.mjs
+          git add -A world-code
+          if git diff --cached --quiet; then
+            echo "world-code/ deja a jour"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "world-code synchronise avec src/"
+          git push
+
+      - name: Verifier world-code/ (pull request)
+        if: github.event_name == 'pull_request'
+        run: node tools/build-sources.mjs --check
