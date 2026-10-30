@@ -555,16 +555,25 @@ contraignant**. Remettre une vitesse normale (`>= 1`) ou relâcher la caméra (`
 toujours — sinon un sort interrompu laisserait la victime figée.
 
 Ce qui reste : les **dégâts** (on peut frapper un admin) et les **buffs** (Speed,
-Health Regen…). Et surtout **son propre déplacement** : `withEffectSource()` ouvre une
-fenêtre de 2,5 s autour de chaque cast, donc un admin garde ses dashes. Sans cette
-fenêtre, « immunisé au déplacement » aurait aussi annulé ses propres capacités.
+Health Regen…). Et surtout **son propre déplacement** : un admin garde ses dashes, ses
+téléports et ses dashs aériens.
 
-Cette fenêtre ne profite qu'au lanceur : pendant le cast de **quelqu'un d'autre**, seule la
-personne à l'origine du cast peut bouger. Un admin qui vient d'utiliser une capacité reste
-donc intouchable face à un Control qui l'attrape dans la seconde — sans ça, il suffisait
-d'attendre son cast pour le contrôler quand même.
+**La provenance, pas un minuteur.** La première version ouvrait une fenêtre de 2,5 s
+autour de chaque cast : n'importe quel clic d'item rendait l'admin déplaçable pendant
+2,5 s, et Control Domain en profitait à chaque tick. Il suffisait de jouer normalement
+pour être contrôlé. Le remplacement est un **acteur** (`utils/timer`) :
 
-Les **effets** (`Slowness`, `Weakness`…) n'utilisent pas cette fenêtre : ils sont refusés
+* `withEffectSource(joueur, …)` pose l'acteur pendant le cast ;
+* `run()` mémorise l'acteur de la coroutine et le restaure à chaque reprise, donc
+  `sleep()` ne le perd pas ;
+* `call()` (chargeur des Code Blocks) le pose au nom du joueur qui déclenche le handler.
+
+Une primitive de déplacement n'est donc autorisée que si **l'acteur est la cible
+elle-même** : le joueur qui se déplace, jamais celui qui a cliqué deux secondes plus tôt.
+Un admin qui utilise une capacité pendant le dôme bouge (c'est son cast), et les
+téléports du dôme — qui portent l'acteur du lanceur du dôme — sont refusés.
+
+Les **effets** (`Slowness`, `Weakness`…) ignorent totalement l'acteur : ils sont refusés
 pour un rang immunisé dans tous les cas, c'est le point le plus simple à tester
 (`eff(adminId, "Slowness", 3000, { inbuiltLevel: 3 })` ne fait rien).
 

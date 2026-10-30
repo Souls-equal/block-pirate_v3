@@ -110,7 +110,7 @@ import {
   sub,
   to,
 } from "../utils/fx";
-import { run, setInterval, setTimeout, sleep, step, until } from "../utils/timer";
+import { getActor, run, setInterval, setTimeout, sleep, step, until, withActor } from "../utils/timer";
 import {
   blockAt,
   clearIf,
@@ -572,7 +572,12 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       }
       return undefined;
     }
-    return fn.apply(null, args);
+    /* Ceinture de securite : un handler `onPlayer*(joueur, ...)` est execute
+       au nom de ce joueur. Si l'appelant n'a pas deja pose l'acteur (cast
+       d'une capacite), on le pose ici, pour que ses propres deplacements
+       restent autorises et que ceux des autres restent bloques. */
+    if (getActor() || !args || !args[0]) return fn.apply(null, args);
+    return withActor(args[0], () => fn.apply(null, args));
   }
 
   FA.reload = reload;
