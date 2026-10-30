@@ -66,7 +66,63 @@ comptent dans la limite.
 > Les commentaires et les noms longs restent donc dans le dépôt (utiles pour
 > maintenir le code) : ils ne coûtent **rien** dans le jeu, puisqu'ils ne partent
 > jamais tels quels. Le script vérifie à la fin que les points d'entrée
-> (`onPlayerClick`, `tick`, `onClose`, …) et les ponts `globalThis.FA*` ont survécu.
+> (`onPlayerClick`, `tick`, `onBlockStandStart`, `onClose`, …) et les ponts
+> `globalThis.FA*` ont survécu.
+
+### Synchronisation `src/` → `world-code/`
+
+`world-code/` est **généré** : ne l'édite pas à la main.
+
+* `npm run build:src` (ou `npm run sync`) le régénère depuis `src/` ;
+* `npm run check` échoue si `world-code/` n'est pas à jour (fichiers manquants,
+  modifiés ou orphelins) ;
+* la CI (`.github/workflows/world-code-sync.yml`) le régénère et le commit
+  automatiquement sur `main`, et bloque une PR qui l'aurait laissé périmé.
+
+Le sens inverse n'est pas automatique **par construction** : on ne peut pas
+reconstruire du code lisible à partir du code compacté (commentaires et noms
+d'origine sont perdus). Modifie donc toujours `src/` : `world-code/` suit tout seul.
+
+---
+
+## Lobby, mers et variations (`src/gameplay/variations.js`)
+
+Le monde est découpé en **variations** Bloxd : un `default` qui sert de **lobby**, puis
+une variation **par mer** (`sea-1`, `sea-2`…). Deux joueurs de mers différentes ne se
+croisent jamais, ce qui sépare les puissances sans multiplier les serveurs.
+
+**Parcours**
+
+| Moment | Ce qui se passe |
+| --- | --- |
+| Connexion dans le lobby | tp au spawn `82.5 40 -36.5`, titre « Lobby » |
+| Lancement du jeu (couloir), **1re fois** | tp au hub `10 20 10` + choix de team |
+| Lancement du jeu, **déjà joué** | tp au hub `166.5 20 12.5` + reprise |
+| Choix de team | `setPlayerTeam` puis matchmake vers la mer 1, arrivée au spawn de la team |
+| Reprise | matchmake vers sa mer + tp à la position sauvegardée |
+| Connexion dans une mer | tp à la position sauvegardée (ou au spawn de la team) |
+
+**Réglages** (en haut du fichier) : `LOBBY` (spawn, les deux hubs, blocs de lancement,
+pads de team, rayon) et `SEAS` (une entrée par mer avec ses positions de team).
+Ajouter la mer 2 = ajouter une entrée `2: { id: "sea-2", title: "Sea 2", teams: {...} }`.
+
+**Déclencher depuis le monde** : les boutons du lobby peuvent appeler
+`BPSea.launch(playerId)`, `BPSea.chooseTeam(playerId, "PIRATES" | "MARINES" | "NONE")`,
+`BPSea.continueJourney(playerId)` ou `BPSea.enterSea(playerId, 2)`. Le handler
+`onBlockStandStart` fait la même chose pour les blocs dont le nom contient
+`launch` / `pirate` / `marine` / `continue` (voir `LOBBY.launchBlocks`, `LOBBY.teamPads`).
+
+**Données stockées** — trois clés courtes seulement, aucune clé existante touchée :
+
+| Clé | Contenu | Exemple |
+| --- | --- | --- |
+| `vsea` | numéro de la mer du joueur | `1` |
+| `vp<N>` | position sauvegardée dans la mer N (`x,y,z` entiers) | `120,-900,-45` |
+| `vtp` | arrivée en attente, consommée au join (saut de variation) | `-15,-911,28` |
+
+La position est écrite toutes les 10 s dans une mer, et à la déconnexion. Les joueurs
+d'avant les variations (qui ont déjà une team) sont considérés comme étant en mer 1 :
+on ne leur redemande pas de choisir.
 
 ---
 
@@ -80,7 +136,7 @@ passe par `say()` / `shout()` (ou par le patch de l'API posé au démarrage), qu
 
 | Élément | Couleur | Valeur |
 | --- | --- | --- |
-| Pirates | rouge corail | `#FF7F50` |
+| Pirates | rouge | `#FF5C59` |
 | Marines | bleu clair | `#7DD3FC` |
 | Argent | jaune doré | `#FFD700` |
 | XP | cyan | `#22D3EE` |
@@ -133,6 +189,7 @@ un si nécessaire — jamais tout le message.
 │   ├── core/                     # UI, équipages, grades, admin
 │   │   └── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
+│   │   └── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)

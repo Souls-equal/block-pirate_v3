@@ -54,10 +54,13 @@ function walk(dir, out = []) {
 const files = walk(SRC).sort();
 if (!files.length) throw new Error(`Aucun fichier source dans ${SRC}`);
 
-fs.rmSync(OUT, { recursive: true, force: true });
+/* --check : ne rien ecrire, juste verifier que world-code/ est a jour.
+   Utilise par `npm run check` et par la CI (voir .github/workflows). */
+const CHECK_ONLY = process.argv.includes("--check");
 
 let sourceChars = 0;
 const rows = [];
+const outputs = [];
 for (const file of files) {
   const rel = path.relative(SRC, file).replace(/\\/g, "/");
   const source = fs.readFileSync(file, "utf8");
@@ -83,9 +86,7 @@ for (const file of files) {
   code = code.trim();
   if (!code.endsWith(";") && !code.endsWith("}")) code += ";";
 
-  const target = path.join(OUT, rel);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, code, "utf8");
+  outputs.push({ rel, code });
   rows.push({ rel, before: source.length, after: code.length });
 }
 
@@ -97,7 +98,8 @@ const ENTRY_POINTS = [
   "onPlayerChat", "onEntityDeleted", "onEntityCollision", "onWorldAttemptSpawnMob",
   "onWorldAttemptDespawnMob", "onPlayerDamagingOtherPlayer", "onPlayerDamagingMob",
   "onAttemptKillPlayer", "onPlayerKilledOtherPlayer", "onPlayerKilledMob", "onMobDamagingPlayer",
-  "onPlayerDropItem", "onPlayerBoughtShopItem", "onPlayerUsedThrowable", "tick", "onClose",
+  "onPlayerDropItem", "onPlayerBoughtShopItem", "onPlayerUsedThrowable",
+  "onBlockStandStart", "tick", "onClose",
 ];
 for (const name of ENTRY_POINTS) {
   if (!new RegExp("(^|[,;{}\\n])" + name + "\\s*=").test(entry))
@@ -117,6 +119,39 @@ const saved = Math.round((1 - total / sourceChars) * 100);
 console.log(`World Code compact  : ${total.toLocaleString("fr-FR")} car. ` +
   `(${pct} % des ${WORLD_LIMIT.toLocaleString("fr-FR")} autorisés, -${saved} % vs sources)`);
 console.log(`Sources lisibles    : ${sourceChars.toLocaleString("fr-FR")} car.`);
+/* Ecriture (ou verification en mode --check). */
+if (CHECK_ONLY) {
+  const stale = [];
+  const extra = [];
+  for (const out of outputs) {
+    const target = path.join(OUT, out.rel);
+    if (!fs.existsSync(target)) { stale.push(out.rel + " (manquant)"); continue; }
+    if (fs.readFileSync(target, "utf8") !== out.code) stale.push(out.rel);
+  }
+  const expected = new Set(outputs.map((o) => o.rel).concat(["README.md"]));
+  if (fs.existsSync(OUT)) {
+    for (const rel of walk(OUT).map((f) => path.relative(OUT, f).replace(/\\/g, "/")))
+      if (!expected.has(rel)) extra.push(rel);
+  }
+  if (stale.length || extra.length) {
+    console.error("world-code/ n'est pas a jour par rapport a src/ :");
+    for (const f of stale.slice(0, 12)) console.error("  - " + f);
+    if (stale.length > 12) console.error(`  ... ${stale.length - 12} autre(s)`);
+    for (const f of extra) console.error("  + " + f + " (n'existe plus dans src/)");
+    console.error("Lance `npm run build:src` puis commit world-code/.");
+    process.exit(1);
+  }
+  console.log(`world-code/ a jour (${outputs.length} fichiers, ${total.toLocaleString("fr-FR")} car.)`);
+  process.exit(0);
+}
+
+fs.rmSync(OUT, { recursive: true, force: true });
+for (const out of outputs) {
+  const target = path.join(OUT, out.rel);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, out.code, "utf8");
+}
+
 /* README du dossier : dit quoi copier, où, et ce qui change. */
 const readme = [
   "# world-code/ - World Code compact (genere, NE PAS EDITER A LA MAIN)",

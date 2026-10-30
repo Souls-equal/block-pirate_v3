@@ -1,0 +1,498 @@
+// gameplay/variations.js
+//
+// LOBBY + MERS (variations Bloxd)
+//
+// Le monde est decoupe en variations :
+//   - "default" : le LOBBY (spawn, couloir de lancement, choix de team) ;
+//   - "sea-1"   : la mer 1 (le jeu) ; "sea-2", "sea-3"... viendront plus tard.
+// Chaque mer est une variation separee : les joueurs n'y voient que ceux de
+// la meme mer, ce qui separe les puissances sans serveur supplementaire.
+//
+// DEROULEMENT
+//   1. Connexion dans le lobby  -> tp au spawn du lobby.
+//   2. Le joueur prend le couloir et lance le jeu :
+//        - jamais joue : tp au hub "premier passage" et choix de team ;
+//        - deja joue   : tp au hub "retour", avec de quoi repartir dans SA mer.
+//   3. Choix de team (ou reprise) -> matchmake vers la mer + tp a la position
+//      sauvegardee de cette mer (ou au spawn de la team la premiere fois).
+//
+// REGLES DE STOCKAGE (db par joueur = quota de caracteres, le nom du joueur
+// compte dedans) : on n'ajoute que des cles tres courtes et rien d'autre.
+//   vsea : numero de la mer du joueur (1, 2, ...). Absent = jamais joue.
+//   vp<N> : position sauvegardee dans la mer N, compacte "x,y,z" (entiers).
+//   vtp  : position d'arrivee en attente (consommee et supprimee au join).
+// Aucune cle existante (money, lvl, team, xp...) n'est modifiee.
+
+import { setInterval } from "../utils/timer";
+import { C, say } from "../core/theme";
+import { forgetChatChannel } from "../core/team";
+
+/* ---------------------------------------------------------------- reglages */
+
+export const LOBBY = {
+    /* Variation du lobby (celle du jeu de base). */
+    variation: "default",
+    title: "Lobby",
+    /* Spawn a la connexion. */
+    spawn: [82.5, 40, -36.5],
+    /* Hub "premier passage" (choix de team). */
+    hubFirst: [10, 20, 10],
+    /* Hub "deja joue" (bouton de reprise). */
+    hubReturning: [166.5, 20, 12.5],
+    /* Couloir de lancement : les blocs sur lesquels marcher pour "lancer le
+       jeu". Completer avec le nom exact des blocs de ton couloir (ou laisser
+       vide et appeler BPSea.launch(playerId) depuis ton bouton). */
+    launchBlocks: [],
+    /* Pads de choix de team dans le hub : nom du bloc -> team. */
+    teamPads: {
+        "Pirate Pad": "PIRATES",
+        "Marine Pad": "MARINES",
+        "Neutral Pad": "NONE"
+    },
+    /* Pad de reprise ("continuer dans ma mer"). */
+    continueBlocks: ["Continue Pad"],
+    /* Rayon (en blocs) autour des centres du hub : marcher dans la zone
+       revient au meme que marcher sur le pad, si les pads ne sont pas des
+       blocs distincts. 0 = desactive. */
+    padRadius: 2
+};
+
+/* Les mers. `teams` = position d'arrivee de chaque team dans cette mer. */
+export const SEAS = {
+    1: {
+        id: "sea-1",
+        title: "Sea 1",
+        teams: {
+            PIRATES: [-15, -911, 28],
+            NONE: [635, -900, -206],
+            MARINES: [885, -906, -276]
+        }
+    }
+    /* 2: { id: "sea-2", title: "Sea 2", teams: { ... } }, */
+};
+
+/* Sauvegarde de la position dans une mer : toutes les N ticks. */
+const SAVE_EVERY_TICKS = 200; /* 10 s a 20 tps */
+
+/* ------------------------------------------------------------------- etat */
+
+const lastSaved = {};   /* playerId -> "x,y,z" deja ecrit (evite les ecritures inutiles) */
+const notice = {};     /* anti-spam des messages */
+let hooks = null;
+
+/* Injection de dependances (evite les imports circulaires avec team/UI). */
+export function setVariationHooks(h) {
+    hooks = h || null;
+}
+
+/* ---------------------------------------------------------------- helpers */
+
+function num(playerId, key) {
+    try {
+        const v = api.getPlayerDbValue(playerId, key);
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+function put(playerId, key, value) {
+    try {
+        api.setPlayerDbValue(playerId, key, value);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function drop(playerId, key) {
+    try {
+        api.deletePlayerDbValue(playerId, key);
+    } catch (e) {}
+}
+
+/* Position compacte : entiers, "x,y,z" (le moins de caracteres possible). */
+function packPos(pos) {
+    if (!pos || pos.length < 3) return null;
+    return Math.round(pos[0]) + "," + Math.round(pos[1]) + "," + Math.round(pos[2]);
+}
+
+function unpackPos(str) {
+    if (typeof str !== "string") return null;
+    const p = str.split(",");
+    if (p.length < 3) return null;
+    const x = Number(p[0]), y = Number(p[1]), z = Number(p[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    return [x, y, z];
+}
+
+function teleport(playerId, pos) {
+    if (!pos) return false;
+    try {
+        api.setPosition(playerId, pos[0], pos[1], pos[2]);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function positionOf(playerId) {
+    try {
+        const p = api.getPosition(playerId);
+        return p && p.length >= 3 ? p : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function throttled(playerId, key, ms) {
+    const now = Date.now();
+    const full = playerId + "|" + key;
+    if (notice[full] && now - notice[full] < ms) return false;
+    notice[full] = now;
+    return true;
+}
+
+function tell(playerId, segments, key) {
+    if (key && !throttled(playerId, key, 3000)) return;
+    say(playerId, segments);
+}
+
+/* -------------------------------------------------------------- variations */
+
+/* Variation courante. Renvoie LOBBY.variation si le moteur ne fournit rien. */
+export function currentVariation() {
+    try {
+        const v = api.getVariation();
+        return typeof v === "string" && v ? v : LOBBY.variation;
+    } catch (e) {
+        return LOBBY.variation;
+    }
+}
+
+export function isLobby() {
+    return currentVariation() === LOBBY.variation;
+}
+
+/* Numero de mer -> definition. */
+export function seaByNumber(n) {
+    return SEAS[n] || null;
+}
+
+export function seaFromVariation(variation) {
+    for (const n in SEAS) if (SEAS[n].id === variation) return SEAS[n];
+    return null;
+}
+
+/* Numero (cle) de la mer d'une variation : "sea-1" -> "1". */
+export function seaKeyFromVariation(variation) {
+    for (const n in SEAS) if (SEAS[n].id === variation) return n;
+    return null;
+}
+
+/* La mer du joueur (0 = jamais joue).
+   Migration douce : les joueurs d'avant les variations n'ont pas `vsea`, mais
+   ils ont deja une team -> on les considere comme etant en mer 1, sans leur
+   redemander de choisir. Aucune de leurs autres donnees n'est touchee. */
+export function playerSea(playerId) {
+    const n = num(playerId, "vsea");
+    if (n > 0) return n;
+    const team = teamOf(playerId);
+    return team === "PIRATES" || team === "MARINES" ? 1 : 0;
+}
+
+/* Le moteur accepte-t-il les variations ? (sinon on ne fait rien du tout) */
+export function variationsSupported() {
+    return typeof api.getVariation === "function" && typeof api.matchmakeToVariation === "function";
+}
+
+/* Titre affiche en haut a gauche (Sea 1, Lobby...). */
+function applyTitle(playerId, title) {
+    try {
+        api.setClientOption(playerId, "customVariationTitle", title);
+    } catch (e) {}
+}
+
+function moveToVariation(playerId, variation) {
+    try {
+        api.matchmakeToVariation(playerId, variation);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/* ---------------------------------------------------------------- parcours */
+
+/* Position d'arrivee d'une team dans une mer (ou spawn de la mer). */
+function teamSpawn(sea, teamId) {
+    if (!sea) return null;
+    return sea.teams[teamId] || sea.teams.NONE || null;
+}
+
+/* Ecrit la position d'arrivee avant un changement de variation : elle sera
+   appliquee au join (le saut de variation recharge le joueur). */
+function setPending(playerId, pos) {
+    const packed = packPos(pos);
+    if (packed) put(playerId, "vtp", packed);
+}
+
+/* Envoie le joueur dans sa mer (creee avec la team si besoin). */
+export function enterSea(playerId, seaNumber, pos) {
+    const n = Number(seaNumber) || playerSea(playerId) || 1;
+    const sea = seaByNumber(n);
+    if (!sea) return false;
+    if (!variationsSupported()) return false;
+    put(playerId, "vsea", n);
+    setPending(playerId, pos || unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
+    return moveToVariation(playerId, sea.id);
+}
+
+function getDb(playerId, key) {
+    try {
+        return api.getPlayerDbValue(playerId, key);
+    } catch (e) {
+        return undefined;
+    }
+}
+
+/* Team du joueur, lue dans SA db (sans dependre de core/team). */
+export function teamOf(playerId) {
+    const t = getDb(playerId, "team");
+    return typeof t === "string" && t ? t : "NONE";
+}
+
+function applyTeam(playerId, teamId) {
+    let ok = false;
+    try {
+        if (typeof setPlayerTeam === "function") {
+            setPlayerTeam(playerId, teamId);
+            ok = true;
+        }
+    } catch (e) {}
+    if (!ok) {
+        ok = put(playerId, "team", teamId);
+        try {
+            if (savedTeamHook) savedTeamHook(playerId);
+        } catch (e) {}
+    }
+    return ok;
+}
+
+let savedTeamHook = null;
+export function setTeamAppliedHook(fn) { savedTeamHook = fn; }
+
+/* Choix de la team dans le hub : on enregistre, puis on envoie dans la mer 1. */
+export function chooseTeam(playerId, teamId) {
+    const team = teamId === "PIRATES" || teamId === "MARINES" ? teamId : "NONE";
+    const firstTime = playerSea(playerId) === 0;
+    const n = firstTime ? 1 : playerSea(playerId);
+    const sea = seaByNumber(n) || SEAS[1];
+    applyTeam(playerId, team);
+    put(playerId, "vsea", n);
+    setPending(playerId, teamSpawn(sea, team));
+    const ok = moveToVariation(playerId, sea.id);
+    tell(playerId, [
+        { icon: "fa-solid fa-compass", style: { color: C.MARINE } },
+        { str: ok ? " Sailing to " : " Could not board ", style: { color: C.INFO } },
+        { str: sea.title, style: { color: C.XP, fontWeight: "bold" } },
+        { str: " as " + (team === "PIRATES" ? "Pirates" : team === "MARINES" ? "Marines" : "No Team"), style: { color: C.PIRATE } }
+    ]);
+    return ok;
+}
+
+/* Bouton "reprendre" du hub retour : renvoie dans SA mer, a sa position. */
+export function continueJourney(playerId) {
+    const n = playerSea(playerId) || 1;
+    const sea = seaByNumber(n) || SEAS[1];
+    setPending(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
+    const ok = moveToVariation(playerId, sea.id);
+    tell(playerId, [
+        { icon: "fa-solid fa-anchor", style: { color: C.MARINE } },
+        { str: ok ? " Welcome back to " : " Could not board ", style: { color: C.INFO } },
+        { str: sea.title, style: { color: C.XP, fontWeight: "bold" } }
+    ]);
+    return ok;
+}
+
+/* Lancement depuis le couloir : premier passage ou reprise. */
+export function launch(playerId) {
+    const firstTime = playerSea(playerId) === 0;
+    teleport(playerId, firstTime ? LOBBY.hubFirst : LOBBY.hubReturning);
+    if (firstTime) {
+        say(playerId, [
+            { icon: "fa-solid fa-user-group", style: { color: C.MONEY } },
+            { str: " Choose your side: ", style: { color: C.INFO } },
+            { str: "Pirates", style: { color: C.PIRATE, fontWeight: "bold" } },
+            { str: " / ", style: { color: C.INFO } },
+            { str: "Marines", style: { color: C.MARINE, fontWeight: "bold" } },
+            { str: " / ", style: { color: C.INFO } },
+            { str: "None", style: { color: C.INFO, fontWeight: "bold" } }
+        ]);
+    } else {
+        say(playerId, [
+            { icon: "fa-solid fa-anchor", style: { color: C.MARINE } },
+            { str: " Continue your journey in ", style: { color: C.INFO } },
+            { str: (seaByNumber(playerSea(playerId)) || SEAS[1]).title, style: { color: C.XP, fontWeight: "bold" } }
+        ]);
+    }
+    return true;
+}
+
+/* --------------------------------------------------------------- cycle vie */
+
+/* A appeler au join (toutes variations). */
+export function variationJoin(playerId) {
+    if (!playerId || !variationsSupported()) return false;
+    const variation = currentVariation();
+    if (variation === LOBBY.variation) {
+        applyTitle(playerId, LOBBY.title);
+        teleport(playerId, LOBBY.spawn);
+        return true;
+    }
+
+    const sea = seaFromVariation(variation);
+    const title = sea ? sea.title : variation;
+    applyTitle(playerId, title);
+    if (!sea) return true;
+
+    const key = seaKeyFromVariation(variation) || "1";
+    const pending = unpackPos(getDb(playerId, "vtp"));
+    if (pending) {
+        drop(playerId, "vtp");
+        teleport(playerId, pending);
+    } else {
+        const saved = unpackPos(getDb(playerId, "vp" + key));
+        teleport(playerId, saved || teamSpawn(sea, teamOf(playerId)));
+    }
+    return true;
+}
+
+/* Sauvegarde la position du joueur s'il est dans une mer. */
+export function savePosition(playerId) {
+    if (!playerId || !variationsSupported()) return false;
+    const variation = currentVariation();
+    if (variation === LOBBY.variation) return false;
+    const sea = seaFromVariation(variation);
+    if (!sea) return false;
+    const key = seaKeyFromVariation(variation) || "1";
+    const packed = packPos(positionOf(playerId));
+    if (!packed || lastSaved[playerId] === packed) return false;
+    lastSaved[playerId] = packed;
+    return put(playerId, "vp" + key, packed);
+}
+
+/* A appeler en quittant : derniere sauvegarde puis oubli de l'etat memoire. */
+export function variationLeave(playerId) {
+    try {
+        savePosition(playerId);
+    } catch (e) {}
+    delete lastSaved[playerId];
+    for (const key in notice) if (key.indexOf(playerId + "|") === 0) delete notice[key];
+    /* Meme raison pour le dernier canal de chat memorise (core/team.js). */
+    try {
+        forgetChatChannel(playerId);
+    } catch (e) {}
+}
+
+/* Sauvegarde periodique de tous les joueurs de la variation. */
+function saveAll() {
+    if (!variationsSupported()) return;
+    if (currentVariation() === LOBBY.variation) return;
+    let ids = [];
+    try {
+        ids = api.getPlayerIds() || [];
+    } catch (e) {
+        return;
+    }
+    for (let i = 0; i < ids.length; i++) {
+        try {
+            savePosition(ids[i]);
+        } catch (e) {}
+    }
+}
+
+let loopStarted = false;
+
+/* Branche la sauvegarde periodique (appelee une fois au demarrage). */
+export function startVariationLoop() {
+    if (loopStarted) return;
+    loopStarted = true;
+    setInterval(saveAll, SAVE_EVERY_TICKS);
+}
+
+/* ------------------------------------------------------- interactions monde */
+
+function samePos(a, b, radius) {
+    if (!a || !b) return false;
+    return Math.abs(a[0] - b[0]) <= radius && Math.abs(a[1] - b[1]) <= radius && Math.abs(a[2] - b[2]) <= radius;
+}
+
+function nearHub(pos, blockX, blockY, blockZ) {
+    return samePos(pos, [blockX, blockY, blockZ], LOBBY.padRadius);
+}
+
+function teamFromBlock(blockName) {
+    if (!blockName) return null;
+    const name = String(blockName);
+    if (LOBBY.teamPads[name]) return LOBBY.teamPads[name];
+    const low = name.toLowerCase();
+    if (low.indexOf("pirate") !== -1) return "PIRATES";
+    if (low.indexOf("marine") !== -1) return "MARINES";
+    if (low.indexOf("neutral") !== -1 || low.indexOf("none") !== -1) return "NONE";
+    return null;
+}
+
+function isContinueBlock(blockName) {
+    if (!blockName) return false;
+    const name = String(blockName);
+    if (LOBBY.continueBlocks.indexOf(name) !== -1) return true;
+    return name.toLowerCase().indexOf("continue") !== -1;
+}
+
+function isLaunchBlock(blockName) {
+    if (!blockName) return false;
+    const name = String(blockName);
+    if (LOBBY.launchBlocks.indexOf(name) !== -1) return true;
+    return name.toLowerCase().indexOf("launch") !== -1;
+}
+
+/* Handler onBlockStandStart : tout le parcours du lobby passe par ici. */
+export function onStand(playerId, x, y, z, blockName) {
+    if (!playerId || !variationsSupported()) return false;
+    if (currentVariation() !== LOBBY.variation) return false;
+
+    const team = teamFromBlock(blockName);
+    if (team) return chooseTeam(playerId, team);
+
+    if (isContinueBlock(blockName)) return continueJourney(playerId);
+
+    if (isLaunchBlock(blockName)) return launch(playerId);
+
+    /* Repli par position : le bloc touche est dans la zone d'un pad connu. */
+    if (LOBBY.padRadius > 0) {
+        if (nearHub([x, y, z], LOBBY.hubReturning[0], LOBBY.hubReturning[1], LOBBY.hubReturning[2])) {
+            return continueJourney(playerId);
+        }
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------ api publique
+   Exposee pour les boutons du monde : BPSea.launch(playerId),
+   BPSea.chooseTeam(playerId, "PIRATES"), BPSea.continueJourney(playerId). */
+export const BPSea = {
+    launch: launch,
+    chooseTeam: chooseTeam,
+    continueJourney: continueJourney,
+    enterSea: enterSea,
+    savePosition: savePosition,
+    playerSea: playerSea,
+    currentVariation: currentVariation,
+    config: { LOBBY: LOBBY, SEAS: SEAS }
+};
+
+try {
+    globalThis.BPSea = BPSea;
+} catch (e) {}

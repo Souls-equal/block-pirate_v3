@@ -243,25 +243,46 @@ export function spawnEnemy(callerId, pos, type, name, amount, level, rank) {
 
         try { api.setMobSetting(mobId, "metaInfo", buildMobMeta(level, rank, xpReward, moneyMin, moneyMax, fullName)) } catch (e) {}
 
-        api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
-          subtitle: [
-            { icon: rank === 3 ? "fa-solid fa-fire" : "fa-solid fa-user", style: { color: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO } },
-            { str: rank === 3 ? " BOSS" : rank === 2 ? " TIER 2" : " NORMAL", style: { color: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO, fontWeight: "bold" } },
-            { str: "  |  ", style: { color: C.INFO } },
-            { str: "Lvl " + level, style: { color: C.MARINE } }
-          ],
-          healthbar: {
-              display: "always",
-              height: "13px"
-          },
-          border: {
-            colour: rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO,
-            applyTo: "nametag",
-            style: "double"
-          }
-        });
+        setMobNameTag(mobId, rank, level, fullName);
     }
     return true
+}
+
+/* NAMETAG DES MOBS
+   `nameTagInfo` est valide seulement avec les cles du schema Bloxd :
+   content / subtitle / healthbar{display,height,backgroundColour,foregroundColour}
+   / border{colour,style,width,applyTo}. `border` doit etre un frere de
+   `healthbar`, pas un enfant, et les parties de texte d'un nametag ne
+   prennent pas d'icone (elles sont reservees au chat) : sinon le moteur
+   repond « Expected: valid nameTagInfo value » et le mob n'apparait jamais.
+   On degrade en deux temps pour qu'un nametag refuse ne bloque jamais le
+   spawn. */
+function setMobNameTag(mobId, rank, level, name) {
+    const accent = rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO;
+    const label = rank === 3 ? "BOSS" : rank === 2 ? "TIER 2" : "NORMAL";
+    const rich = {
+        content: [{ str: String(name || "Mob"), style: { color: accent, fontWeight: "bold" } }],
+        subtitle: [
+            { str: label, style: { color: accent, fontWeight: "bold" } },
+            { str: "  |  Lvl " + level, style: { color: C.MARINE } }
+        ],
+        /* `height` volontairement omis : la valeur attendue (nombre ou "13px")
+               n'est pas documentee, et une valeur refusee ferait perdre tout le
+               nametag. La hauteur par defaut est tres bien. */
+            healthbar: { display: "always", foregroundColour: accent },
+        border: { colour: accent, applyTo: "nametag", style: rank === 3 ? "double" : "solid" }
+    };
+    try {
+        api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", rich);
+        return;
+    } catch (e) {}
+    /* Repli minimal : un nom + une barre de vie, sans style exotique. */
+    try {
+        api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
+            content: [{ str: String(name || "Mob") }],
+            healthbar: { display: "always" }
+        });
+    } catch (e) {}
 }
 
 function resolveSummonOwnerForXp(playerId) {
