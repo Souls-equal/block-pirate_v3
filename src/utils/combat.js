@@ -15,6 +15,7 @@ import {
     isMobAlive,
     isMobEntityType,
     isNpcEntity,
+    isOnlinePlayer,
     isPlayerAlive,
     isStillAlive,
     posOf,
@@ -26,6 +27,7 @@ import {
 } from "./lifeform";
 import { setTimeout, nowMs } from "./timer";
 import { C, say } from "../core/theme";
+import { isCrowdControlImmune } from "../core/ranks";
 export const summonOwner = {};
 /* Garde d'equipe (marines entre eux, meme crew). Posee par index.js avec
    canDamage() de core/team : l'import direct creerait un cycle
@@ -413,15 +415,122 @@ export function damage(target, rawAmount, caster, itemName) {
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   GARDE-FOUS DE MOUVEMENT (toutes les capacites passent par ici)
+
+   1. VEHICULE — bateau (physique 1) et monture (physique 5).
+      Tant qu'un joueur est dessus, on ne lui donne AUCUNE vitesse ni
+      impulsion : le bateau suit le joueur, un dash le propulsait donc a
+      une vitesse absurde (18 blocs/s x le multiplicateur du bateau).
+
+   2. CROWD CONTROL — les rangs marques `immuneToCrowdControl` (ADMIN,
+      OWNER, voir core/ranks.js) ne se font ni pousser, ni root, ni
+      ralentir, ni teleporter par la capacite de quelqu'un d'autre. Leur
+      propre deplacement reste permis : withEffectSource() ouvre une
+      fenetre pendant le cast du joueur, et c'est la seule facon de
+      deplacer un joueur immunise.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* [0,0,0] des types de physique qui transportent le joueur */
+const VEHICLE_TYPES = { 1: "boat", 5: "mob" };
+/* lire getPlayerPhysicsState pour tout le monde a chaque impact coute cher :
+   on garde le resultat le temps d'un tick (50 ms). */
+const vehicleCache = {};
+
+export function vehicleTypeOf(id) {
+    if (!id || !isOnlinePlayer(id)) return 0;
+    const now = nowMs();
+    const c = vehicleCache[id];
+    if (c && c.at === now) return c.type;
+    let type = 0;
+    try {
+        const st = api.getPlayerPhysicsState(id);
+        if (st && typeof st.type === "number") type = st.type;
+    } catch (e) {
+        type = 0;
+    }
+    /* nettoyage de temps en temps : la table ne doit pas grossir indefiniment */
+    if (Object.keys(vehicleCache).length > 160) {
+        for (const k in vehicleCache) delete vehicleCache[k];
+    }
+    vehicleCache[id] = { at: now, type: type };
+    return type;
+}
+
+/* Le joueur est-il dans un vehicule (donc protege de tout deplacement) ? */
+export function inVehicle(id) {
+    return !!VEHICLE_TYPES[vehicleTypeOf(id)];
+}
+
+/* Fenetre "je me deplace moi-meme", ouverte a chaque cast du joueur. */
+const selfMoveUntil = {};
+const SELF_MOVE_MS = 2500;
+
+function markSelfMove(casterId) {
+    if (!casterId) return;
+    selfMoveUntil[casterId] = nowMs() + SELF_MOVE_MS;
+}
+
+export function isSelfMoving(id) {
+    return !!selfMoveUntil[id] && selfMoveUntil[id] > nowMs();
+}
+
+/* Crowd control bloque ? (immunise ET ce n'est pas son propre deplacement) */
+export function ccLocked(id) {
+    /* les mobs ne sont pas concernes : on evite un appel de rang par impact */
+    if (!id || !isOnlinePlayer(id)) return false;
+    if (!isCrowdControlImmune(id)) return false;
+    return !isSelfMoving(id);
+}
+
+/* Le joueur qui vient d'utiliser une capacite de deplacement doit savoir
+   pourquoi rien ne bouge. Anti-spam : un message toutes les 3 s. */
+const lastMoveNotice = {};
+function moveNotice(id, text) {
+    const now = nowMs();
+    const last = lastMoveNotice[id];
+    /* `last !== undefined` et non `last` : nowMs() vaut 0 au tout premier tick. */
+    if (last !== undefined && now - last < 3000) return;
+    lastMoveNotice[id] = now;
+    try {
+        say(id, [
+            { icon: "fa-solid fa-ban", style: { color: "#FFD166" } },
+            { str: " " + text, style: { color: "#FFD166" } },
+        ]);
+    } catch (e) {}
+}
+
+/* Raison d'un blocage de mouvement, ou null si le deplacement est permis. */
+function moveBlocked(id) {
+    if (!id) return null;
+    if (inVehicle(id)) return "vehicle";
+    if (ccLocked(id)) return "cc";
+    return null;
+}
+
 /* MOUVEMENT / EFFETS */
 export function impulse(id, x, y, z) {
     if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    const blocked = moveBlocked(id);
+    if (blocked) {
+        if (blocked === "vehicle" && effectCast && effectCast.caster === String(id)) {
+            moveNotice(id, "No movement abilities while you are in a boat.");
+        }
+        return false;
+    }
     try { return !!api.applyImpulse(id, x, y, z); }
     catch (e) { return false; }
 }
 
 export function setVel(id, x, y, z) {
     if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    const blocked = moveBlocked(id);
+    if (blocked) {
+        if (blocked === "vehicle" && effectCast && effectCast.caster === String(id)) {
+            moveNotice(id, "No movement abilities while you are in a boat.");
+        }
+        return false;
+    }
     try { return !!api.setVelocity(id, x, y, z); }
     catch (e) { return false; }
 }
@@ -646,6 +755,13 @@ export function grounded(id) {
 
 export function teleport(id, x, y, z) {
     if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    const blocked = moveBlocked(id);
+    if (blocked) {
+        if (blocked === "vehicle" && effectCast && effectCast.caster === String(id)) {
+            moveNotice(id, "No movement abilities while you are in a boat.");
+        }
+        return false;
+    }
     try { api.setPosition(id, x, y, z); return true; }
     catch (e) { return false; }
 }
@@ -715,6 +831,9 @@ export function withEffectSource(casterId, abilityId, fn) {
         caster: casterId ? String(casterId) : "",
         ability: abilityId ? String(abilityId) : ""
     };
+    /* le joueur a le droit de se deplacer lui-meme pendant son cast :
+       c'est ce qui distingue un dash d'un crowd control subi. */
+    markSelfMove(effectCast.caster);
     try {
         return fn();
     } finally {
@@ -760,6 +879,22 @@ function slotsSummary(slots) {
     return sum;
 }
 
+/* Effets qui CONTROLENT le joueur (ralentir, affaiblir, aveugler...).
+   Un rang immunise au crowd control ne les recoit pas d'un autre joueur ;
+   ses propres effets (buffs, ce qu'il s'applique lui-meme) passent. */
+const CC_EFFECTS = {
+    "slowness": 1,
+    "weakness": 1,
+    "blindness": 1,
+    "nausea": 1,
+    "mining fatigue": 1,
+    "darkness": 1,
+};
+
+export function isCrowdControlEffect(effectId) {
+    return !!CC_EFFECTS[String(effectId || "").toLowerCase()];
+}
+
 /* FONCTION PRINCIPALE — applyEffect custom avec cumul par provenance */
 
 export function applyEffect(targetId, effectId, duration, opts = {}) {
@@ -773,6 +908,12 @@ export function applyEffect(targetId, effectId, duration, opts = {}) {
     const type = safeEntityType(targetId);
     if (type === null) return false;
     if (type === "NPC") return false;
+
+    /* Crowd control refuse a un rang immunise (ADMIN / OWNER) : ni slow ni
+       weakness, jamais. Pas de fenetre "auto-deplacement" ici : un joueur
+       immunise ne s'inflige pas a lui-meme un ralentissement, alors qu'il a
+       besoin de bouger lui-meme. */
+    if (isCrowdControlEffect(effectId) && isCrowdControlImmune(targetId)) return false;
 
     if (isMobEntityType(type) || isMobAlive(targetId)) {
         const effectOpts = { inbuiltLevel };

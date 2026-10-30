@@ -1,3 +1,11 @@
+/* Chaque rang porte des FLAGS booleens, lus par les gardes du jeu.
+   Ajouter une immunite = une ligne ici, rien a toucher ailleurs.
+
+     byPassChatRestriction : lit tous les canaux de chat (pas un droit d'ecrire)
+     immuneToCrowdControl  : ne peut etre ni ralentie, ni root, ni pousse,
+                             ni teleporte par la capacite de quelqu'un d'autre.
+                             Son propre deplacement reste evidemment permis.
+                             Actif pour ADMIN et OWNER. */
 export const PERMISSION_LEVELS = {
     NONE: 0,
     BASIC: 1,
@@ -14,6 +22,7 @@ export const RANKS = {
         color: "#aaaaaa",
         permissionLevel: PERMISSION_LEVELS.NONE,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
     OWNER: {
         id: "OWNER",
@@ -21,6 +30,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.OWNER,
         byPassChatRestriction: true,
+        immuneToCrowdControl: true,
     },
     ADMIN: {
         id: "ADMIN",
@@ -28,6 +38,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.ADMIN,
         byPassChatRestriction: true,
+        immuneToCrowdControl: true,
     },
     DEV: {
         id: "DEV",
@@ -35,6 +46,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.DEV,
         byPassChatRestriction: true,
+        immuneToCrowdControl: false,
     },
     MOD: {
         id: "MOD",
@@ -42,6 +54,7 @@ export const RANKS = {
         color: "#ff9900",
         permissionLevel: PERMISSION_LEVELS.MOD,
         byPassChatRestriction: true,
+        immuneToCrowdControl: false,
     },
     TESTER: {
         id: "TESTER",
@@ -49,6 +62,7 @@ export const RANKS = {
         color: "#ff4444",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
     MOBLANDS: {
         id: "MOBLANDS",
@@ -56,6 +70,7 @@ export const RANKS = {
         color: "#75dec5",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
     KNIGHTFALL: {
         id: "KNIGHT FALL",
@@ -63,6 +78,7 @@ export const RANKS = {
         color: "#b08dfb",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
     VIP: {
         id: "VIP",
@@ -70,6 +86,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
     YOUTUBER: {
         id: "YOUTUBER",
@@ -77,6 +94,7 @@ export const RANKS = {
         color: "red",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        immuneToCrowdControl: false,
     },
 };
 
@@ -148,4 +166,12 @@ export function isMod(playerId) {
 
 export function canBypassChatRestriction(playerId) {
     return getRankDataForPlayer(playerId).byPassChatRestriction === true;
+}
+
+/* Crowd control : un admin/owner ne se fait ni deplacer, ni root, ni slow.
+   Le flag vit dans RANKS (voir en haut du fichier) : une ligne suffit pour
+   l'etendre a un autre rang. */
+export function isCrowdControlImmune(playerId) {
+    if (!playerId) return false;
+    return getRankDataForPlayer(playerId).immuneToCrowdControl === true;
 }

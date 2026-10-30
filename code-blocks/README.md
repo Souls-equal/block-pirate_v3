@@ -2,7 +2,7 @@
 
 Généré par `npm run build:blocks`. Sources lisibles : `src/blocks/`.
 
-**36 fichiers sources → 8 Code Blocks** (445 788 → 226 252 caractères, -49 %).
+**36 fichiers sources → 8 Code Blocks** (446 276 → 226 233 caractères, -49 %).
 
 Colle **le contenu entier** de chaque `pack-XX.js` dans UN Code Block du monde,
 à x=100000, y=100000, z indiqué ci-dessous (blocs consécutifs).
@@ -10,11 +10,11 @@ L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.
 
 | Pack | z | Caractères | Fruits / modules |
 | --- | --- | --- | --- |
-| `pack-01.js` | `100002` | 28 749 | spring, quakes, light, rocket, paintballs, portal, rubber, diamond, pain, gas |
-| `pack-02.js` | `100003` | 30 977 | flame, blade, ghost, tiger form, magma |
+| `pack-01.js` | `100002` | 28 790 | spring, quakes, light, rocket, paintballs, portal, rubber, diamond, pain, gas |
+| `pack-02.js` | `100003` | 30 938 | flame, blade, ghost, tiger form, magma |
 | `pack-03.js` | `100004` | 31 216 | lightning, dark, ice, smoke, song, tiger mark, creation |
-| `pack-04.js` | `100005` | 30 253 | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
-| `pack-05.js` | `100006` | 31 182 | dought, control state, control domain, control slash, control shambles |
+| `pack-04.js` | `100005` | 30 243 | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
+| `pack-05.js` | `100006` | 31 171 | dought, control state, control domain, control slash, control shambles |
 | `pack-06.js` | `100007` | 26 447 | common uncommon plus, rare legendary plus |
 | `pack-07.js` | `100008` | 22 994 | legendary mythical plus |
 | `pack-08.js` | `100009` | 24 434 | mythical apex plus |

@@ -42,13 +42,20 @@ export const ACTION_PERMISSIONS = {
     set_level:         PERMISSION_LEVELS.OWNER,
 };
 
+/* Points de warp du panneau admin (bouton "Warp to Island").
+   L'ordre de ce tableau EST l'ordre du menu deroulant : un nom = une entree,
+   et une faute de frappe dans le nom se voit tout de suite dans la liste.
+   [x, y, z] : y est la hauteur du sol au point d'arrivee. */
 export const ISLAND_WARPS = {
-    "Starter Island":   [688, -910, -239],
-    "Jungle":           [1350, -910, 330],
-    "Pirate Village":   [950, -910, 810],
-    "Desert":           [650, -910, 1680],
-    "Snow Village":     [2510, -905, 520],
-    "Marine Fortress":  [2140, -910, -470],
+    "Starter Pirate":   [-12, -910, 24],
+    "Middle Town":      [635, -900, -206],
+    "Starter Marine":   [885, -906, -276],
+    "Jungle":           [1319, -906, 317],
+    "Pirate Village":   [811, -906, 770],
+    "Desert":           [650, -913, 1789],
+    "Snow Village":     [2502, -915, 664],
+    "Marine Fortress":  [2101, -910, -666],
+    "Skylands":         [2498, -909, 1247],
 };
 
 /* ==========================================================================

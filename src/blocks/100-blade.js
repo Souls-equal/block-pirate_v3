@@ -2,7 +2,7 @@
 // Source lisible. Ce fichier est minifié + empaqueté par `npm run build:blocks`.
 // NE PAS coller ce fichier directement dans un Code Block : utiliser code-blocks/pack-XX.js.
 
-(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
+(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,setVel,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
 /* SPIN BLADE — lames noires en orbite */
 const S_LEN = 4.4, S_R0 = 0.9, S_ARMS = 2, S_PTS = 7, S_SPEED = 0.3;
 const S_SIZE = 0.5, S_BOX = 0.16, S_EMIT = 2;
@@ -103,7 +103,9 @@ function castBombDash(pid, itemName) {
     sound.at(pid, "cannonFire2", 0.85, 1.1, 24);
     hitArea(p, 2, pid, itemName, 30, { height: 5 });
     boom(p, 1.2, { count: 60, colors: [[[255, 80, 0], [255, 200, 40]]] });
-    try { api.setVelocity(pid, d[0] * 18, d[1] * 18, d[2] * 18); } catch (e) {}
+    /* setVel passe par les gardes (bateau / crowd control) : un dash dans
+       un bateau ne propulse plus le bateau a une vitesse absurde. */
+    setVel(pid, d[0] * 18, d[1] * 18, d[2] * 18);
     return true;
 }
 
@@ -170,7 +172,7 @@ function castBladeDash(pid, itemName) {
     const end = Date.now() + DASH_MS;
     const hit = {};
 
-    try { api.setVelocity(pid, d[0] * 18, d[1] * 18, d[2] * 18); } catch (e) {}
+    setVel(pid, d[0] * 18, d[1] * 18, d[2] * 18);
 
     run({
         next: function () {
