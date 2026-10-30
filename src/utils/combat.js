@@ -879,16 +879,14 @@ function slotsSummary(slots) {
     return sum;
 }
 
-/* Effets qui CONTROLENT le joueur (ralentir, affaiblir, aveugler...).
-   Un rang immunise au crowd control ne les recoit pas d'un autre joueur ;
-   ses propres effets (buffs, ce qu'il s'applique lui-meme) passent. */
+/* Effets qui CONTROLENT le joueur (ralentir, affaiblir, aveugler).
+   Un rang immunise au crowd control ne les recoit pas, meme de lui-meme.
+   N'inscrire ici que des effets qui existent vraiment dans Bloxd : un nom
+   invente ne bloque rien et donne l'illusion d'une protection. */
 const CC_EFFECTS = {
     "slowness": 1,
     "weakness": 1,
     "blindness": 1,
-    "nausea": 1,
-    "mining fatigue": 1,
-    "darkness": 1,
 };
 
 export function isCrowdControlEffect(effectId) {

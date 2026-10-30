@@ -166,9 +166,20 @@ const packs = bins.map((bin, i) => {
   };
 });
 
+/* generatedAt ne change que si le contenu change : sinon chaque build
+   réécrivait le manifeste pour rien, et le fichier apparaissait modifié à
+   chaque fois (on finissait par le « git checkout » et il devenait faux). */
+const previousManifest = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(OUT, "manifest.json"), "utf8"));
+  } catch (e) {
+    return null;
+  }
+})();
+
 const manifest = {
   format: "BP3",
-  generatedAt: new Date().toISOString(),
+  generatedAt: previousManifest ? previousManifest.generatedAt : null,
   maxPackChars: MAX,
   origin: { x: ORIGIN[0], y: ORIGIN[1], z: ORIGIN[2] },
   sourceFiles: files.length,
@@ -178,6 +189,16 @@ const manifest = {
   packCount: total,
   packs,
 };
+/* même contenu que le manifeste précédent -> on garde son horodatage */
+const sameAsBefore = (() => {
+  if (!previousManifest) return false;
+  const a = Object.assign({}, manifest, { generatedAt: null });
+  const b = Object.assign({}, previousManifest, { generatedAt: null });
+  return JSON.stringify(a) === JSON.stringify(b);
+})();
+manifest.generatedAt = sameAsBefore
+  ? previousManifest.generatedAt
+  : new Date().toISOString();
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
 // README généré : « où est mon fruit ? » répondu d'un coup d'œil.
