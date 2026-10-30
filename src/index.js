@@ -26,6 +26,9 @@ import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { installTheme as installTheme, shout } from "./core/theme";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop } from "./gameplay/variations";
+/* Pont global : rend launch / chooseTeam / continueJourney / enterSea
+   appelables depuis les Code Blocks (voir gameplay/world-api.js). */
+import "./gameplay/world-api";
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
