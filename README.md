@@ -314,6 +314,7 @@ connecté, joue normalement, garde son stuff, ses coins, sa place — rien n'est
 | --- | --- |
 | **Mute Player** | liste de durées : `Permanent (until unmuted)`, `10 minutes`, `1 hour`, `1 day` |
 | **Unmute Player** | liste des joueurs muets (fonctionne même hors ligne) |
+| **Unmute by Name** | on **tape le nom** — filet de sécurité si le nom manque dans la liste |
 | **View Mute List** | qui est muet, depuis combien de temps, par qui |
 
 **Règles**
@@ -322,7 +323,9 @@ connecté, joue normalement, garde son stuff, ses coins, sa place — rien n'est
 * impossible de mute quelqu'un du **même rang ou au-dessus** (comme pour le kick/ban) ;
 * une durée expire **toute seule** : le mute s'efface au premier message suivant, aucun cron ;
 * le mute suit le joueur d'une variation à l'autre (lobby → `sea1` → …) ;
-* un joueur muet qui essaie d'écrire reçoit un message privé (durée + auteur), rien n'est envoyé aux autres.
+* un joueur muet qui essaie d'écrire reçoit un message privé (durée + auteur), rien n'est envoyé aux autres ;
+* le tableau **Mute List** se remplit **tout de suite** après un mute (avant, il restait sur son
+  instantané d'ouverture du panneau : on venait de muter quelqu'un sans jamais le voir dans la liste).
 
 **Où est-ce stocké** (`src/core/team.js`, à la suite de `handleChat`) — uniquement des clés nouvelles :
 
@@ -334,6 +337,21 @@ connecté, joue normalement, garde son stuff, ses coins, sa place — rien n'est
 
 Le contrôle se fait dans `handleChat` (`src/core/team.js`), avant tout le reste, donc
 tous les canaux sont couverts (Global, Team, Crew).
+
+**La liste du lobby n'est qu'un index — la vérité est la db joueur.** Un redémarrage de lobby
+efface la db lobby mais **pas** le mute (il est dans la db du joueur) : le joueur restait donc
+muet tout en ayant disparu de la liste, impossible à démuter. Trois garde-fous désormais :
+
+1. `getMuteList()` **rajoute** tout joueur muet encore en ligne (lu dans sa db), même si l'index
+   l'a perdu — donc il est toujours démutable ;
+2. `syncMuteIndex()` est appelé **au join** et depuis `isMuted()` : il recopie la db joueur dans
+   l'index, la liste se répare toute seule ;
+3. **Unmute by Name** permet de lever un mute dont le nom a disparu de la liste.
+
+Les mutes **expirés** sont nettoyés au passage (plus de nom fantôme qui affiche « expired » ou
+qui répond « already muted » à la sanction suivante). Si un nom reste dans l'index sans
+enregistrement (db lobby perdue, joueur hors ligne), le tableau l'affiche avec
+`(no record — use Unmute by Name)` au lieu de le faire disparaître.
 
 ---
 
