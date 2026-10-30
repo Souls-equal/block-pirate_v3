@@ -25,10 +25,22 @@ import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlay
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { installTheme as installTheme, shout } from "./core/theme";
-import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop } from "./gameplay/variations";
-/* Pont global : rend launch / chooseTeam / continueJourney / enterSea
-   appelables depuis les Code Blocks (voir gameplay/world-api.js). */
-import "./gameplay/world-api";
+import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea } from "./gameplay/variations";
+
+/* PONT VERS LES CODE BLOCKS
+   En Bloxd, une fonction n'est visible depuis un autre Code Block que si elle
+   est affectee SANS declaration (format `nom = () => {}`) :
+       launch = (playerId) => {}      -> utilisable dans les autres Code Blocks
+       export function launch() {}    -> exportee (module)
+       function launch() {}           -> privee au fichier
+   variations.js est un module : ses fonctions y sont locales, donc invisibles
+   depuis un Code Block. On les recopie ici sous leur nom GLOBAL, sans
+   declaration. NE JAMAIS ecrire `const launch = ...` : le nom redeviendrait
+   prive et les Code Blocks ne le verraient plus. */
+launch = (playerId) => bpLaunch(playerId);
+chooseTeam = (playerId, teamId) => bpChooseTeam(playerId, teamId);
+continueJourney = (playerId) => bpContinue(playerId);
+enterSea = (playerId, seaNumber) => bpEnterSea(playerId, seaNumber);
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */

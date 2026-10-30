@@ -34,6 +34,9 @@ const SRC = path.join(ROOT, "src");
    ouvres sur GitHub pour copier chaque fichier dans le World Code. */
 const OUT = path.join(ROOT, "world-code");
 const WORLD_LIMIT = 512_000;
+/* Le World Code de Bloxd est limite en NOMBRE DE FICHIERS (30) en plus des
+   caracteres. On bloque le build plutot que de le decouvrir en collant. */
+const FILE_LIMIT = 30;
 /* Seul `blocks/` ne part pas dans le World Code : ce sont les Code Blocks
    (voir build-blocks.mjs). `build/` est compacté s'il existe chez toi
    (layer/path/sphere) : ces fichiers comptent aussi dans la limite. */
@@ -206,3 +209,8 @@ for (const r of rows.sort((a, b) => b.after - a.after).slice(0, 8))
   console.log(`   ${String(r.after).padStart(6)} car.  ${r.rel}  (était ${r.before.toLocaleString("fr-FR")})`);
 if (total > WORLD_LIMIT)
   throw new Error(`World Code compact trop grand : ${total} > ${WORLD_LIMIT}`);
+if (rows.length > FILE_LIMIT)
+  throw new Error(
+    `Trop de fichiers pour le World Code : ${rows.length} > ${FILE_LIMIT}. ` +
+      `Fusionne deux modules (ex. core/mute.js dans core/team.js).`,
+  );
