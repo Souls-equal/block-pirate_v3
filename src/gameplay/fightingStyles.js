@@ -8,6 +8,7 @@ import {
     impulse,
     lifeforms,
     setVel,
+    withEffectSource,
 } from "../utils/combat";
 import {
     facing,
@@ -1032,7 +1033,10 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
 
     let ok = true;
     try {
-        const res = matched.handler(playerId, matched.name, targetId);
+        /* provenance "joueur|capacité" : deux usages de la même capacité
+           ne s'empilent pas, deux capacités différentes si. */
+        const res = withEffectSource(playerId, matched.id, () =>
+            matched.handler(playerId, matched.name, targetId));
         if (res === false) ok = false;
     } catch (e) {
         ok = false;

@@ -89,6 +89,13 @@ export function setInterval(fn: () => void, interval: number): TimerHandle {
     };
 }
 
+// Horloge du scheduler en millisecondes (1 tick = 50 ms).
+// Sert aux registres d'effets : ils doivent vieillir au même rythme que les timers,
+// sinon un lag serveur ferait expirer les effets trop tôt (ou jamais).
+export function nowMs(): number {
+    return time * 50;
+}
+
 export function sleep(t: number): Wait {
     if (t < 0) t = 0;
     return { t: t };

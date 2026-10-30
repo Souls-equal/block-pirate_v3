@@ -24,7 +24,7 @@ import {
     safePosition,
     targetBlock,
 } from "./lifeform";
-import { setTimeout } from "./timer";
+import { setTimeout, nowMs } from "./timer";
 import { C, say } from "../core/theme";
 export const summonOwner = {};
 /* Garde d'equipe (marines entre eux, meme crew). Posee par index.js avec
@@ -680,9 +680,87 @@ export function getBaseEffectDuration(playerId, effectId) {
 
 export function clearPlayerEffects(playerId) {
     delete baseEffectLevel[playerId];
+    delete effectSources[playerId];
 }
 
-/* FONCTION PRINCIPALE — applyEffect custom avec cumul + restauration */
+/* ═══════════════════════════════════════════════════════════════
+   PROVENANCE DES EFFETS — un même effet ne s'empile que si la
+   provenance diffère.
+
+   Provenance = "lanceur|capacité" (le joueur qui lance ET l'abilité
+   utilisée). Elle est posée autour du cast par withEffectSource()
+   — un seul point de passage par famille d'abilité (fruits dans
+   fruit/abilities.js, styles de combat dans gameplay/fightingStyles.js).
+
+   Quand aucune provenance n'est connue (effet de tick, aura, piège au
+   sol...), on retombe sur l'effet lui-même : "fx|Slowness". Conséquence
+   voulue : dans le doute on ne cumule pas.
+
+   Règle finale :
+     • même provenance  -> la durée se rafraîchit, le niveau NE monte pas ;
+     • provenances ≠    -> les niveaux s'additionnent (vrai cumul de groupe).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* targetId -> effectId -> { clé de provenance: { level, until, name, icon } } */
+const effectSources = {};
+
+/* contexte du cast en cours (remis à sa valeur précédente en sortie) */
+let effectCast = null;
+
+/* Pose la provenance le temps d'un cast. Les effets appliqués
+   synchroniquement par l'abilité héritent de "lanceur|capacité". */
+export function withEffectSource(casterId, abilityId, fn) {
+    const prev = effectCast;
+    effectCast = {
+        caster: casterId ? String(casterId) : "",
+        ability: abilityId ? String(abilityId) : ""
+    };
+    try {
+        return fn();
+    } finally {
+        effectCast = prev;
+    }
+}
+
+function provenanceKey(effectId, opts) {
+    const caster = opts.casterId !== undefined
+        ? String(opts.casterId)
+        : (effectCast ? effectCast.caster : "");
+    const ability = opts.source !== undefined
+        ? String(opts.source)
+        : (effectCast ? effectCast.ability : "");
+    if (!ability) return "fx|" + effectId;
+    return (caster || "?") + "|" + ability;
+}
+
+/* Empilements vivants pour (cible, effet) — purge les entrées expirées. */
+function sourceSlots(targetId, effectId, now) {
+    let book = effectSources[targetId];
+    if (!book) book = effectSources[targetId] = {};
+    let slots = book[effectId];
+    if (!slots) slots = book[effectId] = {};
+    for (const k in slots) {
+        if (!(slots[k].until > now)) delete slots[k];
+    }
+    return slots;
+}
+
+/* Somme des niveaux empilés + l'empilement qui vit le plus longtemps
+   (c'est lui qui fournit le libellé / l'icône affichés). */
+function slotsSummary(slots) {
+    const sum = { level: 0, until: 0, name: null, icon: null };
+    for (const k in slots) {
+        sum.level += slots[k].level;
+        if (slots[k].until > sum.until) {
+            sum.until = slots[k].until;
+            sum.name = slots[k].name || null;
+            sum.icon = slots[k].icon || null;
+        }
+    }
+    return sum;
+}
+
+/* FONCTION PRINCIPALE — applyEffect custom avec cumul par provenance */
 
 export function applyEffect(targetId, effectId, duration, opts = {}) {
 
@@ -723,16 +801,44 @@ export function applyEffect(targetId, effectId, duration, opts = {}) {
         return;
     }
 
-    const extraBonus = Math.max(0, currentLevel - baseLevel) + inbuiltLevel;
-    const newLevel = baseLevel + extraBonus;
+    /* ── 5. Cas : effet TEMPORAIRE — cumul SEULEMENT si la provenance change ── */
+    const now = nowMs();
+    const slots = sourceSlots(targetId, effectId, now);
+
+    /* niveau déjà posé par ce registre avant cette application */
+    let before = 0;
+    for (const k in slots) before += slots[k].level;
+
+    const key = provenanceKey(effectId, opts);
+    const slot = slots[key];
+    if (slot) {
+        /* même provenance : on rafraîchit la durée, on n'ajoute RIEN.
+           Si la même capacité revient plus fort (niveau supérieur), on
+           garde le plus fort au lieu d'empiler. */
+        if (inbuiltLevel > slot.level) slot.level = inbuiltLevel;
+        slot.until = now + duration;
+        if (displayName) slot.name = displayName;
+        if (icon) slot.icon = icon;
+    } else {
+        slots[key] = { level: inbuiltLevel, until: now + duration, name: displayName, icon };
+    }
+
+    const live = slotsSummary(slots);
+
+    /* niveaux posés hors de ce registre (moteur, api.applyEffect direct) */
+    const foreign = Math.max(0, currentLevel - baseLevel - before);
+    const newLevel = baseLevel + foreign + live.level;
 
     const effectOpts = { inbuiltLevel: newLevel };
-    if (displayName) effectOpts.displayName = displayName;
-    if (icon) effectOpts.icon = icon;
+    const label = displayName || live.name;
+    const ico = icon || live.icon;
+    if (label) effectOpts.displayName = label;
+    if (ico) effectOpts.icon = ico;
 
     try { api.applyEffect(targetId, effectId, duration, effectOpts); } catch (e2) { return false; }
 
     scheduleEffectRestore(targetId, effectId, duration);
+    return true;
 }
 
 /* RESTAURATION DIFFÉRÉE — réapplique le niveau de base à l'expiration */
@@ -746,18 +852,30 @@ function scheduleEffectRestore(playerId, effectId, duration) {
 
             if (!isStillAlive(playerId)) return;
 
-            let currentLevel = 0;
-            try { currentLevel = api.getEffectLevel(playerId, effectId) || 0; } catch (e0) {}
+            const now = nowMs();
+            /* purge les empilements expirés, puis on réapplique la somme
+               de ceux qui restent (un empilement de groupe peut survivre
+               à l'expiration du premier). */
+            const live = slotsSummary(sourceSlots(playerId, effectId, now));
             const baseLevel = getBaseEffectLevel(playerId, effectId);
 
-            if (currentLevel > baseLevel) return;
+            if (live.level > 0) {
+                const remain = Math.max(50, live.until - now);
+                const opts = { inbuiltLevel: baseLevel + live.level };
+                if (live.name) opts.displayName = live.name;
+                if (live.icon) opts.icon = live.icon;
+                try { api.applyEffect(playerId, effectId, remain, opts); } catch (e1) {}
+                /* réarme pour l'expiration suivante */
+                scheduleEffectRestore(playerId, effectId, remain);
+                return;
+            }
 
             if (baseLevel > 0) {
                 try {
                     api.applyEffect(playerId, effectId, null, { inbuiltLevel: baseLevel });
-                } catch (e1) {}
+                } catch (e2) {}
             } else {
-                try { api.removeEffect(playerId, effectId); } catch (e2) {}
+                try { api.removeEffect(playerId, effectId); } catch (e3) {}
             }
         } catch (e) {
 
@@ -770,6 +888,13 @@ function scheduleEffectRestore(playerId, effectId, duration) {
 export function removeEffect(playerId, effectId) {
     if (!playerId || !isAliveId(playerId)) return;
     const baseLevel = getBaseEffectLevel(playerId, effectId);
+
+    /* l'effet est retiré volontairement : sans ça, le registre croirait
+       encore à un empilement vivant et le réappliquerait au tick suivant. */
+    try {
+        const book = effectSources[playerId];
+        if (book) delete book[effectId];
+    } catch (eRm) {}
 
     try { api.removeEffect(playerId, effectId); } catch (e) {}
 
