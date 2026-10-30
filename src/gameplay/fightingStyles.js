@@ -7,6 +7,7 @@ import {
     hitSeg,
     impulse,
     lifeforms,
+    setMoveSpeed,
     setVel,
     teleport,
     withEffectSource,
@@ -173,19 +174,14 @@ function freezeEntity(tid, ms) {
     eff(tid, "Slowness", ms, { inbuiltLevel: 6 });
     const isPl = isPlayerAlive(tid);
     if (isPl) {
-        try {
-            api.setClientOption(tid, "speedMultiplier", 0);
-        } catch (e) {}
+        /* setMoveSpeed : le root (0) est refuse a un rang immunise */
+        setMoveSpeed(tid, 0);
     } else {
         setVel(tid, 0, 0, 0);
     }
     const ticks = Math.max(1, Math.ceil(ms / 50));
     sTimeout(function () {
-        if (freezeTok[tid] === tok && isPl) {
-            try {
-                api.setClientOption(tid, "speedMultiplier", 1);
-            } catch (e) {}
-        }
+        if (freezeTok[tid] === tok && isPl) setMoveSpeed(tid, 1);
     }, ticks);
     let step = 0;
     const maxSteps = Math.max(1, Math.floor(ticks / 2));

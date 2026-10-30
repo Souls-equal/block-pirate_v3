@@ -15,6 +15,8 @@
       posOf: _,
       isAliveId: f,
       isSolid: l,
+      teleport,
+      forceCameraDir,
     } = (e.fx, e),
     { at: soundAt, point } = e.fx;
   // L'état partagé (__CT__) est créé par 250-control-state.js, évalué juste AVANT
@@ -159,21 +161,18 @@
                     a(n, "Weakness", 1600, { inbuiltLevel: 1 });
                   }
                   if (t.t % 3 === 0) {
-                    try {
-                      c.setClientOption(
-                        n,
-                        "forcedCameraDirection",
-                        W([t.center[0] - r[0], t.center[1] + 1.5 - r[1], t.center[2] - r[2]]),
-                      );
-                    } catch (t) {}
+                    /* camera + deplacement = crowd control : un admin/owner
+                       immunise garde son regard ET ses pieds. */
+                    forceCameraDir(
+                      n,
+                      W([t.center[0] - r[0], t.center[1] + 1.5 - r[1], t.center[2] - r[2]]),
+                    );
                   }
                   o.a += 0.05 * M;
                   const s = t.center[0] + o.r * Math.cos(o.a),
                     i = t.center[2] + o.r * Math.sin(o.a),
                     f = t.center[1] + 2 + 0.7 * Math.sin(2 * o.a);
-                  try {
-                    c.setPosition(n, s, f, i);
-                  } catch (t) {}
+                  teleport(n, s, f, i);
                   if (t.t % 2 === 0) {
                     point([s, f, i], {
                       tex: "soul_0",
