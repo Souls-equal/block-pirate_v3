@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-30T20:28:34.353Z",
+  "generatedAt": "2026-10-30T20:53:42.467Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,8 +8,8 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 446276,
-  "packedChars": 226233,
+  "sourceChars": 446269,
+  "packedChars": 226079,
   "compression": "49 %",
   "packCount": 8,
   "packs": [
@@ -38,9 +38,9 @@
       "index": 2,
       "file": "pack-02.js",
       "z": 100003,
-      "chars": 30938,
-      "payloadChars": 30905,
-      "hash": "58e1714b",
+      "chars": 30860,
+      "payloadChars": 30827,
+      "hash": "f3f53389",
       "modules": 5,
       "sources": [
         "020-flame.js",
@@ -88,9 +88,9 @@
       "index": 5,
       "file": "pack-05.js",
       "z": 100006,
-      "chars": 31171,
-      "payloadChars": 31138,
-      "hash": "cc75ab89",
+      "chars": 31095,
+      "payloadChars": 31062,
+      "hash": "cec62c75",
       "modules": 5,
       "sources": [
         "120-dought.js",

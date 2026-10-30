@@ -2,7 +2,7 @@
 // Source lisible. Ce fichier est minifié + empaqueté par `npm run build:blocks`.
 // NE PAS coller ce fichier directement dans un Code Block : utiliser code-blocks/pack-XX.js.
 
-(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
+(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,setMoveSpeed,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
 /* BOUCLIER D'IMMUNITÉ */
 const GUARD_TICK = 3;
 const guard = {};
@@ -135,7 +135,7 @@ const PR_SPD = 3, PR_REG = 2;
 const prisons = {};
 
 function unroot(tid) {
-    if (isPlayerAlive(tid)) { try { api.setClientOption(tid, "speedMultiplier", 1); } catch (e) {} }
+    if (isPlayerAlive(tid)) setMoveSpeed(tid, 1);
 }
 
 function prisonOff(pid, st) {
@@ -150,7 +150,7 @@ function prisonOff(pid, st) {
 }
 
 function cageFor(pid, tid) {
-    if (isPlayerAlive(tid)) { try { api.setClientOption(tid, "speedMultiplier", 0); } catch (e) {} }
+    if (isPlayerAlive(tid)) setMoveSpeed(tid, 0);
     eff(tid, "Slowness", PR_MS, { inbuiltLevel: 6 });
     return { id: tid };
 }

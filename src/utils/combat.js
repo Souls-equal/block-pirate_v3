@@ -472,6 +472,13 @@ function markSelfMove(casterId) {
 }
 
 export function isSelfMoving(id) {
+    if (!id) return false;
+    /* Pendant le cast de QUELQU'UN, la seule personne qui a le droit de
+       bouger, c'est le lanceur. C'est ce qui empeche un admin de se faire
+       attraper par Control juste apres avoir lance sa propre capacite. */
+    if (effectCast) return effectCast.caster === String(id);
+    /* Hors cast (partie asynchrone d'une coroutine, ex. Flying Kick) : on
+       retombe sur la fenetre ouverte par le dernier cast du joueur. */
     return !!selfMoveUntil[id] && selfMoveUntil[id] > nowMs();
 }
 
@@ -750,6 +757,25 @@ export function nearest(pos, maxDist, caster) {
 /* DIVERS */
 export function grounded(id) {
     try { return (api.getBlockCoordinatesPlayerStandingOn(id) || []).length > 0; }
+    catch (e) { return false; }
+}
+
+/* Vitesse de deplacement. `0` = root : c'est du crowd control, refuse a un
+   rang immunise. Remettre une vitesse normale (>= 1) n'est JAMAIS bloque,
+   sinon on laisserait quelqu'un fige apres un sort. */
+export function setMoveSpeed(id, mult) {
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    if (!(mult > 0) && ccLocked(id)) return false;
+    try { api.setClientOption(id, "speedMultiplier", mult); return true; }
+    catch (e) { return false; }
+}
+
+/* Camera forcee (Control Domain braque le regard de ses prisonniers).
+   `null` = on relache : toujours autorise, c'est un nettoyage. */
+export function forceCameraDir(id, dir) {
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    if (dir !== null && ccLocked(id)) return false;
+    try { api.setClientOption(id, "forcedCameraDirection", dir); return true; }
     catch (e) { return false; }
 }
 

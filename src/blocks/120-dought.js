@@ -2,7 +2,7 @@
 // Source lisible. Ce fichier est minifié + empaqueté par `npm run build:blocks`.
 // NE PAS coller ce fichier directement dans un Code Block : utiliser code-blocks/pack-XX.js.
 
-(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
+(FA=>{/* source : ce fichier est regroupé avec d'autres dans un pack par le build. */const C=FA.c,R=FA.r,F=C.fx,{api,damage,eff,entitiesIn,heal,hitArea,hitSeg,impulse,setMoveSpeed,isAliveId,lifeforms,markUntil,pickTarget,posOf,safeHealth,safePosition,statLevel,unmark,strengthMult,claimSummon,freeSummon,chest,facing,heading,isPlayerAlive,safeEntityName,safeEntityType,targetBlock,boom,box,boxSpan,CAGE,circle,clamp,column,dist2,distH2,frame,GOLDEN,inBox,norm,point,ring,TAU,TEX,run,setInterval,setTimeout,sleep,blockAt,clearIf,freeSpot,isSolid,raycast,setBlock,stuck,knockBack}=C,mesh=F,sound=F,ct_mesh=F.create,ct_to=F.move,ct_off=F.remove,ct_tilt=F.rotate,ct_preset=F.playParticle,soundAt=F.at,tf_create=F.create,tf_move=F.move,tf_remove=F.remove,tf_turn=F.rotate;
 /* FULL PUNCH — cage de poings de mochi/béton noir en particules + dégâts sur la durée */
 const FREEZE_MS = 3000, FREEZE_DMG = 12, FREEZE_EVERY = 250, PUNCH_MS = 700;
 const freezeTok = {}, freezeSpeed = {};
@@ -13,7 +13,9 @@ const COL_MOCHI = [248, 236, 208, 0.95];
 const COL_GOLD = [255, 195, 75, 0.9];
 
 function setSpeed(pid, v) {
-    try { api.setClientOption(pid, "speedMultiplier", v); } catch (e) {}
+    /* setMoveSpeed : 0 (root) est refuse a un rang immunise, la remise a une
+       vitesse normale passe toujours. */
+    setMoveSpeed(pid, v);
 }
 
 function clearFreeze(tid) {

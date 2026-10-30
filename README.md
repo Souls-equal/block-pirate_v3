@@ -532,17 +532,37 @@ immuneToCrowdControl: true,   // OWNER et ADMIN ; false partout ailleurs
 
 Une ligne suffit pour l'étendre à un autre rang. Quand il est actif, le joueur ne peut être :
 
-* ni **poussé / attiré** (`impulse`, les pulls Gravity et Shambles),
-* ni **root** (`setVel(id, 0, 0, 0)`, `jumpAmount` du Gas),
-* ni **téléporté** par une capacité (Grapple Rush, Shambles),
-* ni **ralenti / affaibli** — `Slowness`, `Weakness`, `Blindness` sont ignorés
-  (`CC_EFFECTS` dans `combat.js`). Seuls des effets **qui existent réellement** y sont
-  listés : un nom inventé ne bloque rien, il donne juste l'illusion d'une protection.
+| Ce que fait la capacité | Primitive gardée | Bloqué |
+| --- | --- | --- |
+| pousser / attirer | `impulse()` | Gravity Grab, Shambles, knockbacks |
+| figer sur place | `setVel()`, `setMoveSpeed()` | Grapple, Freeze du Dought, cage du Ghost |
+| déplacer | `teleport()` | Control Domain, Shambles, Gravity Grab, Grapple |
+| braquer la caméra | `forceCameraDir()` | Control Domain |
+| ralentir / affaiblir | `applyEffect()` (`CC_EFFECTS`) | `Slowness`, `Weakness`, `Blindness` |
+| bloquer le saut | `setClientOption(jumpAmount)` | root du Gas |
+
+`CC_EFFECTS` ne contient que des effets **qui existent réellement** dans Bloxd : un nom
+inventé ne bloque rien, il donne juste l'illusion d'une protection.
+
+**Le cas Control Domain.** C'était le trou : la capacité ne poussait pas, elle *repositionnait*
+chaque cible en orbite (`api.setPosition`) **et** lui braquait la caméra
+(`forcedCameraDirection`), deux appels bruts qui contournaient les gardes. Les deux sont
+passés par `teleport()` / `forceCameraDir()`, donc un ADMIN ou un OWNER reste planté au sol,
+libre de son regard, pendant que les autres tournent autour du dôme.
+
+Détail important : `setMoveSpeed()` et `forceCameraDir()` ne bloquent que le **sens
+contraignant**. Remettre une vitesse normale (`>= 1`) ou relâcher la caméra (`null`) passe
+toujours — sinon un sort interrompu laisserait la victime figée.
 
 Ce qui reste : les **dégâts** (on peut frapper un admin) et les **buffs** (Speed,
 Health Regen…). Et surtout **son propre déplacement** : `withEffectSource()` ouvre une
 fenêtre de 2,5 s autour de chaque cast, donc un admin garde ses dashes. Sans cette
 fenêtre, « immunisé au déplacement » aurait aussi annulé ses propres capacités.
+
+Cette fenêtre ne profite qu'au lanceur : pendant le cast de **quelqu'un d'autre**, seule la
+personne à l'origine du cast peut bouger. Un admin qui vient d'utiliser une capacité reste
+donc intouchable face à un Control qui l'attrape dans la seconde — sans ça, il suffisait
+d'attendre son cast pour le contrôler quand même.
 
 Les **effets** (`Slowness`, `Weakness`…) n'utilisent pas cette fenêtre : ils sont refusés
 pour un rang immunisé dans tous les cas, c'est le point le plus simple à tester
