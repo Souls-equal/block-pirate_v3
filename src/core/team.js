@@ -5,7 +5,6 @@ import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
-import { isMuted, muteRefusal } from "./mute";
 import { C, say, shout } from "./theme";
 function safeName(id) {
     if (!id) return "Unknown";
@@ -827,4 +826,252 @@ export function handleBountyKill(killerId, victimId) {
     bountySay(killerId, "Bounty: +$" + stolen + " (total $" + bounty + ")", C.PIRATE);
     refreshBountyUi(killerId, victimId);
     return { type: "steal", amount: stolen, bounty: bounty };
+}
+
+/* ==========================================================================
+   MUTE — « tais-toi », et rien d'autre.
+
+   Un mute n'empeche QUE de parler : le joueur se deplace, se bat, commerce,
+   utilise ses fruits... Rien n'est supprime et il n'est pas deconnecte,
+   contrairement a un kick ou a un ban. Le panneau admin est dans core/admin.js.
+
+   STOCKAGE (uniquement des cles nouvelles)
+     db JOUEUR  "mt"               = "Par|fin"  -> source de verite, suit le
+                                     joueur d'une variation a l'autre.
+     db LOBBY   "admin_muteList"   = "Nom1,Nom2"
+     db LOBBY   "admin_mute_<nom>" = "Par|fin"  -> liste consultable meme
+                                     quand le joueur est hors ligne.
+   `fin` = 0 : permanent, sinon date de fin en ms (le mute s'efface tout seul).
+
+   IMPORTANT : team.js et admin.js s'importent mutuellement. Tout ce qui suit
+   est donc en `function` (hors TDZ) et les cles sont ecrites en clair dans les
+   fonctions : rien ne depend de l'ordre de chargement des deux fichiers.
+   ========================================================================== */
+
+/* Durees proposees dans le panneau admin (ms ; 0 = permanent). */
+export function muteDurations() {
+    return {
+        "Permanent (until unmuted)": 0,
+        "10 minutes": 10 * 60000,
+        "1 hour": 60 * 60000,
+        "1 day": 24 * 60 * 60000,
+    };
+}
+
+export function muteDurationOptions() {
+    return Object.keys(muteDurations());
+}
+
+function muteLobbyGet(key) {
+    try {
+        const v = api.getLobbyDbValue(key);
+        return v == null ? null : String(v);
+    } catch (e) {
+        return null;
+    }
+}
+
+function muteLobbySet(key, value) {
+    try {
+        api.setLobbyDbValue(key, value);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function muteLobbyDel(key) {
+    try {
+        api.deleteLobbyDbValue(key);
+    } catch (e) {}
+}
+
+function muteDbGet(playerId, key) {
+    try {
+        const v = api.getPlayerDbValue(playerId, key);
+        return v == null ? null : String(v);
+    } catch (e) {
+        return null;
+    }
+}
+
+function muteDbSet(playerId, key, value) {
+    try {
+        api.setPlayerDbValue(playerId, key, value);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function muteDbDel(playerId, key) {
+    try {
+        api.deletePlayerDbValue(playerId, key);
+    } catch (e) {}
+}
+
+function muteNameOf(playerId) {
+    try {
+        return api.getEntityName(playerId) || "";
+    } catch (e) {
+        return "";
+    }
+}
+
+/* "Par|fin" -> { by, until }. Null si la valeur est inutilisable. */
+function muteParse(raw) {
+    if (!raw) return null;
+    const parts = String(raw).split("|");
+    const by = (parts[0] || "Admin").trim() || "Admin";
+    const until = Number(parts[1]) || 0;
+    return { by: by, until: until };
+}
+
+function muteExpired(info) {
+    return !!info && info.until > 0 && Date.now() >= info.until;
+}
+
+export function getMuteList() {
+    const raw = muteLobbyGet("admin_muteList");
+    if (!raw) return [];
+    return raw.split(",").filter(function (n) {
+        return n.length > 0;
+    });
+}
+
+function muteSaveList(list) {
+    return muteLobbySet("admin_muteList", list.join(","));
+}
+
+export function isMutedName(name) {
+    if (!name) return false;
+    const info = muteParse(muteLobbyGet("admin_mute_" + name));
+    if (info) {
+        if (muteExpired(info)) {
+            /* Menage paresseux : le mute s'efface tout seul. */
+            unmuteName(name, true);
+            return false;
+        }
+        return true;
+    }
+    return getMuteList().indexOf(name) !== -1;
+}
+
+/* Un joueur est-il muet ? (db joueur d'abord, liste du lobby en secours) */
+export function isMuted(playerId) {
+    if (!playerId) return false;
+    const raw = muteDbGet(playerId, "mt");
+    if (raw) {
+        const info = muteParse(raw);
+        if (info && !muteExpired(info)) return true;
+        muteDbDel(playerId, "mt");
+    }
+    return isMutedName(muteNameOf(playerId));
+}
+
+function muteOnlineIds() {
+    try {
+        return api.getPlayerIds() || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function muteIdOfName(name) {
+    if (!name) return null;
+    try {
+        const id = api.getPlayerId(name);
+        if (id) return id;
+    } catch (e) {}
+    const all = muteOnlineIds();
+    for (let i = 0; i < all.length; i++) if (muteNameOf(all[i]) === name) return all[i];
+    return null;
+}
+
+/* Infos affichables : { by, until, remaining } ou null. */
+export function getMuteInfo(name) {
+    let raw = muteLobbyGet("admin_mute_" + name);
+    if (!raw) {
+        /* Repli quand le joueur est en ligne : sa db joueur porte le mute. */
+        const all = muteOnlineIds();
+        for (let i = 0; i < all.length; i++) {
+            if (muteNameOf(all[i]) !== name) continue;
+            raw = muteDbGet(all[i], "mt");
+            break;
+        }
+    }
+    const info = muteParse(raw);
+    if (!info || muteExpired(info)) return null;
+    return { by: info.by, until: info.until, remaining: remainingText(info.until) };
+}
+
+/* "10 min", "2 h", "permanent" */
+export function remainingText(until) {
+    if (!until) return "permanent";
+    const ms = until - Date.now();
+    if (ms <= 0) return "expired";
+    const min = Math.ceil(ms / 60000);
+    if (min < 60) return min + " min";
+    const h = Math.round(min / 60);
+    if (h < 48) return h + " h";
+    return Math.round(h / 24) + " days";
+}
+
+/* Mute par nom (le joueur peut etre hors ligne). */
+export function muteName(name, byName, durationMs) {
+    if (!name) return false;
+    const until = durationMs > 0 ? Date.now() + durationMs : 0;
+    const info = String(byName || "Admin") + "|" + until;
+
+    muteLobbySet("admin_mute_" + name, info);
+    const list = getMuteList();
+    if (list.indexOf(name) === -1) {
+        list.push(name);
+        muteSaveList(list);
+    }
+
+    /* Le joueur en ligne recoit aussi le drapeau dans sa db (il suit le joueur
+       d'une variation a l'autre, contrairement a la db du lobby). */
+    const id = muteIdOfName(name);
+    if (id) muteDbSet(id, "mt", info);
+    return true;
+}
+
+/* Mute du joueur cible (panneau admin). */
+export function mutePlayer(playerId, byName, durationMs) {
+    const name = muteNameOf(playerId);
+    if (!name) return false;
+    if (!muteName(name, byName, durationMs)) return false;
+    const until = durationMs > 0 ? Date.now() + durationMs : 0;
+    muteDbSet(playerId, "mt", String(byName || "Admin") + "|" + until);
+    return true;
+}
+
+/* Retire le mute (silencieux = pas de message de succes). */
+export function unmuteName(name, silent) {
+    if (!name) return false;
+    const wasThere = getMuteList().indexOf(name) !== -1 || muteLobbyGet("admin_mute_" + name) != null;
+    muteSaveList(getMuteList().filter(function (n) {
+        return n !== name;
+    }));
+    muteLobbyDel("admin_mute_" + name);
+    const id = muteIdOfName(name);
+    if (id) muteDbDel(id, "mt");
+    return !silent ? wasThere : false;
+}
+
+export function unmutePlayer(playerId) {
+    return unmuteName(muteNameOf(playerId));
+}
+
+/* Ce qu'on repond au joueur qui essaie de parler. */
+export function muteRefusal(playerId) {
+    const info = getMuteInfo(muteNameOf(playerId)) || { by: "an admin", remaining: "unknown" };
+    return [
+        { icon: "fa-solid fa-microphone-slash", style: { color: "#EF4444" } },
+        { str: " You are muted", style: { color: "#EF4444", fontWeight: "bold" } },
+        { str: " (" + info.remaining + ") by ", style: { color: "#CBD5E1" } },
+        { str: info.by, style: { color: "#FFD700", fontWeight: "bold" } },
+        { str: " — you can play, but not talk.", style: { color: "#CBD5E1" } },
+    ];
 }

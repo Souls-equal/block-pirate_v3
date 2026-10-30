@@ -36,8 +36,8 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
 
 ## World Code : la limite des 512 000 caractères
 
-Bloxd limite le World Code à **512 000 caractères**, et il compte **le texte brut des
-fichiers collés**. Les sources de `src/` sont écrites pour être lues (commentaires,
+Bloxd limite le World Code à **512 000 caractères** **et à 30 fichiers**, et il compte
+**le texte brut des fichiers collés**. Les sources de `src/` sont écrites pour être lues (commentaires,
 indentation, noms explicites) : ~481 000 caractères à elles seules, donc la limite est
 atteinte dès qu'on ajoute un fichier `src/build/*`.
 
@@ -46,6 +46,12 @@ parcourir directement sur GitHub) : la même arborescence, fichier
 par fichier, mais compactée pour le collage — commentaires et espaces retirés
 (`minifyWhitespace`), code simplifié (`minifySyntax`), **noms locaux raccourcis**
 (`minifyIdentifiers`).
+
+> **Limite de 30 fichiers** : `build-sources.mjs` refuse de produire `world-code/` au-delà
+> de **30 fichiers** (`FILE_LIMIT`). C'est pour ça que le mute vit dans `core/team.js`
+> (avec `handleChat`) et que le pont des Code Blocks vit dans `index.js` : deux fichiers
+> de moins, et la limite est tenue. Avant d'ajouter un module, demande-toi s'il ne peut
+> pas rejoindre un fichier existant.
 
 | | Caractères | Limite |
 | --- | --- | --- |
@@ -116,9 +122,9 @@ En Bloxd, la forme de la déclaration décide de la visibilité :
 | `export function nom() {}` | ✅ oui (export de module) |
 | `function nom() {}` | ❌ non, privée au fichier |
 
-`variations.js` étant un module, ses fonctions y sont **privées**. `src/gameplay/world-api.js`
-les recopie donc sous leur **nom global, sans déclaration**, exactement au format
-`nom = () => {}`. C'est ce fichier qui rend les appels ci-dessous possibles — **ne jamais**
+`variations.js` étant un module, ses fonctions y sont **privées**. La fin du bloc d'imports
+de `src/index.js` les recopie donc sous leur **nom global, sans déclaration**, exactement au
+format `nom = () => {}`. C'est ce pont qui rend les appels ci-dessous possibles — **ne jamais**
 y écrire `const launch = …`, sinon le nom redevient privé et tes Code Blocks ne le voient plus.
 
 | Fonction (globale) | Effet |
@@ -253,7 +259,7 @@ connecté, joue normalement, garde son stuff, ses coins, sa place — rien n'est
 * le mute suit le joueur d'une variation à l'autre (lobby → `sea1` → …) ;
 * un joueur muet qui essaie d'écrire reçoit un message privé (durée + auteur), rien n'est envoyé aux autres.
 
-**Où est-ce stocké** (`src/core/mute.js`) — uniquement des clés nouvelles :
+**Où est-ce stocké** (`src/core/team.js`, à la suite de `handleChat`) — uniquement des clés nouvelles :
 
 | Clé | Où | Contenu |
 | --- | --- | --- |
@@ -292,10 +298,11 @@ compétence est détecté par `isAbilityItemName` (`src/fruit/abilities.js`).
 │   ├── index.js                  # point d'entrée du World Code
 │   ├── core/                     # UI, équipages, grades, admin
 │   │   ├── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
-│   │   └── mute.js               # ⭐ mute (chat seulement) : liste, durées, unmute
+│   │   ├── team.js               # ⭐ équipes + chat + mute (même fichier)
+│   │   ├── admin.js              # ⭐ panneau admin (ban, mute, TP, inventaire)
+│   │   └── ranks.js              # grades + permissions
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   │   ├── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
-│   │   └── world-api.js          # ⭐ launch/chooseTeam/... en global (format Bloxd)
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
@@ -479,7 +486,7 @@ des 95 handlers (dont les 8 de Control/Gravity) n'est pas enregistré.
 - **Fonction appelable depuis un Code Block** : `nom = () => {}` (affectation
   globale, sans `const`/`let`) ; `export function nom() {}` pour exporter ;
   `function nom() {}` reste privé au fichier. Toute fonction destinée au monde
-  passe donc par `src/gameplay/world-api.js`.
+  passe donc par le pont global en tête de `src/index.js`.
 - `dist/`, `build-out/`, `node_modules/` sont ignorés par git. Seuls les packs
   de `code-blocks/` sont versionnés car ce sont les fichiers à coller dans le jeu.
 

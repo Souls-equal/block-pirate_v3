@@ -4,7 +4,7 @@ import { FRUIT_ABILITIES, isAbilityItemName } from "../fruit/abilities";
 import { updateNameTag } from "./team";
 import { refreshLeaderboardPlayer, updateSidebar } from "./UI";
 import { addXP, getStat, setLevel, setStat, xpToNext } from "../utils/data";
-import { MUTE_DURATIONS, MUTE_DURATION_OPTIONS, getMuteList, getMuteInfo, isMuted, mutePlayer, unmuteName, remainingText } from "./mute";
+import { muteDurations, muteDurationOptions, getMuteList, getMuteInfo, isMuted, mutePlayer, unmuteName, remainingText } from "./team";
 
 import { ITEM_COLOR, say, shout } from "./theme";
 /* ==========================================================================
@@ -273,7 +273,7 @@ function setTargetLevelMenu(adminId, userInput) {
 }
 
 /* ==========================================================================
-   MUTE — « tais-toi », et rien d'autre (voir core/mute.js)
+   MUTE — « tais-toi », et rien d'autre (implementation dans core/team.js)
    Le joueur mute peut toujours jouer : on lui bloque uniquement le chat.
    ========================================================================== */
 
@@ -334,7 +334,7 @@ function muteTarget(adminId, userInput) {
     try { adminName = api.getEntityName(adminId) || "Admin"; } catch (e) {}
 
     const choice = String(userInput == null ? "" : userInput).trim();
-    const ms = MUTE_DURATIONS[choice] || 0;
+    const ms = muteDurations()[choice] || 0;
     if (!mutePlayer(targetId, adminName, ms)) return sendAdminInfo(adminId, false, "Failed to save the mute!");
 
     const span = ms > 0 ? "for " + remainingText(Date.now() + ms) : "until unmuted";
@@ -421,7 +421,7 @@ function createMuteItems(adminId) {
                 { str: "\nPick how long, then click Mute.", style: { color: "#888888" } },
                 { str: "\nCannot mute equal or higher rank.", style: { color: "#888888" } },
             ],
-            userInput: { type: "dropdown", dropdownOptions: MUTE_DURATION_OPTIONS },
+            userInput: { type: "dropdown", dropdownOptions: muteDurationOptions() },
         });
     } catch (e) {}
 
