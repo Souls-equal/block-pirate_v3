@@ -147,12 +147,14 @@ function roleForRgb(rgb) {
      - item normal ...................... gris un peu plus fonce
      - item normal renomme (nom custom) . gris tres clair
      - fruit du demon (sneak + click) ... rouge-orange
-     - item de competence ............... bleu-violet */
+     - ability (item d'un fruit) ........ bleu-violet
+     - capacity (style de combat) ....... beige-rose */
 export const ITEM_COLOR = {
-    plain: "#8B8F98",
-    custom: "#E5E7EB",
-    fruit: "#FF6B35",
-    ability: "#8B5CF6",
+    plain: "#8B8F98",     /* item normal : gris un peu plus fonce */
+    custom: "#E5E7EB",    /* item normal renomme (nom custom) : gris tres clair */
+    fruit: "#FF6B35",     /* fruit du demon (mangeable, sneak + click) : rouge-orange */
+    ability: "#8B5CF6",   /* ABILITY : item d'un fruit (bleu-violet) */
+    capacity: "#E8B4A0",  /* CAPACITY : item d'un style de combat (beige-rose) */
 };
 
 const KEEP_AS_IS = {};

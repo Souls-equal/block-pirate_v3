@@ -337,6 +337,20 @@ tous les canaux sont couverts (Global, Team, Crew).
 
 ---
 
+## Vanish : les faux messages join / leave
+
+Activer Vanish diffuse un faux « X left » (et un faux « X joined » au retour) pour que
+l'admin disparaisse des yeux des autres. Ces messages doivent être **indistinguables** d'un
+vrai message du moteur : si leur teinte diffère, on repère immédiatement qu'un admin se
+cache.
+
+Ils passent donc par **`shoutRaw()`** et non `shout()` — sinon `themeColor()` ramenait
+`#cef3ff` à `#7DD3FC` (MARINE), ce qui trahissait le faux message. La teinte est réunie
+dans une seule constante, `VANISH_CHAT_COLOR` (`src/core/admin.js`) : c'est le seul
+endroit à changer si la couleur réelle du moteur évolue.
+
+---
+
 ## Inspection d'inventaire : couleurs
 
 Dans *View Inventory*, chaque item est coloré par **catégorie d'objet** — ce ne sont pas
@@ -348,7 +362,12 @@ des couleurs de rôle, elles gardent donc leur teinte exacte (`ITEM_COLOR` dans
 | Item normal | gris un peu plus foncé `#8B8F98` |
 | Item normal renommé (`customDisplayName`) | gris très clair `#E5E7EB` |
 | Fruit du démon (mangeable, sneak + click) | rouge-orange `#FF6B35` |
-| Item de compétence | bleu-violet `#8B5CF6` |
+| **Ability** — item d'un fruit | bleu-violet `#8B5CF6` |
+| **Capacity** — item d'un style de combat | beige-rose `#E8B4A0` |
+
+Ability et capacity partagent parfois le même item de base (Paintball Explosive Item) :
+c'est le **nom affiché** (`customDisplayName`) qui tranche — `isFightingStyleAbilityName()`
+d'abord, puis `isAbilityItemName()`.
 
 Un fruit rangé sous son nom de bloc est reconnu (table `fruitItemMap`), et un item de
 compétence est détecté par `isAbilityItemName` (`src/fruit/abilities.js`).
