@@ -5,6 +5,7 @@ import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
+import { isMuted, muteRefusal } from "./mute";
 import { C, say, shout } from "./theme";
 function safeName(id) {
     if (!id) return "Unknown";
@@ -428,6 +429,13 @@ export function forgetChatChannel(playerId) {
 }
 
 export function handleChat(playerId, message, channel) {
+    /* MUTE : le joueur ne peut plus parler, mais il joue normalement. On le
+       bloque avant tout le reste, tous canaux confondus. */
+    if (isMuted(playerId)) {
+        say(playerId, muteRefusal(playerId));
+        return false;
+    }
+
     if (isVanished(playerId)) {
         say(playerId, [
             { str: "[Vanish] ", style: { color: "#cef3ff", fontWeight: "bold" } },

@@ -196,6 +196,40 @@ un si nécessaire — jamais tout le message.
 
 ---
 
+## Modération : mute (panneau admin)
+
+Le **mute** est un ban gentil : il empêche **seulement de parler**. Le joueur reste
+connecté, joue normalement, garde son stuff, ses coins, sa place — rien n'est supprimé.
+
+**Dans le panneau admin** (visibles pour **MOD+**, sur le joueur ciblé via *Select Player*) :
+
+| Bouton | Effet |
+| --- | --- |
+| **Mute Player** | liste de durées : `Permanent (until unmuted)`, `10 minutes`, `1 hour`, `1 day` |
+| **Unmute Player** | liste des joueurs muets (fonctionne même hors ligne) |
+| **View Mute List** | qui est muet, depuis combien de temps, par qui |
+
+**Règles**
+
+* impossible de se mute soi-même ;
+* impossible de mute quelqu'un du **même rang ou au-dessus** (comme pour le kick/ban) ;
+* une durée expire **toute seule** : le mute s'efface au premier message suivant, aucun cron ;
+* le mute suit le joueur d'une variation à l'autre (lobby → `sea1` → …) ;
+* un joueur muet qui essaie d'écrire reçoit un message privé (durée + auteur), rien n'est envoyé aux autres.
+
+**Où est-ce stocké** (`src/core/mute.js`) — uniquement des clés nouvelles :
+
+| Clé | Où | Contenu |
+| --- | --- | --- |
+| `mt` | db **joueur** | `Auteur|<fin>` — `0` = permanent, sinon timestamp |
+| `admin_muteList` | db **lobby** | `Nom1,Nom2` (liste du panneau, même hors ligne) |
+| `admin_mute_<nom>` | db **lobby** | `Auteur|<fin>` |
+
+Le contrôle se fait dans `handleChat` (`src/core/team.js`), avant tout le reste, donc
+tous les canaux sont couverts (Global, Team, Crew).
+
+---
+
 ## Arborescence
 
 ```
@@ -203,7 +237,8 @@ un si nécessaire — jamais tout le message.
 ├── src/
 │   ├── index.js                  # point d'entrée du World Code
 │   ├── core/                     # UI, équipages, grades, admin
-│   │   └── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
+│   │   ├── theme.js              # ⭐ palette unique + emojis -> icônes Bloxd (OBLIGATOIRE)
+│   │   └── mute.js               # ⭐ mute (chat seulement) : liste, durées, unmute
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   │   └── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
 │   ├── fruit/
