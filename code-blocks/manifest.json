@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-27T12:26:34.355Z",
+  "generatedAt": "2026-10-30T20:28:34.353Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,8 +8,8 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 445788,
-  "packedChars": 226252,
+  "sourceChars": 446276,
+  "packedChars": 226233,
   "compression": "49 %",
   "packCount": 8,
   "packs": [
@@ -17,9 +17,9 @@
       "index": 1,
       "file": "pack-01.js",
       "z": 100002,
-      "chars": 28749,
-      "payloadChars": 28716,
-      "hash": "ff4d0812",
+      "chars": 28790,
+      "payloadChars": 28757,
+      "hash": "f7c3d06c",
       "modules": 10,
       "sources": [
         "010-spring.js",
@@ -38,9 +38,9 @@
       "index": 2,
       "file": "pack-02.js",
       "z": 100003,
-      "chars": 30977,
-      "payloadChars": 30944,
-      "hash": "d39b219c",
+      "chars": 30938,
+      "payloadChars": 30905,
+      "hash": "58e1714b",
       "modules": 5,
       "sources": [
         "020-flame.js",
@@ -72,9 +72,9 @@
       "index": 4,
       "file": "pack-04.js",
       "z": 100005,
-      "chars": 30253,
-      "payloadChars": 30220,
-      "hash": "b8862b97",
+      "chars": 30243,
+      "payloadChars": 30210,
+      "hash": "2ea9529b",
       "modules": 5,
       "sources": [
         "060-blizzard.js",
@@ -88,9 +88,9 @@
       "index": 5,
       "file": "pack-05.js",
       "z": 100006,
-      "chars": 31182,
-      "payloadChars": 31149,
-      "hash": "fb60b514",
+      "chars": 31171,
+      "payloadChars": 31138,
+      "hash": "cc75ab89",
       "modules": 5,
       "sources": [
         "120-dought.js",

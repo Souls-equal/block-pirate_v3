@@ -17,16 +17,22 @@ const DMG_EXPONENT    = 0.65;
 const DEF_FACTOR = 0.96;
 const DEF_FLOOR  = 0.2;
 
+/* REGEN — nerfee : a 100 points on soignait 22% toutes les 0,84 s, soit
+   27 PV/s, plus vite que la plupart des degats d'abilite. Trois leviers :
+   - moins de soin par tick  : 20% -> 8% de bonus maximum ;
+   - un tick plus lent       : plancher 200 ms -> 1500 ms ;
+   - on remonte moins vite   : 1 s -> 2,5 s sans avoir ete touche.
+   Resultat a 100 points : 12,6% / 1,7 s = 7,6 PV/s (3,5x moins). */
 const REGEN_BASE_AMOUNT   = 0.05;
-const REGEN_MAX_BONUS     = 0.20;
+const REGEN_MAX_BONUS     = 0.08;
 /* La courbe est exponentielle : chaque point rapproche du maximum sans
    jamais l'atteindre. REGEN_DECAY = 1 annulait tout (1^r = 1 -> p = 0), donc
    la regen restait bloquee a 5% / 5s pour TOUS les niveaux. */
-const REGEN_DECAY         = 0.98;
+const REGEN_DECAY         = 0.97;
 const REGEN_BASE_INTERVAL = 5000;
-const REGEN_MIN_INTERVAL  = 200;
+const REGEN_MIN_INTERVAL  = 1500;
 const REGEN_BASE_START    = 5000;
-const REGEN_MIN_START     = 1000;
+const REGEN_MIN_START     = 2500;
 
 export const STAT_CONFIG = {
     h:  { name: "Health",  color: "#ff8888", icon: "fa-solid fa-heart", imageColour: "#Ffe6e6", perPoint: "+20/15/10 HP (diminishing every 50 point)" },
@@ -91,10 +97,11 @@ function pct(fraction) {
 }
 
 /* "4.8s" / "820ms" : sous la seconde on affiche les ms, sinon on ne verrait
-   aucune difference entre deux paliers de regen. */
+   aucune difference entre deux paliers de regen. Une seule decimale en
+   secondes : "2.3s", pas "2.26s" (illisible dans le shop). */
 function timeText(ms) {
     if (ms < 1000) return Math.round(ms) + "ms";
-    return round(ms / 1000) + "s";
+    return Math.round(ms / 100) / 10 + "s";
 }
 
 /* STAT LEVELS */

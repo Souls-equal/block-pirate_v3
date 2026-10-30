@@ -466,21 +466,28 @@ Détails qui comptent :
 
 ```js
 const p = 1 - Math.pow(REGEN_DECAY, r);   // 0 -> 1 quand r grandit
-amount   = 5%   + 20%   * p;              // part de vie rendue
-interval = 5000 - 4800  * p;              // ms entre deux soins
+amount   = 5%   +  8%   * p;              // part de vie rendue par tick
+interval = 5000 -  3500 * p;              // ms entre deux soins
+start    = 5000 -  2500 * p;              // ms sans être touché avant reprise
 ```
 
 `REGEN_DECAY` valait **`1`**, donc `1^r = 1` et `p = 0` **quel que soit le niveau** : tous les
 joueurs affichaient `Regen 5% / 5s`, du premier point au dernier, sans jamais rien gagner.
-Il vaut désormais `0.98` :
+Il vaut désormais `0.97`, avec des plafonds revus à la baisse :
 
-| Points | Affichage | Soin réel |
-| --- | --- | --- |
-| 0 | `Regen 5% / 5s` | 5 % toutes les 5 s |
-| 10 | `Regen 8.7% / 4.1s` | |
-| 25 | `Regen 12.9% / 3.1s` | |
-| 50 | `Regen 17.7% / 1.9s` | |
-| 100 | `Regen 22.3% / 837ms` | |
+| Points | Affichage | PV/s | Temps sans être touché |
+| --- | --- | --- | --- |
+| 0 | `Regen 5% / 5s` | 1,0 | 5,0 s |
+| 10 | `Regen 7.1% / 4.1s` | 1,7 | 4,3 s |
+| 25 | `Regen 9.3% / 3.1s` | 3,0 | 3,7 s |
+| 50 | `Regen 11.3% / 2.3s` | 5,0 | 3,0 s |
+| 100 | `Regen 12.6% / 1.7s` | 7,6 | 2,6 s |
+
+**Pourquoi ce nerf** : avec 20 % de bonus maximum et un tick plancher à 200 ms, 100 points
+donnaient 22,3 % toutes les 0,84 s, soit **27 PV/s** — plus vite que la plupart des dégâts
+d'abilité, donc impossible à tuer autrement qu'en un seul burst. Trois leviers ont été
+baissés (soin par tick, cadence, délai de reprise) : à 100 points on est à **7,6 PV/s**, soit
+3,5× moins, et il faut rester **2,6 s** sans être touché avant que ça reparte.
 
 L'affichage, les valeurs envoyées au moteur (`healthRegenAmount` / `healthRegenInterval` /
 `healthRegenStartAfter`) et la courbe sont les mêmes : impossible de voir un chiffre qui ne
@@ -528,8 +535,9 @@ Une ligne suffit pour l'étendre à un autre rang. Quand il est actif, le joueur
 * ni **poussé / attiré** (`impulse`, les pulls Gravity et Shambles),
 * ni **root** (`setVel(id, 0, 0, 0)`, `jumpAmount` du Gas),
 * ni **téléporté** par une capacité (Grapple Rush, Shambles),
-* ni **ralenti / affaibli** — `Slowness`, `Weakness`, `Blindness`, `Nausea`,
-  `Mining Fatigue`, `Darkness` sont ignorés (`CC_EFFECTS` dans `combat.js`).
+* ni **ralenti / affaibli** — `Slowness`, `Weakness`, `Blindness` sont ignorés
+  (`CC_EFFECTS` dans `combat.js`). Seuls des effets **qui existent réellement** y sont
+  listés : un nom inventé ne bloque rien, il donne juste l'illusion d'une protection.
 
 Ce qui reste : les **dégâts** (on peut frapper un admin) et les **buffs** (Speed,
 Health Regen…). Et surtout **son propre déplacement** : `withEffectSource()` ouvre une
