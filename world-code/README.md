@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**29 fichiers, 295 062 caracteres** (58 % de la limite de 512 000 du World Code, -46 % par rapport aux sources lisibles).
+**29 fichiers, 295 195 caracteres** (58 % de la limite de 512 000 du World Code, -46 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -36,7 +36,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `core/theme.js` | 11 100 | 26 091 |
 | `core/UI.js` | 5 799 | 12 441 |
 | `fruit/abilities.js` | 41 337 | 61 764 |
-| `fruit/fruitData.js` | 4 344 | 5 913 |
+| `fruit/fruitData.js` | 4 477 | 6 046 |
 | `fruit/func-abilities.js` | 21 150 | 28 739 |
 | `fruit/index.js` | 18 231 | 28 172 |
 | `gameplay/codes.js` | 4 375 | 7 139 |
