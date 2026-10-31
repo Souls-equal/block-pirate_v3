@@ -1,6 +1,7 @@
 // fruit/abilities.js
 
 import { getFruit } from "./index";
+import { FRUITS_BY_RARITY as FRUIT_TABLE } from "./fruitData";
 import {
     isImmuneToDamage,
     markAggro,
@@ -1096,19 +1097,14 @@ const FRUIT_ABILITY_TABLE = {
     Dragon:   ["boroBreath", "dragonTwister", "draconicAscent", "meteorShower", "predatorMark"],
 };
 
-const FRUIT_BLOCKS = {
-    Rocket: "Bone Block", Spin: "Leather Block", Blade: "Plum Block", Spring: "Watermelon",
-    Bomb: "Beetroot Block", Smoke: "Diorite", Spike: "Fat Cactus", Flame: "Mango Block",
-    Ice: "Ice", Sand: "Sand", Dark: "Obsidian", Eagle: "Brown Mushroom Block",
-    Diamond: "Block of Diamond", Light: "Pear Block", Rubber: "Engraved Granite", Ghost: "Glass",
-    Magma: "Magma", Quakes: "Ice Bricks", Buddha: "Banana Block", Love: "Cherry Block",
-    Creation: "Bookshelf", Spider: "Block of Coal", Song: "Potato Block", Phoenix: "Corn Block",
-    Portal: "Bread Block", Lightning: "Diamond Ore", Pain: "Pumpkin", Blizzard: "Block of Moonstone",
-    Gravity: "Moonstone Ore", Mammoth: "Engraved Andesite", "T-Rex": "Carrot Block", Dought: "Bedrock",
-    Shadow: "Red Mushroom Block", Venom: "Block of Iron", Gas: "Apple Block", Spirit: "Chili Pepper Block",
-    Tiger: "Snow", Yeti: "Custom Lobby Block", Kitsune: "Snowy Messy Stone", Control: "Stone",
-    Dragon: "Pine Cone Block"
-};
+/* L'item réel d'un fruit vient de fruitData : une seule source de vérité pour
+   le nom tenu en main, donc impossible de désynchroniser les deux tables. */
+const FRUIT_BLOCKS = {};
+for (const rarity in FRUIT_TABLE) {
+    for (const fruit of FRUIT_TABLE[rarity]) {
+        FRUIT_BLOCKS[fruit.rpName] = fruit.itemName;
+    }
+}
 
 const BIND_BY_ID = {};
 const ITEM_TO_BIND = {};

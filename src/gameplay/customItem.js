@@ -1,6 +1,9 @@
 // customItem.js
 
-import { FRUITS_BY_RARITY, fruitDescription, getRarityEnchantTier } from "../fruit/index";
+import { FRUITS_BY_RARITY, fruitDescription, fruitItemAttributes, getRarityEnchantTier } from "../fruit/index";
+import { LEGACY_FRUIT_ITEMS, getFruitItemName, getFruitInfo } from "../fruit/fruitData";
+import { setTimeout as scheduleTick } from "../utils/timer";
+import { say } from "../core/theme";
 
 /* Le tier d'enchantement n'est peut-etre pas modifiable via setItemStat :
    on tente une fois, et si le moteur refuse on ne reessaie plus jamais. */
@@ -86,6 +89,120 @@ export function clearItem(playerId, where, slot) {
     }
 }
 
+/* MIGRATION DES ITEMS DE FRUITS
+
+   Les fruits ont change de noms d'items (blocks -> poissons). Le nom Roleplay
+   ne bouge pas, donc un fruit deja mange, la capacite en cours, la base de
+   donnees et les achats restent valides. Seul l'item tenu en main doit etre
+   remplace : c'est ce que fait migrateFruitItems() a chaque join.
+
+   On ne convertit QUE ce qui porte les attributs d'un fruit
+   (customAttributes.isFruitBlock / fruitRpName). Les anciens noms sont des
+   blocs de construction ordinaires (Stone, Glass, Ice, Snow...) : convertir
+   par le nom seul transformerait un stack de Stone en fruits de Control. */
+
+/* Un item -> nom Roleplay du fruit, ou null si ce n'est pas un fruit. */
+function fruitRpNameOfItem(item) {
+    if (!item || !item.name || item.name === "Air") return null;
+    const attrs = item.attributes && typeof item.attributes === "object" ? item.attributes : null;
+    const ca = attrs && attrs.customAttributes && typeof attrs.customAttributes === "object"
+        ? attrs.customAttributes
+        : null;
+    const byAttr = ca && ca.fruitRpName ? ca.fruitRpName : null;
+    if (byAttr && getFruitInfo(byAttr)) return byAttr;
+    /* attributs partiels : displayName d'un fruit + ancien nom d'item */
+    const shown = attrs && attrs.customDisplayName ? attrs.customDisplayName : null;
+    if (shown && getFruitInfo(shown) && LEGACY_FRUIT_ITEMS[item.name]) return shown;
+    return null;
+}
+
+/* Attributs complets d'un fruit : on garde ce qui existait (uniqueRollId,
+   attributs custom eventuels) et on remet nom, description, tier a jour. */
+function fruitAttrsFor(rpName, previous) {
+    const fresh = fruitItemAttributes(rpName);
+    const oldAttrs = previous && typeof previous === "object" ? previous : {};
+    const oldCa = oldAttrs.customAttributes && typeof oldAttrs.customAttributes === "object"
+        ? oldAttrs.customAttributes
+        : {};
+
+    const out = {};
+    for (const k in oldAttrs) out[k] = oldAttrs[k];
+
+    const ca = {};
+    for (const k in oldCa) ca[k] = oldCa[k];
+    ca.enchantmentTier = fresh.customAttributes.enchantmentTier;
+    ca.isFruitBlock = true;
+    ca.fruitRpName = rpName;
+    if (!ca.uniqueRollId) {
+        ca.uniqueRollId = "m" + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36);
+    }
+
+    out.customAttributes = ca;
+    out.customDisplayName = fresh.customDisplayName;
+    out.customDescription = fresh.customDescription;
+    return out;
+}
+
+function sameFruitLook(attrs, expected) {
+    const ca = attrs && attrs.customAttributes ? attrs.customAttributes : {};
+    return attrs
+        && attrs.customDisplayName === expected.customDisplayName
+        && attrs.customDescription === expected.customDescription
+        && ca.enchantmentTier === expected.customAttributes.enchantmentTier
+        && ca.isFruitBlock === true;
+}
+
+export function migrateFruitItems(playerId) {
+    const result = { item: 0, attrs: 0 };
+
+    scanAllItems(playerId, function (item, where, slot) {
+        const rpName = fruitRpNameOfItem(item);
+        if (!rpName) return;
+        const targetName = getFruitItemName(rpName);
+        if (!targetName) return;
+
+        const amount = typeof item.amount === "number" && item.amount > 0 ? item.amount : 1;
+        const attrs = fruitAttrsFor(rpName, item.attributes);
+        const renaming = item.name !== targetName;
+        if (!renaming && sameFruitLook(item.attributes, attrs)) return;
+
+        if (writeItem(playerId, where, slot, targetName, amount, attrs)) {
+            if (renaming) result.item++;
+            else result.attrs++;
+        }
+    });
+
+    return result;
+}
+
+/* Un joueur qui revient doit voir ses anciens blocs redevenir des blocs. */
+function resetLegacyFruitStats(playerId) {
+    for (const legacyName in LEGACY_FRUIT_ITEMS) {
+        try { api.setItemStat(playerId, legacyName, "displayName", legacyName); } catch (e) {}
+        try { api.setItemStat(playerId, legacyName, "description", ""); } catch (e) {}
+        if (!tierStatUnsupported) {
+            try { api.setItemStat(playerId, legacyName, "enchantmentTier", "Tier 1"); } catch (e) {}
+        }
+    }
+}
+
+function announceFruitMigration(playerId, result) {
+    if (!result || (!result.item && !result.attrs)) return;
+    try {
+        say(playerId, [
+            { str: "[Fruit] ", style: { color: "#E8B4A0" } },
+            {
+                str: result.item
+                    ? result.item + (result.item > 1 ? " fruits ont ete" : " fruit a ete") + " mis a jour vers les nouveaux items."
+                    : "Tes fruits ont ete remis a neuf (enchant + description).",
+                style: { color: "#CBD5E1" },
+            },
+        ]);
+    } catch (e) {}
+}
+
+const FRUIT_MIGRATE_RETRY = 40;
+
 /* JOIN */
 
 export function itemJoin(playerId) {
@@ -127,4 +244,19 @@ export function itemJoin(playerId) {
             }
         }
     }
+    /* Les anciens noms d'items de fruits redeviennent de simples blocs :
+       sans ce nettoyage, un joueur verrait encore "Control" sur ses Stone. */
+    resetLegacyFruitStats(playerId);
+
+    /* Les fruits deja possedes (inventaire + Moonstone Chest) sont réécrits
+       avec leur nouvel item, leur enchant et leur description. */
+    announceFruitMigration(playerId, migrateFruitItems(playerId));
+
+    /* Certains inventaires ne sont pas encore lisibles au tick 0 : on repasse
+       une fois, tardif, pour les fruits qui apparaissent avec le chunk. */
+    try {
+        scheduleTick(function () {
+            announceFruitMigration(playerId, migrateFruitItems(playerId));
+        }, FRUIT_MIGRATE_RETRY);
+    } catch (e) {}
 }

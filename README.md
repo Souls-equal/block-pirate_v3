@@ -711,6 +711,57 @@ même préfixe de famille (`control-`, `gravity-`) et ajoute la famille dans
 
 ---
 
+## Fruits : nouveaux items (poissons) et migration des inventaires
+
+Les fruits ne sont plus des blocs mais des **poissons**. Seul `itemName` a changé :
+le `rpName` (`Rocket`, `Control`, `Dragon`…) reste l'identifiant interne, donc la
+base de données, les capacités, les achats et les fruits déjà mangés continuent de
+fonctionner sans rien migrer côté joueur.
+
+```
+Common     Boulder Bass        Root Flounder       Crystalized Wheatfish   Green Strongfish
+           Bombfish            Moon Strongfish     Boomerang Fish
+Uncommon   Embermark Wrasse    Frost Wolf Eel      Reedglass Minnow        Coastal Mullet
+           Oarfish             Frost Herring
+Rare       Polarflash Electron Lavaflow Trout      Pearlescent Moonfish    Cinder Leviathan
+Legendary  Sumpback Carp       Pyroscale Grouper   Lavawake Slopefish      Scorched Sunfish
+           Basalt Pipefish     Rust Scad           Rainbow Guppy           Nomai Moray
+           Deepwater Lanternfish Eviota Vader      Hatchetfish
+Mythical   Glacial Silverfish  Iceshelf Skate      Heatwarp Flounder       Mangler Catfish
+           Shadow Darter       Pithead             Scored Dace             Rimesnouted Lancetfish
+           Volcanic Catfish    Paleice Rockcod     Frozen Grenadier        Tri-Pointed Needlefish
+           Seahorse
+```
+
+`FRUITS_BY_RARITY` (`src/fruit/fruitData.js`) est la **seule** source de vérité :
+`FRUIT_BLOCKS` (`src/fruit/abilities.js`) est maintenant calculé à partir d'elle,
+donc impossible d'avoir deux tables désynchronisées.
+
+### La migration, au join
+
+`migrateFruitItems()` (`src/gameplay/customItem.js`) passe l'inventaire **et** le
+Moonstone Chest à chaque connexion (puis une seconde fois 2 s plus tard, le temps
+que le chunk soit lisible) et réécrit chaque fruit avec :
+
+* son **nouvel item** (`Bone Block` → `Boulder Bass`) ;
+* son **nom affiché** (`Rocket`) ;
+* sa **description complète** (`● Common Fruit ●`, la phrase du fruit, l'aide
+  « Sneak + Click ») ;
+* son **enchant** (`Tier 1` à `Tier 5` selon la rareté), dans
+  `customAttributes.enchantmentTier` — c'est là que le moteur le lit ;
+* son `uniqueRollId` d'origine, conservé s'il existe.
+
+**Ce qui n'est jamais converti :** un item n'est reconnu comme fruit que s'il porte
+`customAttributes.isFruitBlock` / `fruitRpName`. Les anciens noms sont des blocs de
+construction ordinaires (`Stone`, `Glass`, `Ice`, `Snow`…) : convertir « au nom »
+transformerait un stack de 64 Stone en fruits de Control. Un stack sans attributs
+reste donc un stack, et l'ancien nom redevient un bloc normal (ses `setItemStat`
+sont remis à zéro au join).
+
+La migration est **idempotente** : repasser dessus ne réécrit rien.
+
+---
+
 ## Migration depuis l'ancien système
 
 - Les 32 anciens `code-blocks/z1000XX-*.js` ont été supprimés : leurs sources
