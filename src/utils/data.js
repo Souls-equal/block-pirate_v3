@@ -63,28 +63,123 @@ export function changeMoney(playerId, amount, showMessage=true){
     }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CONFIRMATION D'ACHAT — UN SEUL systeme pour tout le jeu.
+
+   Tous les achats passent par confirmAction() : premier clic = on rappelle ce
+   qui va etre achete, second clic DANS LA MEME FENETRE = l'achat se fait.
+   Avant, il y avait trois comportements differents (un effet "verif" de 2 s
+   pour les items, une Map de 5 s pour les styles de combat, et rien du tout
+   pour le haki et la machine a fruits) : le joueur ne savait jamais quel
+   clic validait quoi.
+
+   Regles :
+   - meme fenetre partout (CONFIRM_MS) ;
+   - meme message de validation, ajoute automatiquement en fin de prompt ;
+   - la cle identifie l'achat : deux clics sur deux choses differentes ne
+     valident jamais l'une par l'autre (le pending est remplace).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const CONFIRM_MS = 3000;
+const CONFIRM_SECONDS = CONFIRM_MS / 1000;
+
+/* playerId -> { key, until } */
+const pendingConfirm = new Map();
+
+/* Fin de la confirmation en cours pour ce joueur (deconnexion, achat fait,
+   changement de contexte). */
+export function clearConfirm(playerId) {
+    if (!playerId) return;
+    pendingConfirm.delete(playerId);
+}
+
+function confirmVisualClear(playerId) {
+    try { api.removeEffect(playerId, "verif"); } catch (e) {}
+}
+
+/* Petit rappel visuel : meme effet, meme duree, pour tous les achats. */
+function confirmVisualShow(playerId) {
+    try {
+        api.applyEffect(playerId, "verif", CONFIRM_MS, {
+            displayName: "Click again to confirm",
+            icon: "NaN",
+        });
+    } catch (e) {}
+}
+
+/* Retourne true si l'achat est confirme (second clic dans la fenetre). */
+export function confirmAction(playerId, key, what) {
+    if (!playerId) return false;
+    if (!key) return true;
+
+    const now = Date.now();
+    const pending = pendingConfirm.get(playerId);
+    if (pending && pending.until < now) pendingConfirm.delete(playerId);
+
+    const current = pendingConfirm.get(playerId);
+    if (current && current.key === key) {
+        pendingConfirm.delete(playerId);
+        confirmVisualClear(playerId);
+        return true;
+    }
+
+    pendingConfirm.set(playerId, { key: key, until: now + CONFIRM_MS });
+    confirmVisualShow(playerId);
+
+    const parts = [];
+    if (what) {
+        if (Array.isArray(what)) for (const w of what) parts.push(w);
+        else parts.push(what);
+    }
+    parts.push({
+        str: "\nClick again within " + CONFIRM_SECONDS + "s to confirm.",
+        style: { color: C.SUCCESS, fontWeight: "bold" },
+    });
+    say(playerId, parts);
+    return false;
+}
+
+/* A appeler quand un achat est confirme puis annule par une autre raison
+   (plus assez d'argent entre les deux clics, par exemple). */
+export function cancelConfirm(playerId) {
+    clearConfirm(playerId);
+    confirmVisualClear(playerId);
+}
+
 export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     if (!attributes.customDisplayName) attributes.customDisplayName = item;
-    if (!attributes.customDescription) attributes.customDescription = ""
+    if (!attributes.customDescription) attributes.customDescription = "";
     const money = getStat(playerId, "money", 0);
     if (money < price) {
         say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" You don't have enough Coins: "+money+"/"+price,style:{color:C.DANGER} }]);
         return;
     }
-    if (api.hasEffect(playerId, "verif")) {
-        if (attributes.customDisplayName===null) attributes.customDisplayName = item;
-        changeMoney(playerId, -price);
 
-        api.giveItem(playerId, item, amount, attributes)
-        say(playerId, "You bough "+amount+" '"+attributes.customDisplayName+"'.", {color:"lime"})
-    } else {
-        api.applyEffect(playerId, "verif", 2000, {displayName:"Are you sure? Click to buy!", icon:"NaN"})
-        say(playerId, [
-            {str:"Are you sure you want to buy "+amount+" '"+attributes.customDisplayName+"' for "+price+" Coins?\nIf yeah: ", style:{color:"lightgray"}},
-            {str:"Click another times to valid! (be fast)",style:{color:"lime"}}
-        ])
+    const label = attributes.customDisplayName;
+    const key = "buy|" + item + "|" + amount + "|" + price;
+    if (!confirmAction(playerId, key, [
+        { icon: "fa-solid fa-cart-shopping", style: { color: C.MONEY } },
+        { str: " Buy " + amount + "x ", style: { color: C.INFO } },
+        { str: label, style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: " for ", style: { color: C.INFO } },
+        { str: price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: "?", style: { color: C.INFO } },
+    ])) return;
+
+    if (!payMoney(playerId, price)) {
+        cancelConfirm(playerId);
+        return;
     }
+    try { api.giveItem(playerId, item, amount, attributes); } catch (e) {}
+    try { api.playSound(playerId, "CashRegister", 1, 1); } catch (e) {}
+    say(playerId, [
+        { icon: "fa-solid fa-bag-shopping", style: { color: C.SUCCESS } },
+        { str: " You bought " + amount + "x ", style: { color: C.INFO } },
+        { str: label, style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: ".", style: { color: C.INFO } },
+    ]);
 }
+
 
 /* utils/leveling.js */
 

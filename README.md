@@ -496,6 +496,69 @@ ressembleraient.
 
 ---
 
+## Achats : une seule confirmation pour tout
+
+Tout achat demande **deux clics dans la même fenêtre** : le premier annonce ce qui va
+être acheté, le second valide. Une seule implémentation, dans `src/utils/data.js` :
+
+```js
+confirmAction(playerId, cle, message)
+// false  = on vient d'afficher le rappel
+// true   = achat confirmé (le 2e clic est arrivé à temps)
+```
+
+| Réglage | Valeur |
+| --- | --- |
+| Fenêtre | `CONFIRM_MS` = **3 000 ms** |
+| Rappel visuel | effet unique + « Click again to confirm » |
+| Message | même phrase de fin partout : « Click again within 3s to confirm. » |
+
+Ce qui utilise cette confirmation :
+
+| Achat | Clé |
+| --- | --- |
+| objet chez un PNJ (`buyItem`) | `buy\|<item>\|<quantité>\|<prix>` |
+| style de combat (`buyFightingStyle`) | `fs\|<style>` |
+| Armament Haki (`buyArmamentHaki`) | `haki` |
+| machine à fruits (`rollFruit`) | `fruit` |
+| recruteur de team (voir plus bas) | `team\|<TEAM>` |
+
+Avant, il y avait trois comportements : un effet `verif` de **2 s** pour les objets, une
+`Map` de **5 s** pour les styles de combat, et **rien du tout** pour le haki et la machine
+à fruits (achats immédiats, y compris à 14 000 pièces). Le joueur ne pouvait pas savoir
+quel clic validait quoi.
+
+La clé compte : enchaîner deux achats **différents** ne valide jamais le premier par
+erreur, et le rappel de l'un ne confirme pas l'autre. La confirmation est remise à zéro
+à la déconnexion (`clearConfirm`) et après un paiement refusé (`cancelConfirm`).
+
+Les achats en **points de stat** (`handleShopBuy`) ne sont pas concernés : ils ne coûtent
+pas d'argent et se remboursent au reset.
+
+---
+
+## PNJ recruteurs de team
+
+Deux PNJ à placer dans le monde (comme les marchands `Fruit Dealer`, `Haki Seller`…),
+nommés exactement :
+
+| Nom du PNJ | Team appliquée |
+| --- | --- |
+| `Pirate Recruiter` | `PIRATES` |
+| `Marine Recruiter` | `MARINES` |
+
+Au **premier clic**, il annonce la team dans laquelle il va te basculer, la team actuelle
+et la conversion des armes. Au **second clic** (même fenêtre de 3 s que tous les achats),
+le changement est appliqué par `setPlayerTeam()` : base de données, nametag, canaux de
+chat, sidebar, armes de team et classement sont mis à jour d'un coup. S'il est déjà dans
+cette team, il le dit et ne fait rien.
+
+Le nom est le seul branchement (`TEAM_RECRUITERS` dans `src/gameplay/NPCs.js`) : renommer
+le PNJ dans le monde suffit à le désactiver, et en ajouter un troisième pour une future
+team ne demande qu'une ligne.
+
+---
+
 ## Garde-fous de mouvement : bateau et crowd control
 
 Tous les déplacements « subis » passent par quatre fonctions de `src/utils/combat.js` —
