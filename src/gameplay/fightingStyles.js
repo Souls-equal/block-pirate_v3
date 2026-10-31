@@ -34,7 +34,7 @@ import {
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { INVENTORY_SLOT_MAX } from "./customItem";
-import { getTotalMoney, payMoney } from "../utils/data";
+import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, say } from "../core/theme";
 
@@ -707,7 +707,6 @@ for (const k in FIGHTING_STYLES) {
 const activeStyles = new Map();
 const abilityCooldowns = new Map();
 const m1Cooldowns = new Map();
-const confirmPurchase = new Map();
 
 export function isFightingStyleAbilityName(customName) {
     return typeof customName === "string" && ALL_FS_ABILITY_NAMES.has(customName);
@@ -847,7 +846,7 @@ export function clearFightingStyle(playerId) {
     activeStyles.delete(playerId);
     abilityCooldowns.delete(playerId);
     m1Cooldowns.delete(playerId);
-    confirmPurchase.delete(playerId);
+    cancelConfirm(playerId);
     removeFightingStyleItems(playerId, null);
     try {
         api.setPlayerDbValue(playerId, FS_DB_KEY, null);
@@ -858,7 +857,7 @@ export function onPlayerLeaveFightingStyle(playerId) {
     activeStyles.delete(playerId);
     abilityCooldowns.delete(playerId);
     m1Cooldowns.delete(playerId);
-    confirmPurchase.delete(playerId);
+    cancelConfirm(playerId);
 }
 
 export function buyFightingStyle(playerId, styleName) {
@@ -894,26 +893,20 @@ export function buyFightingStyle(playerId, styleName) {
         return false;
     }
 
-    const now = Date.now();
-    const pending = confirmPurchase.get(playerId);
-    if (!pending || pending.style !== styleName || now > pending.until) {
-        confirmPurchase.set(playerId, { style: styleName, until: now + 5000 });
-        try {
-            say(playerId, [
-                { icon: "fa-solid fa-hand-fist", style: { color: "#e2e8f0" } }, { str: " Click ", style: { color: "#e2e8f0" } },
-                { str: style.npc, style: { color: style.color, fontWeight: "bold" } },
-                { str: " again within 5s to learn ", style: { color: "#e2e8f0" } },
-                { str: style.name, style: { color: style.color, fontWeight: "bold" } },
-                { str: " for ", style: { color: "#e2e8f0" } },
-                { str: style.price + " Coins", style: { color: "#facc15", fontWeight: "bold" } },
-                { str: " (replaces your current Fighting Style).", style: { color: "#94a3b8" } },
-            ]);
-        } catch (e) {}
+    /* Meme confirmation que tous les autres achats (voir utils/data). */
+    if (!confirmAction(playerId, "fs|" + styleName, [
+        { icon: "fa-solid fa-hand-fist", style: { color: style.color } },
+        { str: " Learn ", style: { color: C.INFO } },
+        { str: style.name, style: { color: style.color, fontWeight: "bold" } },
+        { str: " for ", style: { color: C.INFO } },
+        { str: style.price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: " (replaces your current Fighting Style).", style: { color: C.INFO } },
+    ])) return false;
+
+    if (!payMoney(playerId, style.price)) {
+        cancelConfirm(playerId);
         return false;
     }
-
-    confirmPurchase.delete(playerId);
-    if (!payMoney(playerId, style.price)) return false;
     try {
         api.playSound(playerId, "CashRegister", 1, 1);
     } catch (e) {}

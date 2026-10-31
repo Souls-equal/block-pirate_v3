@@ -2,7 +2,7 @@
 import { getRandomPosition, spawnBoss } from "./boss";
 import { point, TEX } from "./fx";
 import { isMobEntityType, posOf } from "./lifeform";
-import { getTotalMoney, payMoney } from "./data";
+import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "./data";
 
 import { say } from "../core/theme";
 const HK_CLICK = "Small Black Pod";
@@ -153,7 +153,16 @@ export function buyArmamentHaki(playerId) {
         return false;
     }
 
+    /* Meme confirmation que tous les autres achats (voir utils/data). */
+    if (!confirmAction(playerId, "haki", [
+        { icon: "fa-solid fa-hand-fist", style: { color: "#B98CFF" } },
+        { str: " Learn Armament Haki for ", style: { color: "#AAAAAA" } },
+        { str: HK_PRICE + " Gold Coins", style: { color: "#FFD700", fontWeight: "bold" } },
+        { str: " and 1 Black Carpet.", style: { color: "#AAAAAA" } },
+    ])) return false;
+
     if (!payMoney(playerId, HK_PRICE)) {
+        cancelConfirm(playerId);
         hk_say(playerId, [{ str: "Payment failed.", style: { color: "#FF5555", fontWeight: "bold" } }]);
         return false;
     }

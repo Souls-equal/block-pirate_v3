@@ -10,7 +10,7 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { reconcileSP as _ } from "./utils/data";
+import { clearConfirm as bpClearConfirm, reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
 import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
@@ -179,6 +179,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     Gt("variation", () => variationJoin(t));
 }, onPlayerLeave = t => {
     Gt("variation.leave", () => variationLeave(t));
+    bpClearConfirm(t);
     k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t);
     try {
         lt(t);

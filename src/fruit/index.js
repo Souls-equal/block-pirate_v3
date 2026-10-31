@@ -1,5 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say } from "../core/theme";
+import { confirmAction } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -827,6 +828,31 @@ export function rollFruit(t, e = 1) {
   if (!o) return null;
   if (null == t) return o;
   if (M.has(t)) return (p(t, "The fruit machine is already spinning.", { color: "#fbbf24", fontWeight: "700" }), null);
+
+  /* Meme confirmation que tous les autres achats (voir utils/data) : le
+     premier clic annonce le prix, le second lance la machine. Le controle
+     d'argent reste fait plus bas, donc on ne demande pas de confirmer un
+     achat impossible. */
+  const rollLevel = (function () {
+    for (const key of R) {
+      const v = T(t, key);
+      if (null !== v) return Math.max(0, Math.floor(v));
+    }
+    return 0;
+  })();
+  const rollPrice = 500 + 35 * rollLevel;
+  let rollBalance = 0;
+  for (const key of C) {
+    const v = T(t, key);
+    if (null !== v) { rollBalance = Math.max(0, v); break; }
+  }
+  if (rollBalance >= rollPrice && !confirmAction(t, "fruit", [
+    { icon: "fa-solid fa-dice", style: { color: THEME.MONEY } },
+    { str: " Spin the fruit machine for ", style: { color: "#cbd5e1" } },
+    { str: String(rollPrice), style: { color: "#facc15", fontWeight: "700" } },
+    { str: " (level " + rollLevel + ").", style: { color: "#cbd5e1" } },
+  ])) return null;
+
   const r = (function (t) {
     const e = (function (t) {
         for (const e of R) {

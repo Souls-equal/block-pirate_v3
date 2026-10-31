@@ -1,18 +1,113 @@
 // NPCs.js
 import { buyArmamentHaki } from "../utils/haki"
 import { startQuest } from "./quest";
-import { buyItem } from "../utils/data";
+import { buyItem, confirmAction } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
-import { getPlayerTeam } from "../core/team";
+import { getPlayerTeam, getTeamData } from "../core/team";
+import { say } from "../core/theme";
 import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
+/* ══════════════════════════════════════════════════════════════════════════
+   RECRUTEURS DE TEAM
+
+   Un PNJ par camp, place dans le monde avec le nom ci-dessous (comme les
+   autres marchands : "Fruit Dealer", "Haki Seller"...). Au clic, il annonce
+   la team dans laquelle il va te basculer ; au second clic (meme fenetre que
+   tous les autres achats, voir utils/data), le changement est applique.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const TEAM_RECRUITERS = {
+    "Pirate Recruiter": "PIRATES",
+    "Marine Recruiter": "MARINES",
+};
+
+function teamLabel(teamId) {
+    const data = getTeamData(teamId);
+    return data && data.name ? data.name : teamId === "PIRATES" ? "Pirates" : "Marines";
+}
+
+function teamColor(teamId) {
+    const data = getTeamData(teamId);
+    return (data && data.color) || (teamId === "PIRATES" ? "#E63946" : "#7DD3FC");
+}
+
+/* Applique la team. setPlayerTeam (core/team) fait le vrai travail : db,
+   nametag, canaux de chat, sidebar et conversion des armes. Le repli en db
+   n'existe que si la fonction n'a pas ete posee. */
+function applyTeamChoice(playerId, teamId) {
+    try {
+        if (typeof setPlayerTeam === "function") {
+            setPlayerTeam(playerId, teamId);
+            return true;
+        }
+    } catch (e) {}
+    try {
+        api.setPlayerDbValue(playerId, "team", teamId);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function handleTeamRecruiter(playerId, npcName, teamId) {
+    const current = getPlayerTeam(playerId);
+    const target = teamLabel(teamId);
+    const color = teamColor(teamId);
+
+    if (current === teamId) {
+        say(playerId, [
+            { icon: "fa-solid fa-circle-info", style: { color: color } },
+            { str: " You are already a ", style: { color: "#CBD5E1" } },
+            { str: target.replace(/s$/, ""), style: { color: color, fontWeight: "bold" } },
+            { str: ". Nothing to change.", style: { color: "#94A3B8" } },
+        ]);
+        return;
+    }
+
+    /* Premier clic : on dit exactement ce qui va se passer. */
+    if (!confirmAction(playerId, "team|" + teamId, [
+        { icon: "fa-solid fa-users", style: { color: color } },
+        { str: " " + npcName + ": double-click me and you will be switched to the ", style: { color: "#CBD5E1" } },
+        { str: target, style: { color: color, fontWeight: "bold" } },
+        { str: ".", style: { color: "#CBD5E1" } },
+        {
+            str: "\nYou are currently " + (current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, "")) + ".",
+            style: { color: "#94A3B8" },
+        },
+        { str: "\nYour weapons will be converted to " + target + " ones.", style: { color: "#94A3B8" } },
+    ])) return;
+
+    if (!applyTeamChoice(playerId, teamId)) {
+        say(playerId, [
+            { icon: "fa-solid fa-xmark", style: { color: "#EF4444" } },
+            { str: " The team change failed. Try again.", style: { color: "#EF4444" } },
+        ]);
+        return;
+    }
+
+    try { api.playSound(playerId, "exp_levelup", 1, 1.1); } catch (e) {}
+    say(playerId, [
+        { icon: "fa-solid fa-flag", style: { color: color } },
+        { str: " You are now a ", style: { color: "#CBD5E1" } },
+        { str: target.replace(/s$/, ""), style: { color: color, fontWeight: "bold" } },
+        { str: "!", style: { color: "#CBD5E1" } },
+    ]);
+}
+
 export function attackNPC(playerId, mobId) {
 
     const name = safeEntityName(mobId);
     if (!name) return "preventDamage";
     const team = getPlayerTeam(playerId)
+
+    const recruiterTeam = TEAM_RECRUITERS[name];
+    if (recruiterTeam) {
+        handleTeamRecruiter(playerId, name, recruiterTeam);
+        /* meme valeur de retour que tous les autres PNJ : on ne frappe pas. */
+        return "preventDamage";
+    }
 
     if (name === "Quest Dealer") {
         startQuest(playerId);
