@@ -594,9 +594,37 @@ item est un interrupteur ou une action, coût 0.
 
 | Item | Effet |
 | --- | --- |
-| `Island Arrows` | affiche / masque les flèches qui pointent vers les îles |
+| `Island Arrows` | interrupteur général : **tout** montrer / **tout** cacher |
+| une ligne par île (9) | montre / cache **cette** flèche |
 | `Respawn` | tue le joueur pour le débloquer (coincé dans un bloc, sous la map…) |
 | `PvP Protection` | active / désactive le bouclier de 5 min accordé contre son tueur au respawn |
+
+**Une couleur par île**, choisie sur son thème (`ISLAND_STYLE`, `src/core/UI.js`) : Jungle en
+vert, Snow Village en glace, Marine Fortress en bleu profond, Desert en sable, Pirate Village
+en rouge, Skylands en violet, etc. La même couleur sert pour la flèche **et** pour la ligne de
+boutique, donc on reconnaît une île à sa couleur avant de lire son nom.
+
+| Île | Code | Couleur |
+| --- | --- | --- |
+| Starter Pirate | `SP` | `#F0A35E` |
+| Middle Town | `MT` | `#9AA7B4` |
+| Starter Marine | `SM` | `#5AA9E6` |
+| Jungle | `JU` | `#4CAF50` |
+| Pirate Village | `PV` | `#C0392B` |
+| Desert | `DE` | `#E5C15A` |
+| Snow Village | `SV` | `#A8E0F5` |
+| Marine Fortress | `MF` | `#2F5FA8` |
+| Skylands | `SK` | `#B388E8` |
+
+Le **code** est la clé de réglage d'une île : deux îles ne doivent jamais partager le même,
+sinon cacher l'une cacherait l'autre (une île ajoutée à `ISLAND_WARPS` sans thème reçoit ses
+initiales et le gris neutre, elle ne casse rien). Le clic est résolu par le **code**
+(`isle_ju`, `isle_pv`…), jamais par le libellé affiché : renommer une île ne casse pas les
+clics.
+
+**Masquer une île ne touche qu'à elle.** Quand tout est caché et qu'on en rallume une seule,
+les autres **restent** cachées (pas besoin de huit clics) ; à l'inverse `Show all` efface
+toutes les exceptions, l'interrupteur général doit vraiment tout rallumer.
 
 **Les coordonnées des flèches ne sont pas recopiées** : `applyIslandArrows()` boucle sur
 `ISLAND_WARPS` (`src/core/admin.js`), la même table que les `Warp to Island` du panneau
@@ -607,12 +635,13 @@ Chaque flèche porte un id stable (`isle-pirate-village`, `isle-snow-village`…
 îles ne touche **jamais** la flèche de quête, qui a son propre id (`core/quest.js`), et la
 déconnexion n'efface que nos ids (`settingsLeave`).
 
-Deux **clés db joueur**, courtes, créées à la première utilisation :
+Trois **clés db joueur**, courtes, créées à la première utilisation :
 
-| Clé | Absente / `1` | `0` |
+| Clé | Valeur par défaut | Autre valeur |
 | --- | --- | --- |
-| `dirArrow` | flèches d'îles affichées | masquées |
-| `pvpProt` | protection PvP accordée | refusée |
+| `dirArrow` | `1` : flèches d'îles affichées | `0` = plus aucune |
+| `arrowOff` | absente : aucune île masquée | codes masqués, ex. `"JU,DE"` |
+| `pvpProt` | `1` : protection PvP accordée | `0` = refusée |
 
 `pvpProt` n'est pas décoratif : `isPvPProtectionEnabled()` (`src/utils/combat.js`) est lu au
 **moment d'accorder** le bouclier, au **moment de le tester**, et le message de mort ne
