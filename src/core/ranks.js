@@ -112,6 +112,8 @@ export const STAFF = {
     "KIDDING_MC_VN": "DEV",
     "BLOXD_IO_YT_ZAY":"TESTER",
     "DlRECTOR":"TESTER",
+    "Arthur":"ADMIN",
+    "Chillguy45":"TESTER
 };
 
 const playerRankCache = {};
