@@ -618,6 +618,13 @@ Avant, il y avait trois comportements : un effet `verif` de **2 s** pour les obj
 à fruits (achats immédiats, y compris à 14 000 pièces). Le joueur ne pouvait pas savoir
 quel clic validait quoi.
 
+Deux achats ont un cas particulier, documenté plus bas :
+
+* **Armament Haki** — si le joueur connaît déjà le haki, le vendeur **redonne l'item**
+  (`Small Black Pod`) sans rien facturer : ce n'est pas un achat, donc pas de confirmation ;
+* **machine à fruits** — le prix est débité **à la livraison** du fruit, pas au lancement de
+  l'animation (voir « Machine à fruits »).
+
 La clé compte : enchaîner deux achats **différents** ne valide jamais le premier par
 erreur, et le rappel de l'un ne confirme pas l'autre. La confirmation est remise à zéro
 à la déconnexion (`clearConfirm`) et après un paiement refusé (`cancelConfirm`).
@@ -669,6 +676,96 @@ Résultat : la boucle « je tue mon alt → mon Marine me tue » ne crée **plus
 par simulation sur 50 kills : total des comptes inchangé), alors qu'un vrai joueur garde la
 totalité de la prime anti-farm la première fois qu'il abat un petit joueur, et un Marine garde
 sa prime la première fois qu'il abat un pirate.
+
+---
+
+## Machine à fruits : on ne paie qu'un fruit livré
+
+`rollFruit` (`src/fruit/index.js`) lance une animation d'environ 2,4 s (tick par tick) avant de
+donner le fruit. Deux défauts corrigés :
+
+**1. L'argent était débité au lancement.** Un joueur qui se déconnectait (ou changeait de
+variation) pendant l'animation perdait sa mise : le remboursement tentait d'écrire dans la base
+d'un joueur **déjà parti**, ce qui échoue — donc l'argent était perdu *et* une erreur partait
+dans les logs (`fruitRoll.refund`). Désormais :
+
+| Moment | Ce qui se passe |
+| --- | --- |
+| lancement | le solde est **vérifié**, rien n'est retiré |
+| livraison du fruit | `fruitPay()` relit le solde et débite **une seule fois** ; si le joueur a dépensé entre-temps : « Not enough money anymore. Nothing was taken from you. » |
+| déconnexion en plein tour | `refundRoll()` arrête le minuteur, **aucune écriture en base**, aucune erreur |
+| inventaire plein / échec `giveItem` | remboursement du prix déjà débité (seul cas où il y a quelque chose à rendre) |
+
+**2. L'animation continuait sur un fantôme.** Le minuteur appelait `setClientOption`
+(`middleTextUpper`) et `playSound` sur un id disparu, d'où des `fruitRoll.middleTextUpper` /
+`fruitRoll.playSound` en boucle. Chaque tick vérifie maintenant `fruitOnline(playerId)` et
+s'arrête net au premier tick suivant le départ.
+
+**Le prix affiché pendant l'animation est donc une promesse, pas un débit** : il est prélevé au
+moment où le fruit tombe dans l'inventaire.
+
+---
+
+## Boss Garp : il apparaît à côté du joueur
+
+`startBoss()` (`src/utils/haki.js`, appelé par le Code Block du portail) tirait **deux positions
+au hasard** dans un rectangle de 250 × 286 blocs : le joueur d'un côté, le boss de l'autre, donc
+un combat qui pouvait commencer à 250 blocs de distance (le boss mettait des secondes à arriver,
+ou perdait sa cible en route).
+
+Maintenant :
+
+1. le joueur est téléporté dans l'arène (tirage aléatoire, sol vérifié) ;
+2. sa position est **relue après le TP** ;
+3. le boss est posé à **8 blocs** (`BOSS_SPAWN_DIST`) autour de lui, angle aléatoire, point borné
+   à l'intérieur de l'arène et passé par `getSafePosition` (jamais dans un bloc).
+
+Le combat démarre donc dans la seconde, et les gardes apparaissent autour du boss, donc autour du
+joueur.
+
+---
+
+## PNJ : ce que vend chaque nom
+
+Le nom du PNJ **est** son script (voir `attackNPC`, `src/gameplay/NPCs.js`). Pour ajouter un
+marchand, il suffit de le nommer dans le monde comme dans ce tableau — aucun autre fichier à
+toucher.
+
+| PNJ | Objet | Prix | Quantité |
+| --- | --- | --- | --- |
+| `Apple Seller` | Apple | 75 | 3 |
+| `Coconut Seller` | **Cracked Coconut** | 200 | 3 |
+| `Steak Seller` | Steak | 180 | 3 |
+| `Cornbread Seller` | Cornbread | 140 | 3 |
+| `Corn Seller` | Corn | 80 | 3 |
+| `Bread Seller` | Bread | 110 | 3 |
+| `Chili Seller` | Chili Pepper | 120 | 2 |
+| `Mango Seller` | Mango | 120 | 3 |
+| `Venison Seller` | Cooked Venison | 180 | 3 |
+| `Pork Seller` | Cooked Porkchop | 180 | 3 |
+| `Mutton Seller` | Cooked Mutton | 180 | 3 |
+
+Tous passent par `buyItem()` : **la confirmation 3 s s'applique automatiquement**, il n'y a rien
+à ajouter pour un nouveau vendeur.
+
+---
+
+## Haki : le vendeur redonne l'item
+
+`Small Black Pod` est l'item **unique** qui sert à armer le haki. S'il est perdu (lâché, filtré
+d'inventaire, avalé par un respawn), le joueur savait le haki mais n'avait plus aucun moyen de
+l'armer : le vendeur répondait « You already know Armament Haki. » et rien d'autre.
+
+`buyArmamentHaki` (`src/utils/haki.js`) suit maintenant la règle des **fighting styles** :
+
+| État du joueur | Réponse du vendeur |
+| --- | --- |
+| ne connaît pas le haki | achat normal : **3 s de confirmation** (clé `haki`), 14 000 pièces + 1 Black Carpet |
+| connaît le haki, **pod absent** | « You already know Armament Haki. Your Small Black Pod has been given back. » — **gratuit**, sans confirmation |
+| connaît le haki, pod présent | « …your Small Black Pod is in your inventory. » — aucun doublon |
+
+`giveHakiPod()` est partagé par l'achat et le refresh : il ne crée jamais un second pod
+(`getInventoryItemAmount` avant `giveItem`).
 
 ---
 
@@ -997,6 +1094,30 @@ Messages typiques :
   par la limite 32 k : reconstruis ce pack (`npm run build:blocks`).
 - `handler 'onPlayerClickGravityGrab' introuvable` → le fruit n'a pas été chargé ;
   le cooldown est remboursé et l'erreur apparaît dans les logs.
+
+---
+
+## Quêtes : ajouter une île
+
+`quests` (`src/gameplay/quest.js`) est la **seule** source de vérité : la courbe d'XP
+(`xpToNext`, `src/utils/data.js`) et la liste des îles sont dérivées de ce tableau
+(`islandsFromQuests`), triées par `levelMin`. Ajouter une île = ajouter une entrée ici, puis
+`npm run build` pour régénérer `world-code/`.
+
+| Île | Niveaux | Quêtes |
+| --- | --- | --- |
+| Starter Island | 0 – 9 | 3 |
+| Jungle | 10 – 30 | 5 |
+| Pirate Village | 31 – 60 | 5 |
+| Desert | 60 – 90 | 5 |
+| Snow Village | 90 – 120 | 5 |
+| Marine Fortress | 120 – 150 | 6 |
+| **Lower Skylands** | **150 – 190** | **7** (`skyBandit1‑3`, `darkMaster1‑4`) |
+
+Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le monde**), son
+`realMob` (l'espèce réellement invoquée), son `mob.rank`, son `killAmount` et sa `position`
+(l'endroit où le PNJ de quête doit être). `realMob` sert aux messages : le joueur lit
+« Sky Bandit 1 », pas « Draugr Zombie ».
 
 ---
 

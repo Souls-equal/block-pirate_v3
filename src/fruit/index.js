@@ -586,6 +586,14 @@ export function onPlayerDeathFruit(t) {
   delete b[t];
 }
 export function clearFruitCallbacks(t) {
+  /* Deconnexion en pleine animation : la machine avait deja encaisse le
+     prix. On rend l'argent (et on arrete le minuteur) avant de toucher au
+     reste, sinon le joueur perdait sa mise pour un fruit jamais livre. */
+  try {
+    refundRoll(t);
+  } catch (t) {
+    f("clearFruitCallbacks.refundRoll", t);
+  }
   const pending = d.get(t);
   if (pending && n[pending]) {
     try {
@@ -709,15 +717,60 @@ function $(t) {
   return t[Math.floor(Math.random() * t.length)];
 }
 function B(t, e) {
-  if (e)
+  if (e && e.paid)
     try {
       api.setPlayerDbValue(t, e.key, e.balanceBefore);
+      e.paid = false;
     } catch (t) {
       f("fruitRoll.refund", t, e.key);
     }
 }
+/* Encaisse le prix AU MOMENT DE LA LIVRAISON. Relit le solde : le joueur a pu
+   depenser entre-temps (autre achat, autre PNJ). Renvoie false si l'argent
+   n'y est plus — dans ce cas rien n'est debite et rien n'est donne. */
+function fruitPay(t, e) {
+  if (!e) return false;
+  if (e.paid) return true;
+  const cur = T(t, e.key);
+  if (null === cur || cur < e.price) return false;
+  e.balanceBefore = cur;
+  e.balanceAfter = cur - e.price;
+  try {
+    api.setPlayerDbValue(t, e.key, e.balanceAfter);
+    e.paid = true;
+    return true;
+  } catch (r) {
+    f("fruitRoll.pay", r, e.key);
+    return false;
+  }
+}
+/* Le joueur est-il encore dans CE monde ? Pendant l'animation (2 s), il peut
+   deconnecter ou changer de variation : l'entite disparait, et le moindre
+   api.setClientOption / playSound sur cet id leve une erreur. */
+function fruitOnline(t) {
+  if (!t) return false;
+  try {
+    const e = api.getPlayerIds() || [];
+    return -1 !== e.indexOf(t);
+  } catch (e) {
+    return false;
+  }
+}
+/* Rembourse le roll en cours du joueur, s'il y en a un, et l'arrete.
+   La piece est rendue telle quelle (balanceBefore) : le joueur ne perd rien
+   parce qu'il a quitte pendant l'animation. */
+function refundRoll(t) {
+  const e = M.get(t);
+  if (!e) return false;
+  M.delete(t);
+  /* Si rien n'a encore ete debite (cas normal), il n'y a rien a rendre :
+     aucun appel a la base, donc aucune erreur sur un joueur deja parti. */
+  B(t, e);
+  if (fruitOnline(t)) A(t);
+  return true;
+}
 function E(t, o, r) {
-  const c = {};
+  const c = r;
   M.set(t, c);
   const a = (function () {
     const t = [];
@@ -733,6 +786,8 @@ function E(t, o, r) {
     w(t, ["???", "???", "???"], "ROLLING...", r.price, r.level, "#facc15"),
     e(function i() {
       if (M.get(t) !== c) return;
+      /* Parti en plein tour : plus rien a afficher, plus rien a jouer. */
+      if (!fruitOnline(t)) return void refundRoll(t);
       const u = Math.min(1, l / 120);
       if (u >= 1)
         return (
@@ -743,6 +798,17 @@ function E(t, o, r) {
               (function (t, o, r, i) {
                 if (M.get(t) !== o) return;
                 M.delete(t);
+                /* Parti pendant l'animation : rien n'a ete debite, on s'arrete. */
+                if (!fruitOnline(t)) return;
+                /* Encaisse maintenant : le solde peut avoir baisse pendant les 2 s. */
+                if (!fruitPay(t, i))
+                  return void (
+                    A(t),
+                    p(t, "Not enough money anymore. Nothing was taken from you.", {
+                      color: "#f87171",
+                      fontWeight: "700",
+                    })
+                  );
                 const c = n[r],
                   a = c && c.baseItem && c.baseItem.type;
                 if (!a)
@@ -887,17 +953,12 @@ export function rollFruit(t, e = 1) {
         ),
         null
       );
-    const n = { level: e, price: o, key: r.key, balanceBefore: r.balance, balanceAfter: r.balance - o };
-    try {
-      api.setPlayerDbValue(t, n.key, n.balanceAfter);
-    } catch (e) {
-      return (
-        f("fruitRoll.setPlayerDbValue", e, n.key),
-        p(t, "The fruit machine is temporarily unavailable.", { color: "#f87171", fontWeight: "700" }),
-        null
-      );
-    }
-    return n;
+    /* ATTENTION : on ne debite PAS ici. Le prix est retire au moment ou le
+       fruit est livre (voir fruitPay). Payer d'avance obligeait a rembourser
+       quand le joueur quittait pendant l'animation — or on ne peut plus
+       ecrire dans la base d'un joueur deconnecte, donc l'argent etait perdu
+       ET une erreur partait dans les logs. */
+    return { level: e, price: o, key: r.key, balanceBefore: r.balance, balanceAfter: r.balance - o, paid: false };
   })(t);
   return r ? (E(t, o, r), o) : null;
 }
