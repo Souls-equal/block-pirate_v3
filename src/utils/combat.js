@@ -778,6 +778,35 @@ export function forceCameraDir(id, dir) {
     catch (e) { return false; }
 }
 
+/* Saut et doubles sauts. `0` = root vertical : c'est du crowd control, refuse
+   a un rang immunise. Les valeurs de restauration passent TOUJOURS, sinon un
+   sort interrompu laisserait quelqu'un sans saut pour de bon. */
+export function setJumpAmount(id, amount) {
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    if (!(amount > 0) && ccLocked(id)) return false;
+    try { api.setClientOption(id, "jumpAmount", amount); return true; }
+    catch (e) { return false; }
+}
+
+export function setAirJumpCount(id, count) {
+    if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    if (!(count > 0) && ccLocked(id)) return false;
+    try { api.setClientOption(id, "airJumpCount", count); return true; }
+    catch (e) { return false; }
+}
+
+/* Nettoyage : remet une option client a sa valeur d'avant, ou a celle par
+   defaut du moteur si on ne l'a pas. Ce chemin n'est jamais bloque : ce n'est
+   pas un effet subi, c'est la sortie d'un effet. */
+export function restoreClientOption(id, option, value) {
+    if (!id || !option) return false;
+    try {
+        if (value === undefined || value === null) api.setClientOptionToDefault(id, option);
+        else api.setClientOption(id, option, value);
+        return true;
+    } catch (e) { return false; }
+}
+
 export function teleport(id, x, y, z) {
     if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
     const blocked = moveBlocked(id);
@@ -912,6 +941,7 @@ const CC_EFFECTS = {
     "slowness": 1,
     "weakness": 1,
     "blindness": 1,
+    "frozen": 1,
 };
 
 export function isCrowdControlEffect(effectId) {
