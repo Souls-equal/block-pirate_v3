@@ -329,7 +329,7 @@ export function chooseTeam(playerId, teamId) {
     setPending(playerId, teamSpawn(sea, team));
     const ok = moveToVariation(playerId, sea.id);
     tell(playerId, [
-        { icon: "fa-solid fa-compass", style: { color: C.MARINE } },
+        { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
         { str: ok ? " Sailing to " : " Could not board ", style: { color: C.INFO } },
         { str: sea.title, style: { color: C.XP, fontWeight: "bold" } },
         { str: " as " + (team === "PIRATES" ? "Pirates" : team === "MARINES" ? "Marines" : "No Team"), style: { color: C.PIRATE } }
@@ -344,7 +344,7 @@ export function continueJourney(playerId) {
     setPending(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
     const ok = moveToVariation(playerId, sea.id);
     tell(playerId, [
-        { icon: "fa-solid fa-anchor", style: { color: C.MARINE } },
+        { icon: "Boat", style: { color: C.MARINE } },
         { str: ok ? " Welcome back to " : " Could not board ", style: { color: C.INFO } },
         { str: sea.title, style: { color: C.XP, fontWeight: "bold" } }
     ]);
@@ -367,7 +367,7 @@ export function launch(playerId) {
         ]);
     } else {
         say(playerId, [
-            { icon: "fa-solid fa-anchor", style: { color: C.MARINE } },
+            { icon: "Boat", style: { color: C.MARINE } },
             { str: " Continue your journey in ", style: { color: C.INFO } },
             { str: (seaByNumber(playerSea(playerId)) || SEAS[1]).title, style: { color: C.XP, fontWeight: "bold" } }
         ]);

@@ -295,7 +295,7 @@ export function joinUI(playerId) {
     api.setClientOption(playerId, "headerChips", [
         { content: [{ str: "Discord:", style: { color: "#5865F2", fontWeight: "bold" } }], showBackground: true },
         { content: [{ str: ["discord.", "gg", "/",dCode].join(""), style: { color: C.INFO } }], showBackground: true },
-        { content: [{ icon: "fa-solid fa-discord", style: { color: C.MARINE } }, { str: " Join Now! ", style: { color: C.MONEY, fontWeight: "bold" } }], showBackground: false }
+        { content: [{ icon: "fa-solid fa-brands fa-discord", style: { color: C.MARINE } }, { str: " Join Now! ", style: { color: C.MONEY, fontWeight: "bold" } }], showBackground: false }
     ]);
 
     if (api.getEntityName(playerId)==="K4miNoK4mi") {

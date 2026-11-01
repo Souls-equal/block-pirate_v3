@@ -500,7 +500,7 @@ function moveNotice(id, text) {
     lastMoveNotice[id] = now;
     try {
         say(id, [
-            { icon: "fa-solid fa-ban", style: { color: "#FFD166" } },
+            { icon: "fa-solid fa-circle-xmark", style: { color: "#FFD166" } },
             { str: " " + text, style: { color: "#FFD166" } },
         ]);
     } catch (e) {}
