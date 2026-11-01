@@ -302,6 +302,71 @@ export const quests = {
             killAmount: 1,
             position: [2088, -907, -569]
         },
+    },
+    "Lower Skylands": {
+        skyBandit1: {
+            levelMin: 150,
+            levelMax: 155,
+            targetMob: "Sky Bandit 1",
+            realMob: "Draugr Zombie",
+            mob: { rank: 1 },
+            killAmount: 8,
+            position: [2567,-775,1367]
+        },
+        skyBandit2: {
+            levelMin: 155,
+            levelMax: 160,
+            targetMob: "Sky Bandit 2",
+            realMob: "Draugr Zombie",
+            mob: { rank: 1 },
+            killAmount: 8,
+            position: [2632,-780,1345]
+        },
+        skyBandit3: {
+            levelMin: 165,
+            levelMax: 170,
+            targetMob: "Sky Bandit 3",
+            realMob: "Draugr Zombie",
+            mob: { rank: 1 },
+            killAmount: 8,
+            position: [2686,-767,1361]
+        },
+        darkMaster1: {
+            levelMin: 170,
+            levelMax: 175,
+            targetMob: "Dark Master 1",
+            realMob: "Cave Golem",
+            mob: { rank: 2 },
+            killAmount: 8,
+            position: [2940,-672,1695]
+        },
+        darkMaster2: {
+            levelMin: 175,
+            levelMax: 180,
+            targetMob: "Dark Master 2",
+            realMob: "Cave Golem",
+            mob: { rank: 2 },
+            killAmount: 8,
+            position: [2918,-660,1638]
+        },
+        darkMaster3: {
+            levelMin: 180,
+            levelMax: 185,
+            targetMob: "Dark Master 3",
+            realMob: "Cave Golem",
+            mob: { rank: 2 },
+            killAmount: 8,
+            position: [2961,-672,1628]
+        },
+        darkMaster4: {
+            levelMin: 185,
+            levelMax: 190,
+            targetMob: "Dark Master 4",
+            realMob: "Cave Golem",
+            mob: { rank: 3 },
+            killAmount: 6,
+            position: [2912,-671,1590]
+        }
     }
 };
 
