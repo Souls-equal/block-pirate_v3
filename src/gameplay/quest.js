@@ -323,9 +323,18 @@ export const quests = {
             position: [2632,-780,1345]
         },
         skyBandit3: {
+            levelMin: 160,
+            levelMax: 165,
+            targetMob: "Sky Bandit 3",
+            realMob: "Draugr Zombie",
+            mob: { rank: 1 },
+            killAmount: 8,
+            position: [2636,-790,1286]
+        },
+        skyBandit4: {
             levelMin: 165,
             levelMax: 170,
-            targetMob: "Sky Bandit 3",
+            targetMob: "Sky Bandit 4",
             realMob: "Draugr Zombie",
             mob: { rank: 1 },
             killAmount: 8,
