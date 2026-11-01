@@ -173,6 +173,16 @@ function pvpName(id) {
     return n && n !== "Unknown" ? n : String(id);
 }
 
+/* La protection PvP est un REGLAGE (shop > Settings) : le joueur peut la
+   refuser. Cle db "pvpProt" = 0 -> refusee ; absente ou 1 -> accordee.
+   Lu ici et pas ailleurs : un seul endroit decide si un bouclier existe. */
+export function isPvPProtectionEnabled(playerId) {
+    if (!playerId) return false;
+    let v = null;
+    try { v = api.getPlayerDbValue(playerId, "pvpProt"); } catch (e) { return true; }
+    return !(v === 0 || v === "0" || v === false);
+}
+
 /* Vie du joueur, ou null si elle est illisible (entite absente). */
 function pvpHealth(id) {
     try {
@@ -192,7 +202,12 @@ export function notePvPDeath(victimId, killerId) {
     /* Deux callbacks de mort peuvent arriver pour le meme kill :
        on ne repete pas le message. */
     if (!prev || prev.killerId !== killerId || now - prev.at > 2000) {
-        pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". 5 min of protection against them once you respawn (cancelled if you attack them).", C.DANGER);
+        /* Le message ne promet une protection que si elle est activee. */
+        if (isPvPProtectionEnabled(victimId)) {
+            pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". 5 min of protection against them once you respawn (cancelled if you attack them).", C.DANGER);
+        } else {
+            pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". Protection is disabled in your Settings.", C.DANGER);
+        }
     }
     return true;
 }
@@ -200,6 +215,11 @@ export function notePvPDeath(victimId, killerId) {
 /* Appele au respawn : accorde 5 min de protection contre le tueur. */
 export function grantPvPShield(victimId) {
     if (!victimId) return 0;
+    /* Reglage refuse : on jette la mort en attente, aucun bouclier ne sera pose. */
+    if (!isPvPProtectionEnabled(victimId)) {
+        delete PVP_PENDING[victimId];
+        return 0;
+    }
     const pending = PVP_PENDING[victimId];
     if (!pending) return 0;
     delete PVP_PENDING[victimId];
@@ -214,6 +234,11 @@ export function grantPvPShield(victimId) {
 
 export function isPvPShielded(victimId, attackerId) {
     if (!victimId || !attackerId) return false;
+    /* Desactiver le reglage enleve aussi les protections deja en cours. */
+    if (!isPvPProtectionEnabled(victimId)) {
+        if (PVP_SHIELD[victimId]) delete PVP_SHIELD[victimId];
+        return false;
+    }
     const shields = PVP_SHIELD[victimId];
     if (!shields) return false;
     const until = shields[attackerId];

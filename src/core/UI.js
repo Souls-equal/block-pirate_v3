@@ -1,12 +1,14 @@
 // UI.js
 
-import { addStat, getStat, setStat, xpToNext } from "../utils/data";
+import { addStat, confirmAction, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
-import { isVanished } from "./admin";
+import { ISLAND_WARPS, isVanished } from "./admin";
+import { isPvPProtectionEnabled } from "../utils/combat";
+import { getLastDamager } from "../utils/killAttribution";
 import { C, fit, measure } from "./theme";
 
 export const dCode = "7WGjmPHZrS"
@@ -298,17 +300,285 @@ export function joinUI(playerId) {
         { content: [{ icon: "fa-solid fa-brands fa-discord", style: { color: C.MARINE } }, { str: " Join Now! ", style: { color: C.MONEY, fontWeight: "bold" } }], showBackground: false }
     ]);
 
-    if (api.getEntityName(playerId)==="K4miNoK4mi") {
-        api.setDirectionArrow(playerId, "pirate-village", [812, -906, 771], "Pirate Village", false)
-        api.setDirectionArrow(playerId, "starter-pirate", [-5, -900, 33], "Starter Pirate", false)
-        api.setDirectionArrow(playerId, "jungle", [1323, -906, 328], "Jungle", false)
-        api.setDirectionArrow(playerId, "desert", [649, -914, 1789], "Desert", false)
-        api.setDirectionArrow(playerId, "marine-starter", [885, -907, -275], "Marine Starter", true)
-        api.setDirectionArrow(playerId, "mid", [633, -901, -205], "Middle Town", true)
-        api.setDirectionArrow(playerId, "snow", [2499, -915, 663], "Snow Village", false)
-        api.setClientOptions(playerId, {
-            "flySpeedMultiplier": 2,
-            "hideCoordinates": false,
+    /* Les fleches d'iles ne sont plus reservees a un compte : elles sont
+       posees, pour tout le monde, par la categorie Settings (voir plus bas). */
+    try { setupSettingsShop(playerId); } catch (e) {}
+
+    /* Confort du proprietaire du monde, sans effet sur le jeu (ni fleche, ni
+       avantage en combat) : vol plus rapide et coordonnees affichees. */
+    if (api.getEntityName(playerId) === "K4miNoK4mi") {
+        try {
+            api.setClientOptions(playerId, {
+                "flySpeedMultiplier": 2,
+                "hideCoordinates": false,
+            });
+        } catch (e) {}
+    }
+}
+
+/* ==========================================================================
+   SETTINGS (boutique, visible par TOUS)
+
+   Trois reglages personnels, sans achat ni argent :
+
+     1. Island Arrows — affiche ou masque les fleches qui pointent vers les
+        iles. Les coordonnees sont EXACTEMENT celles des teleports du panneau
+        admin (ISLAND_WARPS, core/admin.js) : un seul endroit a corriger si une
+        ile bouge, et les deux fonctions restent d'accord.
+     2. Respawn — tue le joueur pour le debloquer (coince dans un bloc, tombe
+        hors de la map...). Refuse s'il vient de se faire frapper par un
+        joueur : sinon c'est une sortie de combat gratuite.
+     3. PvP Protection — la protection de 5 minutes accordee contre son tueur
+        au respawn (voir utils/combat). Desactivable : plus de bouclier, et la
+        protection deja active tombe immediatement.
+
+   Reglages stockes en db JOUEUR (deux cles nouvelles, courtes) :
+     "dirArrow" = 0  -> fleches d'iles masquees (defaut : affichees)
+     "pvpProt"  = 0  -> protection automatique refusee (defaut : acceptee)
+   ========================================================================== */
+
+const SETTINGS_CATEGORY = "settings";
+const SETTING_ARROW_COLOR = "#7DD3FC";
+const SETTING_RESPAWN_COLOR = "#FFD166";
+const SETTING_PROTECT_COLOR = "#4ADE80";
+
+/* Identifiant stable d'une fleche : une ile = une fleche, donc la masquer ne
+   touche jamais la fleche de quete (qui a son propre id). */
+function islandArrowId(name) {
+    return "isle-" + String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function settingOn(playerId, key, fallback) {
+    let v = null;
+    try { v = api.getPlayerDbValue(playerId, key); } catch (e) { return fallback; }
+    if (v === undefined || v === null || v === "") return fallback;
+    return !(v === 0 || v === "0" || v === false);
+}
+
+function settingSet(playerId, key, on) {
+    try { api.setPlayerDbValue(playerId, key, on ? 1 : 0); return true; }
+    catch (e) { return false; }
+}
+
+export function islandArrowsEnabled(playerId) {
+    return settingOn(playerId, "dirArrow", true);
+}
+
+export function pvpProtectionEnabled(playerId) {
+    return settingOn(playerId, "pvpProt", true);
+}
+
+/* Pose (ou efface) les fleches d'iles du joueur. Ne touche qu'a NOS ids. */
+export function applyIslandArrows(playerId) {
+    if (!playerId) return false;
+    const on = islandArrowsEnabled(playerId);
+    for (const name in ISLAND_WARPS) {
+        const id = islandArrowId(name);
+        try {
+            if (on) api.setDirectionArrow(playerId, id, ISLAND_WARPS[name], name, false);
+            else if (typeof api.clearDirectionArrow === "function") api.clearDirectionArrow(playerId, id);
+        } catch (e) {}
+    }
+    return on;
+}
+
+function settingsSay(playerId, parts) {
+    try { say(playerId, parts); } catch (e) {}
+}
+
+/* Recree les trois items : c'est ce qui met a jour l'etat affiche (ON/OFF). */
+function createSettingsItems(playerId) {
+    const arrows = islandArrowsEnabled(playerId);
+    const protect = pvpProtectionEnabled(playerId);
+
+    const arrowLines = [];
+    for (const name in ISLAND_WARPS) {
+        const p = ISLAND_WARPS[name];
+        arrowLines.push({ str: "\n  " + name, style: { color: "#CBD5E1" } });
+        arrowLines.push({
+            str: "  [" + p[0] + ", " + p[1] + ", " + p[2] + "]",
+            style: { color: "#94A3B8" },
         });
     }
+
+    try {
+        api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_arrows", {
+            image: "Compass",
+            imageColour: SETTING_ARROW_COLOR,
+            canBuy: true,
+            cost: 0,
+            sortPriority: 30,
+            customTitle: [{
+                str: arrows ? "Island Arrows [ON]" : "Island Arrows [OFF]",
+                style: { color: SETTING_ARROW_COLOR, fontWeight: "bold" },
+            }],
+            buyButtonText: [{ str: arrows ? "Hide" : "Show", style: { color: SETTING_ARROW_COLOR } }],
+            description: [
+                { icon: "fa-solid fa-map-marker-check", style: { color: SETTING_ARROW_COLOR } },
+                " Arrows pointing to the islands.",
+                arrows
+                    ? { str: "\n● Showing ", style: { color: "#4ADE80", fontWeight: "bold" } }
+                    : { str: "\n● Hidden ", style: { color: "#888888", fontWeight: "bold" } },
+                { str: (arrows ? "all " : "") + "islands — click to " + (arrows ? "hide" : "show") + ".", style: { color: "#94A3B8" } },
+                ...arrowLines,
+                { str: "\nFree, and it only affects your screen.", style: { color: "#888888" } },
+            ],
+        });
+    } catch (e) {}
+
+    try {
+        api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_respawn", {
+            image: "Ender Pearl",
+            imageColour: SETTING_RESPAWN_COLOR,
+            canBuy: true,
+            cost: 0,
+            sortPriority: 20,
+            customTitle: [{ str: "Respawn", style: { color: SETTING_RESPAWN_COLOR, fontWeight: "bold" } }],
+            buyButtonText: [{ str: "Respawn", style: { color: SETTING_RESPAWN_COLOR } }],
+            description: [
+                { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
+                " Kill yourself and respawn.",
+                { str: "\nStuck in a block, under the map, in a wall?", style: { color: "#CBD5E1" } },
+                { str: "\nThis frees you.", style: { color: "#CBD5E1" } },
+                { str: "\nTwo clicks: the first one only warns you.", style: { color: "#94A3B8" } },
+                { str: "\nRefused if a player just hit you.", style: { color: "#888888" } },
+            ],
+        });
+    } catch (e) {}
+
+    try {
+        api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_protect", {
+            image: "Shield Potion",
+            imageColour: SETTING_PROTECT_COLOR,
+            canBuy: true,
+            cost: 0,
+            sortPriority: 10,
+            customTitle: [{
+                str: protect ? "PvP Protection [ON]" : "PvP Protection [OFF]",
+                style: { color: SETTING_PROTECT_COLOR, fontWeight: "bold" },
+            }],
+            buyButtonText: [{ str: protect ? "Disable" : "Enable", style: { color: SETTING_PROTECT_COLOR } }],
+            description: [
+                { icon: "fa-solid fa-shield-halved", style: { color: SETTING_PROTECT_COLOR } },
+                " The shield you get after being killed by a player.",
+                protect
+                    ? { str: "\n● ON ", style: { color: "#4ADE80", fontWeight: "bold" } }
+                    : { str: "\n● OFF ", style: { color: "#888888", fontWeight: "bold" } },
+                { str: protect
+                    ? "— 5 minutes during which your killer cannot hit you. It drops if you attack them."
+                    : "— you accept every hit again, killer included.", style: { color: "#94A3B8" } },
+                { str: "\nYour choice, nothing is bought.", style: { color: "#888888" } },
+            ],
+        });
+    } catch (e) {}
+}
+
+/* Cree la categorie et ses items. Appele au join, pour tout le monde. */
+export function setupSettingsShop(playerId) {
+    if (!playerId) return false;
+    try {
+        api.configureShopCategoryForPlayer(playerId, SETTINGS_CATEGORY, {
+            customTitle: "Settings",
+            autoSelectCategory: false,
+            sortPriority: 190,
+        });
+    } catch (e) {}
+    createSettingsItems(playerId);
+    applyIslandArrows(playerId);
+    return true;
+}
+
+function toggleIslandArrows(playerId) {
+    const want = !islandArrowsEnabled(playerId);
+    settingSet(playerId, "dirArrow", want);
+    createSettingsItems(playerId);
+    applyIslandArrows(playerId);
+    settingsSay(playerId, [
+        { icon: "fa-solid fa-map-marker-check", style: { color: SETTING_ARROW_COLOR } },
+        { str: want ? " Island arrows shown." : " Island arrows hidden.", style: { color: SETTING_ARROW_COLOR, fontWeight: "bold" } },
+    ]);
+}
+
+function togglePvPProtection(playerId) {
+    const want = !pvpProtectionEnabled(playerId);
+    settingSet(playerId, "pvpProt", want);
+    createSettingsItems(playerId);
+    settingsSay(playerId, [
+        { icon: "fa-solid fa-shield-halved", style: { color: SETTING_PROTECT_COLOR } },
+        { str: want ? " PvP protection enabled." : " PvP protection disabled.", style: { color: SETTING_PROTECT_COLOR, fontWeight: "bold" } },
+        { str: want
+            ? " You get 5 minutes against your killer when you respawn."
+            : " You accept every hit, killer included.", style: { color: "#94A3B8" } },
+    ]);
+}
+
+/* Debloque un joueur coince en le tuant. Anti-abus : refus si un joueur
+   l'a frappe dans les 10 dernieres secondes (sinon c'est une fuite de combat). */
+function settingsRespawn(playerId) {
+    let last = null;
+    try { last = getLastDamager(playerId); } catch (e) { last = null; }
+    if (last && last.killerId && Date.now() - last.at < 10000) {
+        let attackerIsPlayer = false;
+        try {
+            attackerIsPlayer = (api.getPlayerIds() || []).indexOf(last.killerId) !== -1;
+        } catch (e) {}
+        if (attackerIsPlayer) {
+            settingsSay(playerId, [
+                { icon: "fa-solid fa-triangle-exclamation", style: { color: "#EF4444" } },
+                { str: " You are in a fight: no respawn right now.", style: { color: "#EF4444", fontWeight: "bold" } },
+            ]);
+            return;
+        }
+    }
+
+    if (!confirmAction(playerId, "respawn", [
+        { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
+        { str: " Respawn now? ", style: { color: "#CBD5E1" } },
+        { str: "You will die", style: { color: "#EF4444", fontWeight: "bold" } },
+        { str: " and come back at your spawn.", style: { color: "#CBD5E1" } },
+    ])) return;
+
+    let killed = false;
+    try {
+        if (typeof api.killLifeform === "function") { api.killLifeform(playerId); killed = true; }
+    } catch (e) {}
+    if (!killed) { try { api.setHealth(playerId, 0, undefined, true); killed = true; } catch (e) {} }
+    if (!killed) { try { api.applyHealthChange(playerId, -99999, undefined, true); killed = true; } catch (e) {} }
+
+    if (!killed) {
+        settingsSay(playerId, [
+            { icon: "fa-solid fa-circle-xmark", style: { color: "#EF4444" } },
+            { str: " Respawn failed. Try again in a moment.", style: { color: "#EF4444", fontWeight: "bold" } },
+        ]);
+        return;
+    }
+    settingsSay(playerId, [
+        { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
+        { str: " Respawning…", style: { color: SETTING_RESPAWN_COLOR, fontWeight: "bold" } },
+    ]);
+}
+
+/* Point d'entree unique, branche sur onPlayerBoughtShopItem (index.js). */
+export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInput) {
+    if (categoryKey !== SETTINGS_CATEGORY) return false;
+    if (!playerId || !itemKey) return false;
+    switch (itemKey) {
+        case "set_arrows": toggleIslandArrows(playerId); return true;
+        case "set_respawn": settingsRespawn(playerId); return true;
+        case "set_protect": togglePvPProtection(playerId); return true;
+        case "set_info": createSettingsItems(playerId); return true;
+        default: return false;
+    }
+}
+
+/* Deconnexion : on efface nos fleches (l'API le recommande) sans toucher a
+   celles des quetes, qui ont leurs propres ids. */
+export function settingsLeave(playerId) {
+    if (!playerId) return false;
+    for (const name in ISLAND_WARPS) {
+        try {
+            if (typeof api.clearDirectionArrow === "function") api.clearDirectionArrow(playerId, islandArrowId(name));
+        } catch (e) {}
+    }
+    return true;
 }

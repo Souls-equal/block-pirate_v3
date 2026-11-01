@@ -586,6 +586,47 @@ ressembleraient.
 
 ---
 
+## Settings : les réglages du joueur (boutique)
+
+Une **quatrième catégorie de boutique**, `Settings` (`src/core/UI.js`), créée au join pour
+**tout le monde** — ce n'étaient pas des privilèges à garder. On n'y achète rien : chaque
+item est un interrupteur ou une action, coût 0.
+
+| Item | Effet |
+| --- | --- |
+| `Island Arrows` | affiche / masque les flèches qui pointent vers les îles |
+| `Respawn` | tue le joueur pour le débloquer (coincé dans un bloc, sous la map…) |
+| `PvP Protection` | active / désactive le bouclier de 5 min accordé contre son tueur au respawn |
+
+**Les coordonnées des flèches ne sont pas recopiées** : `applyIslandArrows()` boucle sur
+`ISLAND_WARPS` (`src/core/admin.js`), la même table que les `Warp to Island` du panneau
+admin. Une île déplacée se corrige donc à **un seul endroit**, et les deux fonctions ne
+peuvent pas se contredire.
+
+Chaque flèche porte un id stable (`isle-pirate-village`, `isle-snow-village`…) : masquer les
+îles ne touche **jamais** la flèche de quête, qui a son propre id (`core/quest.js`), et la
+déconnexion n'efface que nos ids (`settingsLeave`).
+
+Deux **clés db joueur**, courtes, créées à la première utilisation :
+
+| Clé | Absente / `1` | `0` |
+| --- | --- | --- |
+| `dirArrow` | flèches d'îles affichées | masquées |
+| `pvpProt` | protection PvP accordée | refusée |
+
+`pvpProt` n'est pas décoratif : `isPvPProtectionEnabled()` (`src/utils/combat.js`) est lu au
+**moment d'accorder** le bouclier, au **moment de le tester**, et le message de mort ne
+promet plus une protection qui n'existe pas. Couper l'option **retire aussi le bouclier en
+cours** (un réglage ne doit pas laisser un état fantôme).
+
+**Respawn** n'est pas une sortie de combat gratuite : refusé si un **joueur** a frappé la
+cible dans les 10 dernières secondes (`getLastDamager()`, `src/utils/killAttribution.js`) —
+un coup de mob ne bloque rien. Il passe par la même confirmation que les achats
+(`confirmAction(playerId, "respawn", …)` : deux clics en 3 s), puis `api.killLifeform()`,
+avec `api.setHealth(id, 0, …)` en secours.
+
+---
+
 ## Achats : une seule confirmation pour tout
 
 Tout achat demande **deux clics dans la même fenêtre** : le premier annonce ce qui va
