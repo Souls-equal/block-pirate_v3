@@ -124,10 +124,32 @@ export function onPlayerClickArmamentHaki(playerId) {
 }
 
 /* l'achat : 1 Black Carpet (retire) + 14000 Gold Coins */
+/* Le pod de bascule est un item UNIQUE : s'il est perdu (lache, avale par un
+   respawn, filtre d'inventaire), le joueur savait le haki mais n'avait plus
+   AUCUN moyen de l'armer. Comme pour les fighting styles, recliquer le
+   vendeur le rend : c'est un refresh gratuit, pas un rachat. */
+function giveHakiPod(playerId) {
+    let pods = 0;
+    try { pods = api.getInventoryItemAmount(playerId, HK_CLICK) } catch (e) { pods = 0 }
+    if (pods > 0) return false;
+    try { api.giveItem(playerId, HK_CLICK, 1) } catch (e) { return false }
+    return true;
+}
+
 export function buyArmamentHaki(playerId) {
     if (!hk_has(playerId)) return false;
     if (hasArmamentHaki(playerId)) {
-        hk_say(playerId, [{ str: "You already know Armament Haki.", style: { color: "#FFD700" } }]);
+        /* Deja appris : on ne fait payer personne, on rend juste l'item. */
+        const refreshed = giveHakiPod(playerId);
+        hk_say(playerId, refreshed
+            ? [
+                { icon: "fa-solid fa-hand-fist", style: { color: "#B98CFF" } },
+                { str: " You already know Armament Haki.\n", style: { color: "#FFD700" } },
+                { str: "Your Small Black Pod has been given back — click with it to arm your fists.", style: { color: "#AAAAAA" } }
+            ]
+            : [
+                { str: "You already know Armament Haki, and your Small Black Pod is in your inventory.", style: { color: "#FFD700" } }
+            ]);
         return false;
     }
 
@@ -169,9 +191,7 @@ export function buyArmamentHaki(playerId) {
     try { api.removeItemName(playerId, HK_TOLL, 1) } catch (e) {}
     giveArmamentHaki(playerId);
     /* le pod qui sert a basculer : on ne le double pas s'il le traine deja */
-    let pods = 0;
-    try { pods = api.getInventoryItemAmount(playerId, HK_CLICK) } catch (e) {}
-    if (!pods) { try { api.giveItem(playerId, HK_CLICK, 1) } catch (e) {} }
+    giveHakiPod(playerId);
     setArmamentHaki(playerId, true);
     try { api.playSound(playerId, "coin", 1, 1) } catch (e) {}
     hk_say(playerId, [
@@ -213,6 +233,31 @@ function getSafePosition(pos) {
     return [x, y, z];
 }
 
+/* GARP SPAWNE A COTE DU JOUEUR, PAS A L'AUTRE BOUT DE L'ARENE.
+
+   Avant : joueur et boss tires au hasard chacun dans un rectangle de 250x286
+   blocs. Deux tirages independants, donc un combat qui pouvait commencer a
+   250 blocs de distance : le boss arrivait plusieurs secondes plus tard, ou
+   jamais (il perdait la cible, les gardes popaient dans le vide).
+   Maintenant on tire un angle et on pose le boss a BOSS_SPAWN_DIST blocs :
+   assez pres pour que le combat demarre tout de suite, assez loin pour ne pas
+   apparaitre sur le joueur.
+
+   Le point reste borne a l'interieur de l'arene et passe par getSafePosition
+   (jamais dans un bloc). */
+const BOSS_SPAWN_DIST = 8;
+
+function bossPositionNear(playerPos, posA, posB) {
+    const angle = Math.random() * Math.PI * 2;
+    const dx = Math.cos(angle) * BOSS_SPAWN_DIST;
+    const dz = Math.sin(angle) * BOSS_SPAWN_DIST;
+    const minX = Math.min(posA[0], posB[0]), maxX = Math.max(posA[0], posB[0]);
+    const minZ = Math.min(posA[2], posB[2]), maxZ = Math.max(posA[2], posB[2]);
+    const x = Math.min(maxX, Math.max(minX, playerPos[0] + dx));
+    const z = Math.min(maxZ, Math.max(minZ, playerPos[2] + dz));
+    return getSafePosition([x, playerPos[1], z]);
+}
+
 function hakiBossStart(playerId, posA, posB) {
 
     let playersInZone = [];
@@ -242,14 +287,15 @@ function hakiBossStart(playerId, posA, posB) {
         }
     }
 
-    // Fix underground
+    // Position du joueur : n'importe ou dans l'arene, au sol.
     playerPos = getSafePosition(getRandomPosition(posA, posB));
-    bossPos = getSafePosition(getRandomPosition(posA, posB));
 
-    // TP joueur
+    // TP du joueur AVANT de placer le boss : on le pose par rapport a l'arrivee.
     api.setPosition(playerId, playerPos);
+    try { playerPos = posOf(playerId) || playerPos; } catch (e) {}
 
-    // Spawn boss
+    // Spawn boss : a 8 blocs du joueur, jamais a l'autre bout de l'arene.
+    bossPos = bossPositionNear(playerPos, posA, posB);
     spawnBoss(bossPos);
 }
 

@@ -133,6 +133,11 @@ export function attackNPC(playerId, mobId) {
     else if (name === "Apple Seller") {
         buyItem(playerId, "Apple", 75, 3 )
     }
+    else if (name === "Coconut Seller") {
+        /* Cracked Coconut : la noix craquee donne l'effet Speed (voir la liste
+           des effets natifs). Meme prix que les autres fruits de soin. */
+        buyItem(playerId, "Cracked Coconut", 200, 3 )
+    }
     else if (name === "Steak Seller") {
         buyItem(playerId, "Steak", 180, 3 )
     }
