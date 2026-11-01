@@ -390,17 +390,6 @@ function settingsSay(playerId, parts) {
 function createSettingsItems(playerId) {
     const arrows = islandArrowsEnabled(playerId);
     const protect = pvpProtectionEnabled(playerId);
-
-    const arrowLines = [];
-    for (const name in ISLAND_WARPS) {
-        const p = ISLAND_WARPS[name];
-        arrowLines.push({ str: "\n  " + name, style: { color: "#CBD5E1" } });
-        arrowLines.push({
-            str: "  [" + p[0] + ", " + p[1] + ", " + p[2] + "]",
-            style: { color: "#94A3B8" },
-        });
-    }
-
     try {
         api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_arrows", {
             image: "Compass",
@@ -420,8 +409,6 @@ function createSettingsItems(playerId) {
                     ? { str: "\n● Showing ", style: { color: "#4ADE80", fontWeight: "bold" } }
                     : { str: "\n● Hidden ", style: { color: "#888888", fontWeight: "bold" } },
                 { str: (arrows ? "all " : "") + "islands — click to " + (arrows ? "hide" : "show") + ".", style: { color: "#94A3B8" } },
-                ...arrowLines,
-                { str: "\nFree, and it only affects your screen.", style: { color: "#888888" } },
             ],
         });
     } catch (e) {}
