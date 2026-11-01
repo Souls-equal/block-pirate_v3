@@ -2,7 +2,7 @@ import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleCha
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
-import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H } from "./core/UI"; 
+import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
 import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
@@ -180,7 +180,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onPlayerLeave = t => {
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
-    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t);
+    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t), bpSettingsLeave(t);
     try {
         lt(t);
     } catch (t) {
@@ -382,7 +382,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
-    q(t, r, a, i, e), Z(t, r, a, i, e), jt(t, r, a, i, e);
+    q(t, r, a, i, e), Z(t, r, a, i, e), jt(t, r, a, i, e), Gt("settings", () => bpSettingsShop(t, r, a, i, e));
 }, onPlayerUsedThrowable = (t, r, a) => {
     if (idInSafeZone(t)) return void safeZoneBlocked(t);
     Gt("throwable", () => v(t, r, a));
