@@ -372,6 +372,47 @@ enregistrement (db lobby perdue, joueur hors ligne), le tableau l'affiche avec
 
 ---
 
+## Freeze : figer un joueur (panneau admin)
+
+**Freeze Player** (bouton du panneau admin, **MOD+**, sur le joueur ciblé via *Select Player*)
+immobilise complètement la cible. Un second clic la libère ; le bouton affiche en permanence
+combien de joueurs sont figés.
+
+**Trois verrous, parce qu'un seul ne suffit pas**
+
+| Verrou | Mécanisme | Ce qu'il bloque |
+| --- | --- | --- |
+| Effet natif **`Frozen`** | `eff(id, "Frozen", 1500)` rafraîchi chaque seconde | le moteur lui-même : l'icône `Frozen` s'affiche et le déplacement est refusé |
+| Vitesse / saut | `setMoveSpeed(id, 0)`, `setJumpAmount(id, 0)`, `setAirJumpCount(id, 0)` | course, saut, **doubles sauts** |
+| Re-téléportation | `teleport(id, …)` vers la position verrouillée, toutes les 1 000 ms | dashes, impulsions, grappins, capacités de déplacement : ils ramènent le joueur à sa place |
+
+Le re-téléport n'a lieu **que si la cible s'est réellement écartée** (plus de 0,35 bloc) : un
+joueur sage ne reçoit aucun paquet `setPosition` inutile.
+
+**Règles**
+
+* impossible de se figer soi-même ;
+* impossible de figer un rang **égal ou supérieur** au sien, ni un rang **immunisé au crowd
+  control** (ADMIN, OWNER) : `Frozen` est déclaré dans `CC_EFFECTS`, donc `applyEffect` le
+  refuse de lui-même ;
+* **changer de cible lève le freeze** de l'ancienne — sinon un joueur restait figé pour
+  toujours dès qu'on passait à quelqu'un d'autre ;
+* **la déconnexion lève le freeze** (`adminLeave` → `clearFreezeOnLeave`), pour qu'un id
+  recyclé plus tard n'hérite pas d'un freeze fantôme ;
+* si la cible **meurt**, on ne la téléporte pas : on attend son respawn et on reverrouille
+  sur la position d'arrivée (`api.getHealth` passe à 0 pendant l'écran de mort, alors que le
+  cache des joueurs listés la compte encore vivante) ;
+* expiration de sécurité à **10 minutes**, pour qu'une panne de panneau ne laisse personne
+  figé indéfiniment ;
+* la **restauration n'est jamais bloquée** : `restoreClientOption` remet la vitesse, le saut
+  et les doubles sauts exacts d'avant le freeze (un joueur qui avait un bonus de vitesse le
+  retrouve intact), même si son rang a changé entre-temps.
+
+**Où est-ce stocké ?** Nulle part sur disque : `frozenPlayers` est une `Map` en mémoire
+(`src/core/admin.js`), vidée à la levée. Un redémarrage de lobby libère donc tout le monde.
+
+---
+
 ## Vanish : les faux messages join / leave
 
 Activer Vanish diffuse un faux « X left » (et un faux « X joined » au retour) pour que
