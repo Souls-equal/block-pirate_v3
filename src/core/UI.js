@@ -415,7 +415,7 @@ function createSettingsItems(playerId) {
 
     try {
         api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_respawn", {
-            image: "Ender Pearl",
+            image: "Moonstone Orb",
             imageColour: SETTING_RESPAWN_COLOR,
             canBuy: true,
             cost: 0,
@@ -452,7 +452,6 @@ function createSettingsItems(playerId) {
                 { str: protect
                     ? "— 5 minutes during which your killer cannot hit you. It drops if you attack them."
                     : "— you accept every hit again, killer included.", style: { color: "#94A3B8" } },
-                { str: "\nYour choice, nothing is bought.", style: { color: "#888888" } },
             ],
         });
     } catch (e) {}
