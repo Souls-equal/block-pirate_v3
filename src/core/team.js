@@ -744,6 +744,41 @@ const BOUNTY_WEAK_RATE = 0.05;
 const BOUNTY_LOCK_MS = 3000;
 const BOUNTY_LAST = {};
 
+/* ANTI-FABRICATION D'ARGENT — deux fenetres par PAIRE (tueur, victime).
+
+   La prime "cible trop faible" est un montant CREE : on ajoute 5 % de
+   l'argent de la victime a la prime du tueur sans rien debiter a la victime
+   (c'est tout l'interet de la regle : on ne prend rien au petit joueur).
+   Sans limite, on tuait donc le meme alt en boucle pour gonfler sa propre
+   prime sans depenser un dollar, puis un Marine l'encaissait en argent
+   frais. Une seule prime de ce type par paire et par fenetre.
+
+   Meme logique a l'encaissement : un Marine qui tue deux fois le meme
+   pirate dans la fenetre ne peut pas se faire payer deux fois, sinon un duo
+   marine/pirate fabrique de l'argent en s'entretuant.
+
+   Les paires sont purgees toutes les minutes : aucune fuite memoire. */
+const BOUNTY_PAIR_MS = 10 * 60 * 1000;
+const WEAK_MINT = {};     /* "tueur|victime" -> timestamp de la derniere prime anti-farm */
+const MARINE_COLLECT = {}; /* "tueur|victime" -> timestamp du dernier encaissement */
+let lastBountyPairPrune = 0;
+
+function pruneBountyPairs(now) {
+    if (now - lastBountyPairPrune < 60000) return;
+    lastBountyPairPrune = now;
+    for (const key in WEAK_MINT) {
+        if (now - WEAK_MINT[key] > BOUNTY_PAIR_MS) delete WEAK_MINT[key];
+    }
+    for (const key in MARINE_COLLECT) {
+        if (now - MARINE_COLLECT[key] > BOUNTY_PAIR_MS) delete MARINE_COLLECT[key];
+    }
+}
+
+/* Minutes restantes avant que la paire redevienne "payable". */
+function pairLeftMin(last, now) {
+    return Math.max(1, Math.ceil((BOUNTY_PAIR_MS - (now - last)) / 60000));
+}
+
 function levelOf(playerId) {
     const n = Math.floor(Number(getStat(playerId, "lvl", 1)));
     return n > 0 ? n : 1;
@@ -798,6 +833,8 @@ export function handleBountyKill(killerId, victimId) {
     const now = Date.now();
     if (BOUNTY_LAST[victimId] && now - BOUNTY_LAST[victimId] < BOUNTY_LOCK_MS) return null;
     BOUNTY_LAST[victimId] = now;
+    pruneBountyPairs(now);
+    const pairKey = killerId + "|" + victimId;
 
     let killerTeam = "NONE";
     let victimTeam = "NONE";
@@ -810,6 +847,18 @@ export function handleBountyKill(killerId, victimId) {
     if (killerTeam === "MARINES") {
         const victimBounty = getBounty(victimId);
         if (victimBounty <= 0) return { type: "none", amount: 0, bounty: 0 };
+        /* Deja encaisse cette prime recemment : on la laisse sur la tete du
+           pirate (elle reste a prendre plus tard) mais on ne paie pas deux
+           fois la meme paire, sinon le duo s'entretue pour fabriquer de
+           l'argent. */
+        const lastCollect = MARINE_COLLECT[pairKey];
+        if (lastCollect !== undefined && now - lastCollect < BOUNTY_PAIR_MS) {
+            bountySay(killerId,
+                "Bounty already collected from " + safeName(victimId) + " recently: no payout (" + pairLeftMin(lastCollect, now) + " min left).",
+                C.INFO);
+            return { type: "repeat", amount: 0, bounty: victimBounty };
+        }
+        MARINE_COLLECT[pairKey] = now;
         const payout = Math.min(victimBounty, BOUNTY_MARINE_MAX);
         setBounty(victimId, 0);
         giveMoney(killerId, payout);
@@ -823,8 +872,18 @@ export function handleBountyKill(killerId, victimId) {
        prime — de quoi eviter le farm de petits joueurs sans supprimer l'interet
        du combat. */
     if (levelOf(killerId) - levelOf(victimId) >= BOUNTY_WEAK_GAP) {
+        /* Montant CREE : une seule fois par paire et par fenetre, sinon on
+           gonfle sa prime en tuant le meme alt en boucle (voir plus haut). */
+        const lastWeak = WEAK_MINT[pairKey];
+        if (lastWeak !== undefined && now - lastWeak < BOUNTY_PAIR_MS) {
+            bountySay(killerId,
+                "Target too weak (40+ levels below) and already rewarded recently: no bounty (" + pairLeftMin(lastWeak, now) + " min left).",
+                C.INFO);
+            return { type: "weak-repeat", amount: 0, bounty: getBounty(killerId) };
+        }
         const weak = Math.min(Math.floor(moneyOf(victimId) * BOUNTY_WEAK_RATE), BOUNTY_STEAL_MAX);
         if (weak <= 0) return { type: "none", amount: 0, bounty: getBounty(killerId) };
+        WEAK_MINT[pairKey] = now;
         const weakBounty = addBounty(killerId, weak);
         bountySay(killerId,
             "Target too weak (40+ levels below): no money stolen, bounty +$" + weak + " (total $" + weakBounty + ")",

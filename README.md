@@ -578,6 +578,51 @@ pas d'argent et se remboursent au reset.
 
 ---
 
+## Économie : vol d'argent, prime et anti-fabrication
+
+Un kill entre joueurs ne rapporte **jamais** d'XP (seuls les mobs et les quêtes en donnent) et
+ne fait rien tomber : la seule chose qui bouge, c'est l'argent et la prime
+(`handleBountyKill`, `src/core/team.js`).
+
+| Kill | Règle | Qui paie |
+| --- | --- | --- |
+| Pirate (ou `None`) tue quelqu'un | **10 % de l'argent de la victime**, plafonné à **1 000 $** — transféré : la victime est débitée | la victime |
+| Pirate tue une cible **≥ 40 niveaux plus faible** | **aucun argent volé** ; **5 %** de l'argent de la victime en **prime**, plafonné à 1 000 $ | personne (montant créé) |
+| Marine tue un pirate | encaisse **`min(prime, 10 000 $)`**, la prime repart à 0 | le serveur |
+
+### Le piège : une prime créée est un robinet
+
+La prime « cible trop faible » ne débite **rien** à la victime (c'est tout l'intérêt : on ne
+prend rien au petit joueur). Sans limite, on tuait donc le **même alt** en boucle pour gonfler
+sa prime sans dépenser un dollar, puis un **Marine** venait l'encaisser en argent frais :
+
+| Étape | Argent du main | Prime du main |
+| --- | --- | --- |
+| 10 kills de l'alt (écart ≥ 40 niveaux) | inchangé (20 000 $) | 0 → **+10 000 $** |
+| un Marine tue le main | inchangé | 10 000 → 0, **+10 000 $ encaissés** |
+
+Le duo pirate + alt (`None`) ne peut pas encaisser seul (une prime ne se convertit qu'en team
+**Marine**), mais l'alt devient Marine gratuitement au PNJ recruteur : **deux comptes suffisaient**
+à fabriquer 10 000 $ par minute.
+
+### Les deux fenêtres par paire (10 minutes)
+
+`BOUNTY_PAIR_MS = 10 * 60 * 1000`, et deux tables `"tueur|victime"` purgées chaque minute :
+
+* **`WEAK_MINT`** — une seule prime anti-farm par paire et par fenêtre : les kills suivants sur
+  la même victime ne donnent rien (message « no bounty (N min left) »), et la victime n'est
+  toujours pas débitée ;
+* **`MARINE_COLLECT`** — un Marine ne peut pas encaisser deux fois la prime du **même** pirate
+  dans la fenêtre : la prime **reste sur la tête du pirate** (elle sera encaissable plus tard, ou
+  par un autre Marine), il n'y a simplement pas de second paiement.
+
+Résultat : la boucle « je tue mon alt → mon Marine me tue » ne crée **plus un dollar** (vérifié
+par simulation sur 50 kills : total des comptes inchangé), alors qu'un vrai joueur garde la
+totalité de la prime anti-farm la première fois qu'il abat un petit joueur, et un Marine garde
+sa prime la première fois qu'il abat un pirate.
+
+---
+
 ## PNJ recruteurs de team
 
 Deux PNJ à placer dans le monde (comme les marchands `Fruit Dealer`, `Haki Seller`…),
