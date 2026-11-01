@@ -101,7 +101,7 @@ function drawSidebar(playerId){
     };
 
     block([
-        { icon: "fa-solid fa-skull", style: { color: C.PIRATE } },
+        { icon: "fa-solid fa-skull", style: { color: C.MARINE, fontSize: title } },
         { str: " BLOCK PIRATES\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title } },
     ]);
     block([
@@ -426,9 +426,7 @@ function createSettingsItems(playerId) {
                 { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
                 " Kill yourself and respawn.",
                 { str: "\nStuck in a block, under the map, in a wall?", style: { color: "#CBD5E1" } },
-                { str: "\nThis frees you.", style: { color: "#CBD5E1" } },
-                { str: "\nTwo clicks: the first one only warns you.", style: { color: "#94A3B8" } },
-                { str: "\nRefused if a player just hit you.", style: { color: "#888888" } },
+                { str: "\nClick two time to respawn.", style: { color: "#313D50" } },
             ],
         });
     } catch (e) {}
