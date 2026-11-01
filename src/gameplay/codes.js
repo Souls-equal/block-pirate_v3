@@ -78,7 +78,7 @@ export const refreshInfoCase = (playerId) => {
             "3. Press the ",
             { str: "Redeem", style: { color: "lightgreen", fontWeight: "bold" } },
             " button.\n\n",
-            { icon: "fa-solid fa-gift", style: { color: "hotpink" } },
+            { icon: "fa-solid fa-award", style: { color: "hotpink" } },
             " You get your reward instantly!\n",
             { icon: "fa-solid fa-triangle-exclamation", style: { color: "orange" } },
             " Note: a code only works ONCE per player.\n\n",
@@ -103,7 +103,7 @@ export const setupCodeShop = () => {
         customTitle: [{ str: "Redeem a gift code", style: { color: "violet", fontWeight: "bold" } }],
         buyButtonText: "Redeem",
         description: [
-            { icon: "fa-solid fa-keyboard", style: { color: "violet" } },
+            { icon: "fa-solid fa-terminal", style: { color: "violet" } },
             " Type your code in the text box below, then press ",
             { str: "Redeem", style: { color: "lightgreen", fontWeight: "bold" } },
             ".\n(Spaces are ignored, but uppercase letters matter.)"
@@ -168,7 +168,7 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
 
     if (code.expiration && Date.now() > code.expiration) {
         api.sendOverShopInfo(playerId, [
-            { icon: "fa-solid fa-clock", style: { color: "red" } },
+            { icon: "fa-solid fa-hourglass", style: { color: "red" } },
             { str: "  This code has expired!", style: { color: "red" } }
         ])
         return
@@ -189,13 +189,13 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
     giveReward(playerId, code)
 
     api.sendOverShopInfo(playerId, [
-        { icon: "fa-solid fa-gift", style: { color: "hotpink" } },
+        { icon: "fa-solid fa-award", style: { color: "hotpink" } },
         { str: "  Code accepted! Reward received.", style: { color: "lightgreen" } }
     ])
 
     say(playerId,
         [{ str: "[Codes] ", style: { color: "violet", fontWeight: "bold" } },
-         { icon: "fa-solid fa-gift", style: { color: "hotpink" } },
+         { icon: "fa-solid fa-award", style: { color: "hotpink" } },
          { str: " Code " + code.name + " Redeemed! ", style: { color: "lightgreen", fontWeight: "bold" } },
          code.reward],
         { color: "lightgreen" })

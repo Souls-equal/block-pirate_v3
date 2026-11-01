@@ -102,7 +102,7 @@ function confirmVisualShow(playerId) {
     try {
         api.applyEffect(playerId, "verif", CONFIRM_MS, {
             displayName: "Click again to confirm",
-            icon: "NaN",
+            icon: "fa-solid fa-circle-question",
         });
     } catch (e) {}
 }
@@ -173,7 +173,7 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     try { api.giveItem(playerId, item, amount, attributes); } catch (e) {}
     try { api.playSound(playerId, "CashRegister", 1, 1); } catch (e) {}
     say(playerId, [
-        { icon: "fa-solid fa-bag-shopping", style: { color: C.SUCCESS } },
+        { icon: "fa-solid fa-cart-shopping", style: { color: C.SUCCESS } },
         { str: " You bought " + amount + "x ", style: { color: C.INFO } },
         { str: label, style: { color: C.MONEY, fontWeight: "bold" } },
         { str: ".", style: { color: C.INFO } },

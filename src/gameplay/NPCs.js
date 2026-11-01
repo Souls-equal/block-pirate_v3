@@ -68,7 +68,7 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
 
     /* Premier clic : on dit exactement ce qui va se passer. */
     if (!confirmAction(playerId, "team|" + teamId, [
-        { icon: "fa-solid fa-users", style: { color: color } },
+        { icon: "fa-solid fa-user-group", style: { color: color } },
         { str: " " + npcName + ": double-click me and you will be switched to the ", style: { color: "#CBD5E1" } },
         { str: target, style: { color: color, fontWeight: "bold" } },
         { str: ".", style: { color: "#CBD5E1" } },

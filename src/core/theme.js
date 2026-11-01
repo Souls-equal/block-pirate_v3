@@ -174,6 +174,132 @@ export function themeColor(value) {
     return byHue ? C[byHue] : value;
 }
 
+/* ==========================================================================
+   ICONES — LISTE BLANCHE
+
+   Bloxd ne connait qu'un jeu FERME d'icones. Un nom inconnu ne provoque pas
+   d'erreur : il s'affiche simplement en « ? ». D'ou ce garde-fou, applique a
+   TOUT ce qui sort (chat, textes de boutique, descriptions d'items, Code
+   Blocks), en un seul endroit : `safeIcon()`.
+
+     - un nom Font Awesome doit figurer dans FA_NAMES (sinon ICON_ALIAS, sinon
+       ICON_FALLBACK) ;
+     - les icones natives Bloxd (item, bloc, icone ingame : "Apple", "Frozen",
+       "Compass"...) passent telles quelles : on ne peut pas les valider sans
+       embarquer la liste des milliers d'items, et elles sont deja valides ;
+     - un mot nu en minuscules ("globe", "flag") n'est ni l'un ni l'autre :
+       il est corrige par BARE_ALIAS.
+
+   Ajouter une icone = ajouter son nom ici, sinon elle restera invisible. */
+
+const FA_NAMES = (
+    "add angle-double-up angle-down angle-up angles-up arrow-left arrow-up " +
+    "arrow-up-right-from-square arrows arrows-h arrows-left-right arrows-rotate " +
+    "arrows-up-down-left-right award backpack bars bee bell block-question bolt " +
+    "boot calendar caret-down caret-up cart-shopping check chess-knight chess-rook " +
+    "child-reaching circle-check circle-info circle-plus circle-question circle-xmark " +
+    "clock-rotate-left cog coins comment-dots commenting compress computer-mouse " +
+    "cookie copy crosshairs crown cube cubes cut dice dizzy door-closed door-open " +
+    "download edit ellipsis ellipsis-h exclamation exclamation-triangle expand " +
+    "external-link eye eye-slash face-diagonal-mouth face-dizzy face-raised-eyebrow " +
+    "face-smile face-worried feather-alt feather-pointed file-alt file-clipboard " +
+    "file-lines file-text film fire fist-raised flag folder-image gauge-high gear " +
+    "gem globe hammer hand-back-point-up hand-fist hand-holding-medical " +
+    "hand-point-left hand-wave hands-clapping hat-santa hat-witch heart " +
+    "heart-music-camera-bolt history hourglass hourglass-clock hourglass-empty house " +
+    "icons image image-slash info-circle joystick layer-group left-from-bracket " +
+    "lightbulb list list-squares location-check location-xmark lock lock-open " +
+    "magnifying-glass male map-marker-check map-marker-times map-marker-xmark minus " +
+    "minus-square mouse music music-slash navicon palette pants party-horn paste " +
+    "pause pen pen-field pen-to-square person person-arrow-down-to-line " +
+    "person-arrow-up-from-line person-falling-burst person-military-pointing " +
+    "planet-ringed play plus plus-circle power-off ranking-star recycle redo-alt " +
+    "refresh right-from-bracket rocket-launch rotate-forward rotate-right scissors " +
+    "search shield shield-alt shield-blank shield-halved shirt shoe shopping-cart " +
+    "sign-out-alt skull smile snowflake sparkle square-dashed square-minus star " +
+    "star-christmas store subtract swords sync t-shirt tachometer-alt " +
+    "tachometer-alt-fast terminal trash-alt trash-can triangle-exclamation trophy " +
+    "tshirt up-from-bracket upload user user-astronaut user-check user-clock " +
+    "user-friends user-group user-group-crown user-minus user-plus user-slash " +
+    "user-unlock users-crown video video-camera volume volume-down volume-low " +
+    "volume-medium volume-slash warning wifi wifi-3 wifi-strong wrench x xmark zap"
+).split(" ");
+
+const FA_BRANDS = (
+    "apple chrome discord google-play instagram reddit-alien tiktok twitch " +
+    "windows x-twitter youtube"
+).split(" ");
+
+const FA_SET = {};
+for (let i = 0; i < FA_NAMES.length; i++) FA_SET[FA_NAMES[i]] = 1;
+const BRAND_SET = {};
+for (let i = 0; i < FA_BRANDS.length; i++) BRAND_SET[FA_BRANDS[i]] = 1;
+
+/* Icone de secours : toujours valide, jamais de « ? ». */
+export const ICON_FALLBACK = "fa-solid fa-circle-info";
+
+/* Anciens noms (ou noms plausibles) -> nom valide. Le suffixe fait foi :
+   "fa-solid fa-recycle" et "fa-broom" tombent tous les deux sur "broom". */
+const ICON_ALIAS = {
+    gift: "fa-solid fa-award",
+    microphone: "fa-solid fa-volume",
+    "microphone-slash": "fa-solid fa-volume-slash",
+    ghost: "Invisible",
+    keyboard: "fa-solid fa-terminal",
+    bullhorn: "fa-solid fa-bell",
+    broom: "fa-solid fa-recycle",
+    ban: "fa-solid fa-circle-xmark",
+    anchor: "Boat",
+    unlock: "fa-solid fa-lock-open",
+    trash: "fa-solid fa-trash-can-can",
+    users: "fa-solid fa-user-group",
+    clock: "fa-solid fa-hourglass",
+    compass: "fa-solid fa-map-marker-check",
+    "bag-shopping": "fa-solid fa-cart-shopping",
+    "location-crosshairs": "fa-solid fa-crosshairs",
+    "island-tropical": "fa-solid fa-globe",
+    gavel: "fa-solid fa-hammer",
+    question: "fa-solid fa-circle-question",
+    "arrow-right-to-bracket": "fa-solid fa-door-open",
+    "shield-check": "fa-solid fa-shield-halved",
+    "user-shield": "fa-solid fa-shield-halved",
+};
+
+/* Mots nus historiques (ni Font Awesome, ni nom Bloxd). */
+const BARE_ALIAS = {
+    globe: "fa-solid fa-globe",
+    flag: "fa-solid fa-flag",
+    nan: ICON_FALLBACK,
+    undefined: ICON_FALLBACK,
+    null: ICON_FALLBACK,
+    star: "fa-solid fa-star",
+    fire: "fa-solid fa-fire",
+};
+
+/* Nom d'icone sur : renvoie TOUJOURS quelque chose que Bloxd sait afficher. */
+export function safeIcon(name) {
+    if (typeof name !== "string") return ICON_FALLBACK;
+    const raw = name.trim();
+    if (!raw) return ICON_FALLBACK;
+
+    /* Icone native Bloxd (item, bloc, icone ingame) : on n'y touche pas. */
+    if (raw.indexOf("fa-") !== 0) {
+        const bare = raw.indexOf(" ") === -1 && raw === raw.toLowerCase();
+        if (bare) return BARE_ALIAS[raw] || ICON_FALLBACK;
+        return raw;
+    }
+
+    const tokens = raw.split(/\s+/);
+    let base = tokens[tokens.length - 1];
+    if (base.indexOf("fa-") === 0) base = base.slice(3);
+
+    if (tokens.indexOf("fa-brands") !== -1) {
+        return BRAND_SET[base] ? "fa-solid fa-brands fa-" + base : ICON_FALLBACK;
+    }
+    if (FA_SET[base]) return raw;
+    return ICON_ALIAS[base] || ICON_FALLBACK;
+}
+
 /* Emoji -> icone Bloxd. La liste couvre tous les emojis du projet ; les
    suivants iront directement dans ICON. */
 export const ICON = {
@@ -287,7 +413,14 @@ export function format(message, style) {
         }
         if (part.icon) {
             const iconStyle = normalizeStyle(part.style);
-            out.push(iconStyle === part.style ? part : Object.assign({}, part, { style: iconStyle }));
+            const iconName = safeIcon(part.icon);
+            if (iconName === part.icon && iconStyle === part.style) {
+                out.push(part);
+                continue;
+            }
+            const fixed = Object.assign({}, part, { icon: iconName });
+            if (iconStyle !== part.style) fixed.style = iconStyle;
+            out.push(fixed);
             continue;
         }
         if (typeof part.str === "string") {
@@ -514,7 +647,7 @@ function toIconsOnly(message) {
 
 /* Icone seule, dans la couleur demandee. */
 export function icon(name, color) {
-    const part = { icon: name };
+    const part = { icon: safeIcon(name) };
     if (color) part.style = { color: themeColor(color) };
     return part;
 }

@@ -171,12 +171,12 @@ export function setupChatChannels(playerId) {
     const channels = [
         {
             channelName: CHAT_CHANNEL.GLOBAL,
-            elementContent: [{ icon: "globe" }, { str: " G" }],
+            elementContent: [{ icon: "fa-solid fa-globe" }, { str: " G" }],
             elementBgColor: "#2671d7"
         },
         {
             channelName: CHAT_CHANNEL.TEAM,
-            elementContent: [{ icon: "flag" }, { str: playerTeamData.chatLetter}],
+            elementContent: [{ icon: "fa-solid fa-flag" }, { str: playerTeamData.chatLetter}],
             elementBgColor: playerTeamData.color
         }
     ];
@@ -1223,7 +1223,7 @@ export function unmutePlayer(playerId) {
 export function muteRefusal(playerId) {
     const info = getMuteInfo(muteNameOf(playerId)) || { by: "an admin", remaining: "unknown" };
     return [
-        { icon: "fa-solid fa-microphone-slash", style: { color: "#EF4444" } },
+        { icon: "fa-solid fa-volume-slash", style: { color: "#EF4444" } },
         { str: " You are muted", style: { color: "#EF4444", fontWeight: "bold" } },
         { str: " (" + info.remaining + ") by ", style: { color: "#CBD5E1" } },
         { str: info.by, style: { color: "#FFD700", fontWeight: "bold" } },

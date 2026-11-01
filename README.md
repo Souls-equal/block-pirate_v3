@@ -220,6 +220,30 @@ Dans le code : `import { C, say, shout } from "./theme"` puis `say(id, [...])`,
 `say(id, "texte", { color: C.MONEY })` ou `{ icon: "fa-solid fa-coins" }`.
 `themeColor()` est idempotent : une couleur déjà palette revient identique.
 
+### Icônes : une liste blanche, sinon « ? »
+
+Bloxd n'affiche **pas d'erreur** pour une icône inconnue : il montre un **`?`**. La liste des
+noms acceptés est fermée (96 icônes du jeu + 209 Font Awesome + 11 marques), donc un nom
+inventé ne se voit qu'en jeu — jamais dans les logs.
+
+Tout passe donc par **`safeIcon()`** (`core/theme.js`), appelé par `format()` : c'est le point
+unique par lequel passent le chat, les textes de boutique, les descriptions d'items **et** les
+Code Blocks (via le patch de l'API).
+
+| Cas | Ce qui se passe |
+| --- | --- |
+| `fa-solid fa-xmark` (dans `FA_NAMES`) | rendu tel quel |
+| `fa-solid fa-brands fa-discord` (dans `FA_BRANDS`) | rendu tel quel |
+| `Apple`, `Frozen`, `Compass`, `Boat`… (nom Bloxd : item, bloc, icône du jeu) | **intact** — ces noms ne sont pas validés, ils sont natifs |
+| ancien nom (`fa-solid fa-broom`, `fa-gift`, `fa-trash`…) | remplacé par l'équivalent valide (`ICON_ALIAS`) |
+| mot nu (`globe`, `flag`) | corrigé (`BARE_ALIAS`) |
+| nom inconnu | **`fa-solid fa-circle-info`** (`ICON_FALLBACK`) — jamais de `?` |
+
+**Ajouter une icône** = ajouter son nom dans `FA_NAMES` (ou `FA_BRANDS`), sinon elle sera
+remplacée à l'affichage. `npm run check` lance **`tools/check-icons.mjs`**, qui relit la liste
+blanche et refuse toute icône du code absente : une faute de frappe casse la CI au lieu de
+produire un `?` en jeu.
+
 > **À créer une fois dans le World Code** (dossier `core/`) : `theme.js` est importé par
 > `index.js`, `core/team.js`, `core/UI.js`, `fruit/index.js`, `gameplay/*` et `utils/*`.
 > Sans lui, aucun de ces fichiers ne se charge.
@@ -249,6 +273,31 @@ La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
 caractères : une seule couleur par partie, `fontSize` réservé au titre, textes
 libres (fruit, style, cible de quête) bornés, et blocs secondaires retirés un à
 un si nécessaire — jamais tout le message.
+
+---
+
+## Panneau admin : on ne montre que ce qu'on peut faire
+
+`ACTION_PERMISSIONS` (`src/core/admin.js`) est la **seule** source de vérité, et elle sert
+maintenant deux fois : à refuser le clic **et** à décider si le bouton apparaît
+(`panelItem()` / `canSeePanelItem()`). Un rang inférieur ne voit donc plus des boutons qui
+répondraient « tu n'as pas la permission ».
+
+| Rang | Ce qu'il voit dans le panneau |
+| --- | --- |
+| **TESTER** (`BASIC`) | `Admin Panel`, `Select Player`, `TP To Player`, `Warp to Island`, `Clear Entities` |
+| **MOD** | + `TP Here`, `TP To Position`, `Vanish`, `Freeze Player`, `View Inventory` (+ pages d'inspection), `Mute` / `Unmute` / `Mute List` |
+| **DEV** | + `Kick Player` |
+| **ADMIN** | + `Announcement` |
+| **OWNER** | + `Set Gamemode`, `Ban` / `Unban` / `View Ban List`, `Give Fruit`, `Remove Items`, `Change Money`, `Level / XP Menu` |
+
+Les items d'**affichage** suivent la permission de l'action qu'ils documentent
+(`PANEL_ITEM_PERMISSION`) : une page « aucune inspection » n'apparaît pas à qui ne peut pas
+inspecter.
+
+**Les TESTER peuvent se téléporter vers un joueur** (`TP To Player` = `BASIC`), et seulement
+celui-là : `TP Here`, `TP To Position` et les warps d'île gardent leur niveau (`MOD` / `BASIC`
+inchangés), et les TP restent refusés dans le lobby (variation `default`).
 
 ---
 
