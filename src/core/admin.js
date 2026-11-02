@@ -9,6 +9,7 @@ import { muteDurations, muteDurationOptions, getMuteList, getMuteInfo, isMuted, 
 import { eff, isAliveId, restoreClientOption, setAirJumpCount, setJumpAmount, setMoveSpeed, setVel, teleport } from "../utils/combat";
 import { setInterval as everyTick } from "../utils/timer";
 import { blockKillCredit } from "../utils/killAttribution";
+import { currentVariation } from "../gameplay/variations";
 
 import { ITEM_COLOR, say, shout, shoutRaw } from "./theme";
 /* ==========================================================================
@@ -55,6 +56,10 @@ export const ACTION_PERMISSIONS = {
    et une faute de frappe dans le nom se voit tout de suite dans la liste.
    [x, y, z] : y est la hauteur du sol au point d'arrivee.
 
+   Quand les variations sont coupees (VARIATIONS_ENABLED = false dans
+   gameplay/variations.js), la variation courante est la mer 1 : les iles et
+   les warps existent donc dans le monde unique, sans lobby.
+
    La cle est le NOM DE LA VARIATION : une mer a ses iles, et le panneau ne
    propose que celles de la mer ou l'on se trouve. Le lobby ("default") n'en a
    aucune, donc le bouton n'y existe pas. Le jour ou la mer 2 arrive, on ajoute
@@ -87,12 +92,10 @@ export function islandsOfVariation(variation) {
 /* Iles de la variation courante. Le jeu recharge le joueur a chaque saut de
    variation : cette lecture suffit, rien a maintenir a la main. */
 export function currentIslands() {
-    let variation = LOBBY_VARIATION;
-    try {
-        const v = api.getVariation();
-        if (typeof v === "string" && v) variation = v;
-    } catch (e) {}
-    return islandsOfVariation(variation);
+    /* Meme decision que partout ailleurs (gameplay/variations.js) : quand les
+       variations sont coupees, la variation courante EST la mer 1, donc les
+       iles existent dans le monde unique. */
+    return islandsOfVariation(currentVariation());
 }
 
 /* Y a-t-il des iles ici ? (panneau admin et fleches s'appuient dessus) */
@@ -199,11 +202,8 @@ function sendAdminInfo(adminId, ok, text) {
 const LOBBY_VARIATION = "default";
 
 function canAdminTp(adminId) {
-    let variation = "";
-    try {
-        variation = api.getVariation();
-    } catch (e) {}
-    if (variation !== LOBBY_VARIATION) return true;
+    /* Sans variations il n'y a pas de lobby : le TP est toujours autorise. */
+    if (currentVariation() !== LOBBY_VARIATION) return true;
     sendAdminInfo(adminId, false, "Teleport is disabled in the lobby (variation \"default\"). Join your sea first.");
     return false;
 }
