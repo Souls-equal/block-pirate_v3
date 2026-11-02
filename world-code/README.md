@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**29 fichiers, 321 728 caracteres** (63 % de la limite de 512 000 du World Code, -49 % par rapport aux sources lisibles).
+**29 fichiers, 322 128 caracteres** (63 % de la limite de 512 000 du World Code, -49 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -30,7 +30,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 
 | Fichier | Caracteres | Source lisible |
 | --- | --- | --- |
-| `core/admin.js` | 60 610 | 97 951 |
+| `core/admin.js` | 60 719 | 98 901 |
 | `core/ranks.js` | 2 457 | 5 245 |
 | `core/team.js` | 18 617 | 44 605 |
 | `core/theme.js` | 14 922 | 32 455 |
@@ -43,7 +43,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/customItem.js` | 4 141 | 10 289 |
 | `gameplay/fightingStyles.js` | 19 919 | 41 594 |
 | `gameplay/NPCs.js` | 7 088 | 14 143 |
-| `gameplay/quest.js` | 10 492 | 22 154 |
+| `gameplay/quest.js` | 10 557 | 23 366 |
 | `gameplay/spawning.js` | 6 145 | 14 262 |
 | `gameplay/stamina.js` | 4 493 | 10 048 |
 | `gameplay/stats.js` | 4 776 | 10 726 |
@@ -54,7 +54,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `utils/data.js` | 4 653 | 10 443 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 5 579 | 12 568 |
-| `utils/killAttribution.js` | 1 972 | 6 020 |
+| `utils/killAttribution.js` | 2 198 | 6 920 |
 | `utils/killfeed.js` | 834 | 1 159 |
 | `utils/lifeform.js` | 3 842 | 7 058 |
 | `utils/timer.ts` | 1 432 | 5 761 |

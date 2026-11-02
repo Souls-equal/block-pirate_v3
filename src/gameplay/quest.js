@@ -516,14 +516,19 @@ spawnQuestMob = (playerId, questId) => {
     return spawnEnemy(playerId, spawnPos, quest.realMob, name, amount, level, rank);
 }
 
-/* CHECK QUEST VALIDITY (auto-complete si trop fort) */
+/* CHECK QUEST VALIDITY (auto-complete si trop fort)
+
+   Une seule recompense, meme si le joueur gagne plusieurs niveaux d'un coup :
+   `completeQuest` rend false s'il n'y avait rien a terminer (deja paye), et
+   c'est ce retour qui decide si on enchaine sur une nouvelle quete. */
 export function checkQuestValidity(playerId) {
     const quest = playerQuest[playerId];
     if (!quest) return false;
 
     const playerLevel = getStat(playerId, "lvl", 1);
     if (playerLevel > quest.levelMax) {
-        completeQuest(playerId);
+        if (!completeQuest(playerId)) return false;
+        /* Paye une fois : on lui donne la quete de son nouveau niveau. */
         startQuest(playerId);
         return true;
     }
@@ -645,8 +650,7 @@ export function onQuestKill(playerId, mobName) {
 
     const playerLevel = getStat(playerId, "lvl", 1);
     if (playerLevel > quest.levelMax) {
-        completeQuest(playerId);
-        startQuest(playerId);
+        if (completeQuest(playerId)) startQuest(playerId);
         return;
     }
 
@@ -655,35 +659,52 @@ export function onQuestKill(playerId, mobName) {
     }
 }
 
-/* COMPLETE QUEST */
+/* Termine une quete et paie UNE SEULE FOIS.
+   Renvoie false si le joueur n'avait pas de quete ou si la recompense de la
+   quete en cours est deja en train d'etre versee. */
+const questBeingPaid = {};
+
 function completeQuest(playerId) {
     const quest = playerQuest[playerId];
-    if (!quest) return;
+    if (!quest) return false;
+    if (questBeingPaid[playerId]) return false;
 
-    const rank = Math.min(3, Math.max(1, (quest.mob && quest.mob.rank) || 1));
-    const reward = computeQuestReward(quest.killAmount, quest.levelMin, rank);
+    questBeingPaid[playerId] = true;
+    try {
+        const rank = Math.min(3, Math.max(1, (quest.mob && quest.mob.rank) || 1));
+        const reward = computeQuestReward(quest.killAmount, quest.levelMin, rank);
+        const msg = questMessage(quest, quest);
 
-    addXP(playerId, reward.xp);
-    changeMoney(playerId, reward.money);
+        /* L'ETAT EST NETTOYE AVANT DE PAYER, et c'est le coeur du correctif :
+           addXP() peut faire gagner plusieurs niveaux, ce qui appelle
+           checkQuestValidity() et completeQuest() une nouvelle fois. Tant que
+           la quete restait en memoire, le niveau depassait levelMax et la meme
+           quete etait payee en boucle (recompense en double, triple...). */
+        delete playerQuest[playerId];
+        delete questProgress[playerId];
+        saveQuest(playerId, null, 0);
+        try {
+            api.clearDirectionArrow(playerId, quest.id);
+        } catch (e) {}
 
-    const msg = questMessage(quest, quest);
+        say(playerId, [
+            { icon: "fa-solid fa-trophy", style: { color: "#FFD700", fontWeight: "bold" } }, { str: " QUEST COMPLETE!\n", style: { color: "#FFD700", fontWeight: "bold" } },
+            ...msg.complete,
+            { str: "\nYou gained: ", style: { color: "#B3B3B3" } },
+            { str: "+" + reward.money, style: { color: "#ECC727" } },
+            { str: " Money\n", style: { color: "#ECC727" } },
+            { str: "And ", style: { color: "#B3B3B3" } },
+            { str: "+" + reward.xp, style: { color: "#2791EC" } },
+            { str: " xp", style: { color: "#2791EC" } }
+        ]);
 
-    say(playerId, [
-        { icon: "fa-solid fa-trophy", style: { color: "#FFD700", fontWeight: "bold" } }, { str: " QUEST COMPLETE!\n", style: { color: "#FFD700", fontWeight: "bold" } },
-        ...msg.complete,
-        { str: "\nYou gained: ", style: { color: "#B3B3B3" } },
-        { str: "+" + reward.money, style: { color: "#ECC727" } },
-        { str: " Money\n", style: { color: "#ECC727" } },
-        { str: "And ", style: { color: "#B3B3B3" } },
-        { str: "+" + reward.xp, style: { color: "#2791EC" } },
-        { str: " xp", style: { color: "#2791EC" } }
-    ]);
-
-    delete playerQuest[playerId];
-    delete questProgress[playerId];
-    saveQuest(playerId, null, 0);
-    api.clearDirectionArrow(playerId, quest.id);
-    updateSidebar(playerId);
+        addXP(playerId, reward.xp);
+        changeMoney(playerId, reward.money);
+        updateSidebar(playerId);
+        return true;
+    } finally {
+        questBeingPaid[playerId] = false;
+    }
 }
 
 /* DB SAVE / LOAD */
