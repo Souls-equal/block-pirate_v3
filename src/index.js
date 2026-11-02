@@ -2,7 +2,7 @@ import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleCha
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
-import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave } from "./core/UI"; 
+import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
 import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
@@ -458,7 +458,7 @@ doPeriodicSave = () => {
         }
     } ]);
 }, tick = t => {Mt(t);//sphere
-    ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("prune", () => {
+    ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();
     });
 }, R(() => {

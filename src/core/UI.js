@@ -6,10 +6,11 @@ import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
-import { ISLAND_WARPS, isVanished } from "./admin";
+import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
+import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
 import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
-import { C, fit, measure } from "./theme";
+import { C, fit, measure, say } from "./theme";
 
 export const dCode = "7WGjmPHZrS"
 
@@ -317,23 +318,29 @@ export function joinUI(playerId) {
 }
 
 /* ==========================================================================
-   SETTINGS (boutique, visible par TOUS)
+   SETTINGS (boutique, visible par TOUS, SAUF dans le lobby)
 
    Reglages personnels, sans achat ni argent :
 
-     1. Island Arrows — UNE fleche par ile, chacune de la couleur de son theme,
-        et chacune masquable separement : sur un ecran charge, on garde les
-        deux ou trois iles qui servent et on cache le reste. L'item du haut est
-        l'interrupteur general (tout montrer / tout cacher).
-        Les coordonnees sont EXACTEMENT celles des teleports du panneau admin
-        (ISLAND_WARPS, core/admin.js) : un seul endroit a corriger si une ile
-        bouge, et les deux fonctions restent d'accord.
+     1. Island Arrows — les iles de la MER ou l'on se trouve (core/admin.js :
+        ISLAND_WARPS_BY_SEA), une fleche par ile, chacune de la couleur de son
+        theme. Deux listes deroulantes font le menage a l'ecran :
+           "Hide an island" ne propose QUE les iles affichees ;
+           "Show an island" ne propose QUE les iles cachees.
+        Valider deplace l'ile d'une liste vers l'autre, donc une ile ne peut
+        jamais etre dans les deux (ni disparaitre des deux).
+        L'item du haut est l'interrupteur general (tout montrer / tout cacher).
      2. Respawn — tue le joueur pour le debloquer (coince dans un bloc, tombe
         hors de la map...). Refuse s'il vient de se faire frapper par un
         joueur : sinon c'est une sortie de combat gratuite.
      3. PvP Protection — la protection de 5 minutes accordee contre son tueur
         au respawn (voir utils/combat). Desactivable : plus de bouclier, et la
         protection deja active tombe immediatement.
+
+   PAS DE SETTINGS DANS LE LOBBY (variation "default") : il n'y a ni ile ni mer
+   a y regler. Le jeu recharge le joueur a chaque saut de variation, donc un
+   simple test au join suffit : dans une mer la categorie existe, dans le lobby
+   elle n'existe pas (et nos fleches sont effacees au passage).
 
    Reglages stockes en db JOUEUR (trois cles nouvelles, courtes) :
      "dirArrow" = 0        -> plus aucune fleche d'ile (defaut : affichees)
@@ -343,13 +350,18 @@ export function joinUI(playerId) {
 
 const SETTINGS_CATEGORY = "settings";
 const SETTING_ARROW_COLOR = "#7DD3FC";
+const SETTING_HIDE_COLOR = "#FCA5A5";
+const SETTING_SHOW_COLOR = "#86EFAC";
 const SETTING_RESPAWN_COLOR = "#FFD166";
 const SETTING_PROTECT_COLOR = "#4ADE80";
+/* Valeur affichee dans une liste vide : l'API veut au moins une option, et un
+   libelle entre parentheses ne peut pas etre confondu avec une ile. */
+const EMPTY_CHOICE = "(nothing left)";
 
 /* Une couleur par ile, choisie sur son theme, et un code court qui sert de cle
    de reglage : deux iles ne doivent jamais partager un code, sinon cacher l'une
-   cacherait l'autre. Toute ile ajoutee a ISLAND_WARPS sans theme ici recoit un
-   code derive de ses initiales et le gris neutre (voir islandTheme). */
+   cacherait l'autre. Toute ile ajoutee sans theme ici recoit ses initiales et
+   le gris neutre (voir islandTheme) : elle marche quand meme. */
 const ISLAND_STYLE = {
     "Starter Pirate":   { code: "SP", color: "#F0A35E" },  /* sable du depart */
     "Middle Town":      { code: "MT", color: "#9AA7B4" },  /* pierre de la ville */
@@ -369,14 +381,16 @@ function islandTheme(name) {
     return { code: (initials.slice(0, 2) || "IL"), color: "#94A3B8" };
 }
 
-function islandItemKey(name) {
-    return "isle_" + islandTheme(name).code.toLowerCase();
-}
-
 /* Identifiant stable d'une fleche : une ile = une fleche, donc la masquer ne
    touche jamais la fleche de quete (qui a son propre id). */
 function islandArrowId(name) {
     return "isle-" + String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+/* Les iles de la mer courante. Une seule lecture par affichage : le lobby (ou
+   une mer pas encore declaree) renvoie un objet vide, jamais null. */
+function islandNames() {
+    return Object.keys(currentIslands());
 }
 
 function settingOn(playerId, key, fallback) {
@@ -400,7 +414,7 @@ export function pvpProtectionEnabled(playerId) {
 }
 
 /* Iles masquees une par une : une seule cle db, une liste de codes courts.
-   Lue une fois par affichage (pas une lecture par ile). */
+   Lue une fois par affichage (pas une lecture de base par ile). */
 function hiddenIslands(playerId) {
     const out = {};
     let v = null;
@@ -414,9 +428,11 @@ function hiddenIslands(playerId) {
     return out;
 }
 
+/* On n'enregistre que les codes des iles de la mer courante : la liste reste
+   courte, et une ile d'une autre mer ne peut pas s'y glisser. */
 function saveHiddenIslands(playerId, hidden) {
     const list = [];
-    for (const name in ISLAND_WARPS) {
+    for (const name in currentIslands()) {
         const code = islandTheme(name).code;
         if (hidden[code] && list.indexOf(code) === -1) list.push(code);
     }
@@ -429,19 +445,33 @@ export function islandArrowVisible(playerId, name) {
     return !hiddenIslands(playerId)[islandTheme(name).code];
 }
 
+/* Les deux listes du panneau : ce qui est affiche, ce qui est cache. */
+function shownIslandNames(playerId) {
+    const all = islandArrowsEnabled(playerId);
+    const hidden = hiddenIslands(playerId);
+    const out = [];
+    for (const name of islandNames()) if (all && !hidden[islandTheme(name).code]) out.push(name);
+    return out;
+}
+
+function hiddenIslandNames(playerId) {
+    const shown = shownIslandNames(playerId);
+    return islandNames().filter(function (name) { return shown.indexOf(name) === -1; });
+}
+
 /* Pose (ou efface) les fleches d'iles du joueur, avec la couleur de chaque ile.
    Ne touche qu'a NOS ids : la fleche de quete survit a tous les reglages. */
 export function applyIslandArrows(playerId) {
     if (!playerId) return false;
     const all = islandArrowsEnabled(playerId);
     const hidden = hiddenIslands(playerId);
-    for (const name in ISLAND_WARPS) {
+    for (const name in currentIslands()) {
         const id = islandArrowId(name);
         const theme = islandTheme(name);
         const on = all && !hidden[theme.code];
         try {
             if (on) {
-                api.setDirectionArrow(playerId, id, ISLAND_WARPS[name], name, false, {
+                api.setDirectionArrow(playerId, id, currentIslands()[name], name, false, {
                     color: theme.color,
                     fontSize: "17px",
                     fontWeight: "bold",
@@ -454,24 +484,37 @@ export function applyIslandArrows(playerId) {
     return all;
 }
 
+/* Efface nos fleches, dans TOUTES les mers declarees : un joueur qui change de
+   variation ne doit pas laisser de fleche derriere lui. */
+function clearIslandArrows(playerId) {
+    if (!playerId || typeof api.clearDirectionArrow !== "function") return false;
+    for (const sea in ISLAND_WARPS_BY_SEA) {
+        for (const name in ISLAND_WARPS_BY_SEA[sea]) {
+            try { api.clearDirectionArrow(playerId, islandArrowId(name)); } catch (e) {}
+        }
+    }
+    return true;
+}
+
+/* Les Settings n'ont de sens que dans une mer. Sans le support des variations,
+   le monde EST la mer (comportement d'avant les mers). */
+export function settingsAvailableHere() {
+    if (!variationsSupported()) return true;
+    return currentVariation() !== LOBBY.variation;
+}
+
 function settingsSay(playerId, parts) {
     try { say(playerId, parts); } catch (e) {}
 }
 
-function visibleIslandCount(playerId, hidden) {
-    if (!islandArrowsEnabled(playerId)) return 0;
-    let n = 0;
-    for (const name in ISLAND_WARPS) if (!hidden[islandTheme(name).code]) n++;
-    return n;
-}
-
-/* Recree les items : c'est ce qui met a jour l'etat affiche (ON / OFF, compteur). */
+/* Recree les items : c'est ce qui met a jour l'etat affiche (compteur, titres,
+   et surtout les options des deux listes deroulantes). */
 function createSettingsItems(playerId) {
+    const total = islandNames().length;
+    const shown = shownIslandNames(playerId);
+    const hidden = hiddenIslandNames(playerId);
     const all = islandArrowsEnabled(playerId);
-    const hidden = hiddenIslands(playerId);
     const protect = pvpProtectionEnabled(playerId);
-    const shown = visibleIslandCount(playerId, hidden);
-    const total = Object.keys(ISLAND_WARPS).length;
 
     /* Interrupteur general. */
     try {
@@ -482,50 +525,63 @@ function createSettingsItems(playerId) {
             cost: 0,
             sortPriority: 50,
             customTitle: [{
-                str: "Island Arrows [" + shown + "/" + total + "]",
+                str: "Island Arrows [" + shown.length + "/" + total + "]",
                 style: { color: SETTING_ARROW_COLOR, fontWeight: "bold" },
             }],
             buyButtonText: [{ str: all ? "Hide all" : "Show all", style: { color: SETTING_ARROW_COLOR } }],
             description: [
                 { icon: "fa-solid fa-map-marker-check", style: { color: SETTING_ARROW_COLOR } },
                 " One arrow per island, each in its own colour.",
-                shown > 0
-                    ? { str: "\n● " + shown, style: { color: "#4ADE80", fontWeight: "bold" } }
+                shown.length > 0
+                    ? { str: "\n● " + shown.length, style: { color: "#4ADE80", fontWeight: "bold" } }
                     : { str: "\n● 0", style: { color: "#888888", fontWeight: "bold" } },
                 { str: " of " + total + " islands shown.", style: { color: "#94A3B8" } },
-                { str: "\nBelow, pick the islands you need.", style: { color: "#CBD5E1" } },
+                { str: "\nPick the islands you need below.", style: { color: "#CBD5E1" } },
             ],
         });
     } catch (e) {}
 
-    /* Un item par ile : c'est la que se regle le « moins de bazar a l'ecran ». */
-    let priority = 49;
-    for (const name in ISLAND_WARPS) {
-        const theme = islandTheme(name);
-        const on = all && !hidden[theme.code];
-        try {
-            api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, islandItemKey(name), {
-                image: "Compass",
-                imageColour: theme.color,
-                canBuy: true,
-                cost: 0,
-                sortPriority: priority--,
-                customTitle: [
-                    { str: name, style: { color: theme.color, fontWeight: "bold" } },
-                    { str: on ? "  [ON]" : "  [OFF]", style: { color: on ? "#4ADE80" : "#888888", fontWeight: "bold" } },
-                ],
-                buyButtonText: [{ str: on ? "Hide" : "Show", style: { color: theme.color } }],
-                description: [
-                    { icon: "fa-solid fa-map-marker-check", style: { color: theme.color } },
-                    { str: " Arrow to " + name + ".", style: { color: "#CBD5E1" } },
-                    on
-                        ? { str: "\n● Shown", style: { color: "#4ADE80", fontWeight: "bold" } }
-                        : { str: "\n● Hidden", style: { color: "#888888", fontWeight: "bold" } },
-                    { str: on ? "\nClick to hide this arrow." : "\nClick to show this arrow.", style: { color: "#94A3B8" } },
-                ],
-            });
-        } catch (e) {}
-    }
+    /* Masquer : ne propose que ce qui est affiche. */
+    try {
+        api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_arrows_hide", {
+            image: "Compass",
+            imageColour: SETTING_HIDE_COLOR,
+            canBuy: true,
+            cost: 0,
+            sortPriority: 48,
+            customTitle: [{ str: "Hide an island", style: { color: SETTING_HIDE_COLOR, fontWeight: "bold" } }],
+            buyButtonText: [{ str: "Hide", style: { color: SETTING_HIDE_COLOR } }],
+            userInput: { type: "dropdown", dropdownOptions: shown.length ? shown : [EMPTY_CHOICE] },
+            description: [
+                { icon: "fa-solid fa-eye-slash", style: { color: SETTING_HIDE_COLOR } },
+                " Remove one arrow from your screen.",
+                { str: "\nShown now: ", style: { color: "#94A3B8" } },
+                { str: shown.length ? shown.join(", ") : "nothing", style: { color: SETTING_SHOW_COLOR } },
+                { str: "\nThe island moves to the other list.", style: { color: "#888888" } },
+            ],
+        });
+    } catch (e) {}
+
+    /* Montrer : ne propose que ce qui est cache. */
+    try {
+        api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_arrows_show", {
+            image: "Compass",
+            imageColour: SETTING_SHOW_COLOR,
+            canBuy: true,
+            cost: 0,
+            sortPriority: 47,
+            customTitle: [{ str: "Show an island", style: { color: SETTING_SHOW_COLOR, fontWeight: "bold" } }],
+            buyButtonText: [{ str: "Show", style: { color: SETTING_SHOW_COLOR } }],
+            userInput: { type: "dropdown", dropdownOptions: hidden.length ? hidden : [EMPTY_CHOICE] },
+            description: [
+                { icon: "fa-solid fa-eye", style: { color: SETTING_SHOW_COLOR } },
+                " Bring one arrow back.",
+                { str: "\nHidden now: ", style: { color: "#94A3B8" } },
+                { str: hidden.length ? hidden.join(", ") : "nothing", style: { color: SETTING_HIDE_COLOR } },
+                { str: "\nThe island moves to the other list.", style: { color: "#888888" } },
+            ],
+        });
+    } catch (e) {}
 
     try {
         api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_respawn", {
@@ -571,9 +627,15 @@ function createSettingsItems(playerId) {
     } catch (e) {}
 }
 
-/* Cree la categorie et ses items. Appele au join, pour tout le monde. */
+/* Cree la categorie et ses items. Appele au join : dans une mer seulement. */
 export function setupSettingsShop(playerId) {
     if (!playerId) return false;
+    if (!settingsAvailableHere()) {
+        /* Lobby : rien a regler, et on ne laisse pas trainer de fleches d'une
+           mer precedente. */
+        clearIslandArrows(playerId);
+        return false;
+    }
     try {
         api.configureShopCategoryForPlayer(playerId, SETTINGS_CATEGORY, {
             customTitle: "Settings",
@@ -600,21 +662,41 @@ function toggleIslandArrows(playerId) {
     ]);
 }
 
+/* Le nom choisi dans une liste. Insensible a la casse, mais jamais devine :
+   une valeur inconnue (ou la ligne "(nothing left)") renvoie null. */
+function resolveIslandName(input) {
+    const raw = String(input == null ? "" : input).trim();
+    if (!raw) return null;
+    const islands = currentIslands();
+    if (islands[raw]) return raw;
+    const lower = raw.toLowerCase();
+    for (const name in islands) if (name.toLowerCase() === lower) return name;
+    return null;
+}
+
 /* Une ile a la fois. Cas utile : tout est cache et on veut UNE ile — on ne
-   rallume qu'elle, les autres restent masquees (pas besoin de 8 clics). */
-function toggleIsland(playerId, name) {
+   rallume qu'elle, les autres restent masquees (pas besoin de huit clics). */
+function setIslandShown(playerId, name, want) {
     const theme = islandTheme(name);
     const all = islandArrowsEnabled(playerId);
     const hidden = hiddenIslands(playerId);
-    const on = all && !hidden[theme.code];
-    let onlyOne = false;
+    const isShown = all && !hidden[theme.code];
 
-    if (on) {
+    if (isShown === want) {
+        settingsSay(playerId, [
+            { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
+            { str: " " + name + (want ? " is already shown." : " is already hidden."), style: { color: "#94A3B8" } },
+        ]);
+        return false;
+    }
+
+    let onlyOne = false;
+    if (!want) {
         hidden[theme.code] = true;
         saveHiddenIslands(playerId, hidden);
     } else {
         if (!all) {
-            for (const other in ISLAND_WARPS) {
+            for (const other of islandNames()) {
                 if (other !== name) hidden[islandTheme(other).code] = true;
             }
             settingSet(playerId, "dirArrow", true);
@@ -629,9 +711,10 @@ function toggleIsland(playerId, name) {
     settingsSay(playerId, [
         { icon: "fa-solid fa-map-marker-check", style: { color: theme.color } },
         { str: " " + name + " ", style: { color: theme.color, fontWeight: "bold" } },
-        { str: on ? "arrow hidden." : "arrow shown.", style: { color: theme.color } },
-        { str: on ? "" : (onlyOne ? " The other islands stay hidden." : ""), style: { color: "#94A3B8" } },
+        { str: want ? "arrow shown." : "arrow hidden.", style: { color: theme.color } },
+        { str: onlyOne ? " The other islands stay hidden." : "", style: { color: "#94A3B8" } },
     ]);
+    return true;
 }
 
 function togglePvPProtection(playerId) {
@@ -697,29 +780,82 @@ function settingsRespawn(playerId) {
 export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInput) {
     if (categoryKey !== SETTINGS_CATEGORY) return false;
     if (!playerId || !itemKey) return false;
+    /* Lobby : la categorie n'existe pas. Si un client garde un vieil item,
+       le clic ne fait rien plutot que de peindre des fleches sans ile. */
+    if (!settingsAvailableHere()) return true;
+
     switch (itemKey) {
         case "set_arrows": toggleIslandArrows(playerId); return true;
+        case "set_arrows_hide": {
+            const name = resolveIslandName(userInput);
+            if (!name) { settingsSay(playerId, [
+                { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
+                { str: " Every island is already hidden.", style: { color: "#94A3B8" } },
+            ]); return true; }
+            setIslandShown(playerId, name, false);
+            return true;
+        }
+        case "set_arrows_show": {
+            const name = resolveIslandName(userInput);
+            if (!name) { settingsSay(playerId, [
+                { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
+                { str: " Every island is already shown.", style: { color: "#94A3B8" } },
+            ]); return true; }
+            setIslandShown(playerId, name, true);
+            return true;
+        }
         case "set_respawn": settingsRespawn(playerId); return true;
         case "set_protect": togglePvPProtection(playerId); return true;
         case "set_info": createSettingsItems(playerId); return true;
         default: break;
     }
-    /* Un item par ile : "isle_ju", "isle_pv"... Resolu par le code, jamais par
-       le libelle affiche : renommer une ile ne casserait pas les clics. */
-    for (const name in ISLAND_WARPS) {
-        if (islandItemKey(name) === itemKey) { toggleIsland(playerId, name); return true; }
+
+    /* Ancien format (un item par ile, "isle_ju") : le client peut encore
+       l'afficher, on le fait basculer plutot que de ne rien faire. */
+    for (const name of islandNames()) {
+        if (islandItemKey(name) === itemKey) {
+            setIslandShown(playerId, name, !islandArrowVisible(playerId, name));
+            return true;
+        }
     }
     return false;
+}
+
+/* Ancien format d'item (un bouton par ile) : garde pour resoudre un clic
+   laisse en place par un client plus vieux que la mise a jour. */
+function islandItemKey(name) {
+    return "isle_" + islandTheme(name).code.toLowerCase();
+}
+
+/* Variation vue par joueur : permet de reagir a un saut de variation meme
+   s'il ne recharge pas le joueur. */
+const lastVariationSeen = {};
+
+/* Filet de securite, appele a chaque tick (une comparaison de texte par
+   joueur, donc presque gratuit) :
+     - lobby  -> les Settings et les fleches n'ont rien a faire la ;
+     - mer    -> ils reviennent, avec les iles de CETTE mer.
+   Le join fait deja le travail dans le cas normal ; ceci couvre le cas ou le
+   passage d'une variation a l'autre se fait sans recharger le joueur. */
+export function settingsSyncVariation(playerId) {
+    if (!playerId) return false;
+    const now = variationsSupported() ? currentVariation() : "world";
+    if (lastVariationSeen[playerId] === now) return false;
+    const first = lastVariationSeen[playerId] === undefined;
+    lastVariationSeen[playerId] = now;
+    if (!settingsAvailableHere()) {
+        clearIslandArrows(playerId);
+        return false;
+    }
+    if (first) return false; /* le join vient de le faire */
+    return setupSettingsShop(playerId);
 }
 
 /* Deconnexion : on efface nos fleches (l'API le recommande) sans toucher a
    celles des quetes, qui ont leurs propres ids. */
 export function settingsLeave(playerId) {
     if (!playerId) return false;
-    for (const name in ISLAND_WARPS) {
-        try {
-            if (typeof api.clearDirectionArrow === "function") api.clearDirectionArrow(playerId, islandArrowId(name));
-        } catch (e) {}
-    }
+    delete lastVariationSeen[playerId];
+    clearIslandArrows(playerId);
     return true;
 }

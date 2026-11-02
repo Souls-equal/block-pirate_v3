@@ -318,8 +318,10 @@ Le refus est un simple message (`Teleport is disabled in the lobby…`) : rien n
 et dès que l'admin est dans une mer, les quatre boutons remarchent normalement.
 (`canAdminTp` dans `src/core/admin.js`.)
 
-Les points du menu **Warp to Island** (`ISLAND_WARPS` dans `src/core/admin.js`) sont, dans
-l'ordre du menu :
+Le menu **Warp to Island** ne liste que les îles de **la mer où l'on se trouve**
+(`currentIslands()`, `src/core/admin.js`) : dans le lobby il n'y a aucune île, donc le bouton
+n'est même pas créé (on ne montre que ce qu'on peut faire). Les points de la mer 1
+(`ISLAND_WARPS_BY_SEA.sea1`) sont, dans l'ordre du menu :
 
 | Nom | x, y, z |
 | --- | --- |
@@ -588,16 +590,26 @@ ressembleraient.
 
 ## Settings : les réglages du joueur (boutique)
 
-Une **quatrième catégorie de boutique**, `Settings` (`src/core/UI.js`), créée au join pour
-**tout le monde** — ce n'étaient pas des privilèges à garder. On n'y achète rien : chaque
-item est un interrupteur ou une action, coût 0.
+Une **quatrième catégorie de boutique**, `Settings` (`src/core/UI.js`). On n'y achète rien :
+chaque item est un interrupteur, une liste ou une action, coût 0.
+
+**Elle n'existe PAS dans le lobby** (`variation "default"`) : il n'y a ni île ni mer à y
+régler. Elle apparaît dès qu'on est dans une mer, et disparaît quand on revient au lobby
+(nos flèches sont effacées au passage). Si un saut de variation ne recharge pas le joueur, un
+contrôle à chaque tick (`settingsSyncVariation`) s'en aperçoit tout seul.
 
 | Item | Effet |
 | --- | --- |
 | `Island Arrows` | interrupteur général : **tout** montrer / **tout** cacher |
-| une ligne par île (9) | montre / cache **cette** flèche |
+| `Hide an island` | liste déroulante des îles **affichées** → en cache une |
+| `Show an island` | liste déroulante des îles **cachées** → en remontre une |
 | `Respawn` | tue le joueur pour le débloquer (coincé dans un bloc, sous la map…) |
 | `PvP Protection` | active / désactive le bouclier de 5 min accordé contre son tueur au respawn |
+
+**Les deux listes sont complémentaires, et c'est le code qui le garantit** : `Hide` ne propose
+que ce qui est visible, `Show` ne propose que ce qui est caché. Valider **déplace** l'île d'une
+liste vers l'autre — une île ne peut donc jamais être dans les deux, ni disparaître des deux.
+Cacher trois îles sur neuf donne `Hide` à 6 entrées et `Show` à 3.
 
 **Une couleur par île**, choisie sur son thème (`ISLAND_STYLE`, `src/core/UI.js`) : Jungle en
 vert, Snow Village en glace, Marine Fortress en bleu profond, Desert en sable, Pirate Village
@@ -617,19 +629,25 @@ boutique, donc on reconnaît une île à sa couleur avant de lire son nom.
 | Skylands | `SK` | `#B388E8` |
 
 Le **code** est la clé de réglage d'une île : deux îles ne doivent jamais partager le même,
-sinon cacher l'une cacherait l'autre (une île ajoutée à `ISLAND_WARPS` sans thème reçoit ses
-initiales et le gris neutre, elle ne casse rien). Le clic est résolu par le **code**
-(`isle_ju`, `isle_pv`…), jamais par le libellé affiché : renommer une île ne casse pas les
-clics.
+sinon cacher l'une cacherait l'autre (une île ajoutée sans thème reçoit ses initiales et le
+gris neutre, elle ne casse rien). Le nom choisi dans une liste est résolu en **ignorant la
+casse** ; une valeur inconnue (ou la ligne `(nothing left)` d'une liste vide) ne fait rien et
+le dit.
 
 **Masquer une île ne touche qu'à elle.** Quand tout est caché et qu'on en rallume une seule,
 les autres **restent** cachées (pas besoin de huit clics) ; à l'inverse `Show all` efface
 toutes les exceptions, l'interrupteur général doit vraiment tout rallumer.
 
 **Les coordonnées des flèches ne sont pas recopiées** : `applyIslandArrows()` boucle sur
-`ISLAND_WARPS` (`src/core/admin.js`), la même table que les `Warp to Island` du panneau
+`currentIslands()` (`src/core/admin.js`), la même table que les `Warp to Island` du panneau
 admin. Une île déplacée se corrige donc à **un seul endroit**, et les deux fonctions ne
 peuvent pas se contredire.
+
+**Les îles appartiennent à une mer.** La table s'appelle `ISLAND_WARPS_BY_SEA` et sa clé est
+le nom de la variation : aujourd'hui `sea1` seulement. Dans le lobby, `currentIslands()`
+renvoie une table vide, donc ni flèche ni `Warp to Island`. Le jour où la mer 2 existe, il
+suffit d'ajouter une entrée `sea2` : les deux fonctions (flèches joueur et warp admin)
+suivent sans autre changement.
 
 Chaque flèche porte un id stable (`isle-pirate-village`, `isle-snow-village`…) : masquer les
 îles ne touche **jamais** la flèche de quête, qui a son propre id (`core/quest.js`), et la
