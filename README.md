@@ -771,6 +771,17 @@ dans les logs (`fruitRoll.refund`). Désormais :
 `fruitRoll.playSound` en boucle. Chaque tick vérifie maintenant `fruitOnline(playerId)` et
 s'arrête net au premier tick suivant le départ.
 
+**3. `getPlayerIds()` n'est pas une preuve de présence.** Il peut encore lister un joueur qui
+vient de partir, alors que `setClientOption`, `setPlayerDbValue` et `playSound` lèvent déjà
+« Player … is not in this world ». On ne parie donc pas sur lui : dès que **notre** handler de
+départ passe (`clearFruitCallbacks`), le joueur est marqué dans `GONE` — ce drapeau est retiré
+à la reconnexion (`handleFruitJoin`). Tant qu'il est posé, plus un seul appel API, plus aucun
+message, plus aucun remboursement tenté : la machine s'arrête en silence, et le joueur ne perd
+rien.
+
+Le même piège existait dans `onPlayerLeave` : les sorties étaient enchaînées par des virgules,
+donc **une** exception dans la première sautait toutes les suivantes (dont la machine à fruits,
+qui continuait de tourner). Chaque sortie est maintenant isolée dans un `Gt("leave.…")`.
 **Le prix affiché pendant l'animation est donc une promesse, pas un débit** : il est prélevé au
 moment où le fruit tombe dans l'inventaire.
 

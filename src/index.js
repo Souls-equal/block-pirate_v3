@@ -180,7 +180,14 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onPlayerLeave = t => {
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
-    k(t), fsLeave(t), Y(t), J(t), s(t), V(t), it(t), Wt(t), pvClear(t), bpSettingsLeave(t);
+    /* Chaque sortie est isolee : avant, une exception dans la premiere
+       fonction sautait toutes les suivantes — la machine a fruits continuait
+       alors de tourner pour un joueur deconnecte (et loguait des erreurs). */
+    Gt("leave.ui", () => k(t)), Gt("leave.style", () => fsLeave(t)),
+    Gt("leave.fruit", () => Y(t)), Gt("leave.codes", () => J(t)),
+    Gt("leave.fruitCallbacks", () => s(t)), Gt("leave.haki", () => V(t)),
+    Gt("leave.items", () => it(t)), Gt("leave.admin", () => Wt(t)),
+    Gt("leave.pvp", () => pvClear(t)), Gt("leave.settings", () => bpSettingsLeave(t));
     try {
         lt(t);
     } catch (t) {
