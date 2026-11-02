@@ -38,6 +38,7 @@ function m(t) {
   return String(t);
 }
 function p(t, e, o) {
+  if (!t || GONE[t]) return;
   try {
     say(t, e);
   } catch (t) {
@@ -507,6 +508,7 @@ export function getFruit(t) {
   return h.get(t) || null;
 }
 export function handleFruitJoin(t) {
+  if (t) delete GONE[t];
   restorePlayerFruit(t);
 }
 export function restorePlayerFruit(t) {
@@ -586,6 +588,10 @@ export function onPlayerDeathFruit(t) {
   delete b[t];
 }
 export function clearFruitCallbacks(t) {
+  /* Marque tout de suite : a partir d'ici, plus aucun appel API pour ce
+     joueur (le reste de la deconnexion peut prendre plusieurs ticks et
+     getPlayerIds peut encore le lister). */
+  if (t) GONE[t] = true;
   /* Deconnexion en pleine animation : la machine avait deja encaisse le
      prix. On rend l'argent (et on arrete le minuteur) avant de toucher au
      reste, sinon le joueur perdait sa mise pour un fruit jamais livre. */
@@ -650,7 +656,13 @@ export function handleFruitClickUp(t, e, o, r, n, i, c) {}
 export function handleFruitJump(t) {}
 const C = ["money", "coins", "beli", "currency", "gold", "cash", "balance"],
   R = ["level", "lvl", "Level"],
-  M = new Map();
+  M = new Map(),
+  /* Joueurs dont on a RECU le depart. api.getPlayerIds() peut encore les
+     lister une fraction de seconde alors que tout appel sur eux leve deja
+     (setClientOption, setPlayerDbValue, playSound...). Notre propre handler
+     de depart est la seule source fiable : des qu'il passe, on n'appelle
+     plus rien pour ce joueur pendant le roll. */
+  GONE = {};
 function T(t, e) {
   try {
     return "number" == typeof (o = api.getPlayerDbValue(t, e)) && Number.isFinite(o)
@@ -664,6 +676,7 @@ function T(t, e) {
   var o;
 }
 function A(t) {
+  if (!t || GONE[t]) return;
   try {
     api.setClientOption(t, "middleTextUpper", "");
   } catch (t) {
@@ -671,6 +684,7 @@ function A(t) {
   }
 }
 function D(t, e, o, r) {
+  if (!t || GONE[t]) return;
   try {
     "function" == typeof api.playSound && api.playSound(t, e, o, r);
   } catch (t) {
@@ -717,6 +731,7 @@ function $(t) {
   return t[Math.floor(Math.random() * t.length)];
 }
 function B(t, e) {
+  if (!t || GONE[t]) return;
   if (e && e.paid)
     try {
       api.setPlayerDbValue(t, e.key, e.balanceBefore);
@@ -731,6 +746,8 @@ function B(t, e) {
 function fruitPay(t, e) {
   if (!e) return false;
   if (e.paid) return true;
+  /* Parti juste avant l'encaissement : on ne touche pas a sa base. */
+  if (!fruitOnline(t)) return false;
   const cur = T(t, e.key);
   if (null === cur || cur < e.price) return false;
   e.balanceBefore = cur;
@@ -748,7 +765,7 @@ function fruitPay(t, e) {
    deconnecter ou changer de variation : l'entite disparait, et le moindre
    api.setClientOption / playSound sur cet id leve une erreur. */
 function fruitOnline(t) {
-  if (!t) return false;
+  if (!t || GONE[t]) return false;
   try {
     const e = api.getPlayerIds() || [];
     return -1 !== e.indexOf(t);
@@ -827,6 +844,10 @@ function E(t, o, r) {
                   const e = api.giveItem(t, a, 1, fruitItemAttributes(r));
                   if ("number" == typeof e && e < 1) throw new Error("Inventory is full");
                 } catch (e) {
+                  /* Parti entre l'encaissement et la remise : il n'y a plus
+                     personne a rembourser ni a prevenir, et loguer une erreur
+                     ici ne servirait a rien (rien n'est recuperable). */
+                  if (!fruitOnline(t)) return void f("fruitRoll.giveItem", e, r);
                   return (
                     B(t, i),
                     A(t),
@@ -839,6 +860,7 @@ function E(t, o, r) {
                 }
                 const l = getFruitInfo(r);
                 e(() => {
+                  if (!fruitOnline(t)) return;
                   (A(t),
                     p(
                       t,
