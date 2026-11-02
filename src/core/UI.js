@@ -338,7 +338,9 @@ export function joinUI(playerId) {
         protection deja active tombe immediatement.
 
    PAS DE SETTINGS DANS LE LOBBY (variation "default") : il n'y a ni ile ni mer
-   a y regler. Le jeu recharge le joueur a chaque saut de variation, donc un
+   a y regler. Tant que les variations sont coupees (VARIATIONS_ENABLED dans
+   gameplay/variations.js), le monde EST la mer 1 : les Settings sont donc
+   toujours la. Le jeu recharge le joueur a chaque saut de variation, donc un
    simple test au join suffit : dans une mer la categorie existe, dans le lobby
    elle n'existe pas (et nos fleches sont effacees au passage).
 

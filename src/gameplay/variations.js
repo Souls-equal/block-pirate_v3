@@ -59,6 +59,43 @@ export const SEAS = {
     /* 2: { id: "sea2", title: "Sea 2", teams: { ... } }, */
 };
 
+/* ==========================================================================
+   INTERRUPTEUR DES VARIATIONS
+
+   false = LE MONDE N'UTILISE PAS LES VARIATIONS. Tout se passe dans la seule
+           variation existante, exactement comme avant les mers : pas de
+           couloir, pas de matchmaking, pas de lobby. Le monde EST la mer 1.
+           Les joueurs jouent tout de suite, sans attendre que l'admin lance
+           une variation (utile quand les variations ne fonctionnent pas).
+
+   true  = lobby + mers (comportement d'origine : "default" puis "sea1"...).
+
+   Rien d'autre a changer : `currentVariation()` renvoie le nom de la mer 1
+   quand l'interrupteur est a false, donc les iles, les warps admin et les
+   Settings se comportent comme en mer, et `isLobby()` est toujours faux.
+   On peut aussi basculer a chaud depuis un Code Block : BPSea.setVariations(true).
+   ========================================================================== */
+
+export const VARIATIONS_ENABLED = false;
+
+/* Etat courant : la constante ci-dessus, modifiable a chaud (voir setVariations). */
+let variationsOn = VARIATIONS_ENABLED;
+
+/* La mer unique quand les variations sont coupees : le monde est la mer 1. */
+export const SOLO_SEA = 1;
+export const SOLO_VARIATION = SEAS[SOLO_SEA].id;
+
+export function areVariationsEnabled() {
+    return variationsOn;
+}
+
+/* Pour tester plus tard sans recoller le World Code : BPSea.setVariations(true)
+   remet le parcours lobby -> mer. Renvoie l'etat applique. */
+export function setVariations(on) {
+    variationsOn = !!on;
+    return variationsOn;
+}
+
 /* Sauvegarde de la position dans une mer : toutes les N ticks. */
 const SAVE_EVERY_TICKS = 200; /* 10 s a 20 tps */
 
@@ -149,8 +186,11 @@ function tell(playerId, segments, key) {
 
 /* -------------------------------------------------------------- variations */
 
-/* Variation courante. Renvoie LOBBY.variation si le moteur ne fournit rien. */
+/* Variation courante.
+   - variations coupees : la mer 1 (le monde entier est jouable) ;
+   - variations actives  : celle du moteur, ou le lobby s'il ne fournit rien. */
 export function currentVariation() {
+    if (!variationsOn) return SOLO_VARIATION;
     try {
         const v = api.getVariation();
         return typeof v === "string" && v ? v : LOBBY.variation;
@@ -184,14 +224,19 @@ export function seaKeyFromVariation(variation) {
    ils ont deja une team -> on les considere comme etant en mer 1, sans leur
    redemander de choisir. Aucune de leurs autres donnees n'est touchee. */
 export function playerSea(playerId) {
+    /* Sans variations il n'y a qu'une mer : inutile de lire la db. */
+    if (!variationsOn) return SOLO_SEA;
     const n = num(playerId, "vsea");
     if (n > 0) return n;
     const team = teamOf(playerId);
     return team === "PIRATES" || team === "MARINES" ? 1 : 0;
 }
 
-/* Le moteur accepte-t-il les variations ? (sinon on ne fait rien du tout) */
+/* Le moteur accepte-t-il les variations ET les a-t-on activees ?
+   (sinon on ne fait rien du tout : pas de matchmaking, pas de teleport de
+   lobby, pas de sauvegarde de position par mer) */
 export function variationsSupported() {
+    if (!variationsOn) return false;
     return typeof api.getVariation === "function" && typeof api.matchmakeToVariation === "function";
 }
 
@@ -278,6 +323,8 @@ export function enterSea(playerId, seaNumber, pos) {
     const n = Number(seaNumber) || playerSea(playerId) || 1;
     const sea = seaByNumber(n);
     if (!sea) return false;
+    /* Sans variations : une seule mer, on y TELEPORTE (aucun matchmaking). */
+    if (!variationsOn) return teleport(playerId, pos || teamSpawn(sea, teamOf(playerId)));
     if (!variationsSupported()) return false;
     put(playerId, "vsea", n);
     setPending(playerId, pos || unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
@@ -324,7 +371,21 @@ export function chooseTeam(playerId, teamId) {
     const firstTime = playerSea(playerId) === 0;
     const n = firstTime ? 1 : playerSea(playerId);
     const sea = seaByNumber(n) || SEAS[1];
+    const teamLabel = team === "PIRATES" ? "Pirates" : team === "MARINES" ? "Marines" : "No Team";
     applyTeam(playerId, team);
+
+    /* Sans variations : la team se choisit sur place, on teleporte au spawn de
+       la team dans le monde (les coordonnees sont les memes). */
+    if (!variationsOn) {
+        const ok = teleport(playerId, teamSpawn(sea, team));
+        tell(playerId, [
+            { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
+            { str: ok ? " You joined the " : " Could not move you to the ", style: { color: C.INFO } },
+            { str: teamLabel, style: { color: team === "PIRATES" ? C.PIRATE : C.MARINE, fontWeight: "bold" } },
+        ]);
+        return ok;
+    }
+
     put(playerId, "vsea", n);
     setPending(playerId, teamSpawn(sea, team));
     const ok = moveToVariation(playerId, sea.id);
@@ -332,7 +393,7 @@ export function chooseTeam(playerId, teamId) {
         { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
         { str: ok ? " Sailing to " : " Could not board ", style: { color: C.INFO } },
         { str: sea.title, style: { color: C.XP, fontWeight: "bold" } },
-        { str: " as " + (team === "PIRATES" ? "Pirates" : team === "MARINES" ? "Marines" : "No Team"), style: { color: C.PIRATE } }
+        { str: " as " + teamLabel, style: { color: C.PIRATE } }
     ]);
     return ok;
 }
@@ -341,6 +402,15 @@ export function chooseTeam(playerId, teamId) {
 export function continueJourney(playerId) {
     const n = playerSea(playerId) || 1;
     const sea = seaByNumber(n) || SEAS[1];
+    /* Sans variations : on remet le joueur a sa place dans le monde. */
+    if (!variationsOn) {
+        const ok = teleport(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
+        tell(playerId, [
+            { icon: "Boat", style: { color: C.MARINE } },
+            { str: ok ? " Welcome back." : " Could not move you.", style: { color: C.INFO } },
+        ]);
+        return ok;
+    }
     setPending(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
     const ok = moveToVariation(playerId, sea.id);
     tell(playerId, [
@@ -353,6 +423,29 @@ export function continueJourney(playerId) {
 
 /* Lancement depuis le couloir : premier passage ou reprise. */
 export function launch(playerId) {
+    /* Sans variations il n'y a pas de couloir : si le joueur a deja une team,
+       on le remet simplement a son spawn ; sinon on lui dit ou choisir. */
+    if (!variationsOn) {
+        const team = teamOf(playerId);
+        const sea = SEAS[SOLO_SEA];
+        if (team === "PIRATES" || team === "MARINES") {
+            teleport(playerId, teamSpawn(sea, team));
+            say(playerId, [
+                { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
+                { str: " Welcome back, ", style: { color: C.INFO } },
+                { str: team === "PIRATES" ? "Pirate" : "Marine", style: { color: team === "PIRATES" ? C.PIRATE : C.MARINE, fontWeight: "bold" } },
+            ]);
+            return true;
+        }
+        say(playerId, [
+            { icon: "fa-solid fa-user-group", style: { color: C.MONEY } },
+            { str: " Choose your side at the recruiter: ", style: { color: C.INFO } },
+            { str: "Pirates", style: { color: C.PIRATE, fontWeight: "bold" } },
+            { str: " / ", style: { color: C.INFO } },
+            { str: "Marines", style: { color: C.MARINE, fontWeight: "bold" } },
+        ]);
+        return false;
+    }
     const firstTime = playerSea(playerId) === 0;
     teleport(playerId, firstTime ? LOBBY.hubFirst : LOBBY.hubReturning);
     if (firstTime) {
@@ -377,9 +470,13 @@ export function launch(playerId) {
 
 /* --------------------------------------------------------------- cycle vie */
 
-/* A appeler au join (toutes variations). */
+/* A appeler au join (toutes variations).
+   Sans variations : on ne touche a rien — pas de tp au spawn du lobby, pas de
+   titre de variation. Le joueur arrive la ou le monde le pose. */
 export function variationJoin(playerId) {
-    if (!playerId || !variationsSupported()) return false;
+    if (!playerId) return false;
+    if (!variationsOn) return false;
+    if (!variationsSupported()) return false;
     const variation = currentVariation();
     if (variation === LOBBY.variation) {
         applyTitle(playerId, LOBBY.title);
@@ -472,6 +569,11 @@ export function startVariationLoop() {
    Exemple de Code Block (bouton du couloir) :
      BPSea.launch(playerId);  // ou BPSea.chooseTeam(playerId, "MARINES") */
 export const BPSea = {
+    /* Interrupteur : BPSea.setVariations(true) remet le parcours lobby -> mer
+       quand les variations fonctionneront dans le monde. */
+    setVariations,
+    areVariationsEnabled,
+    variationsEnabled: VARIATIONS_ENABLED,
     launch,
     chooseTeam,
     continueJourney,

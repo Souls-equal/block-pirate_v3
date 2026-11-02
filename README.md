@@ -93,12 +93,57 @@ d'origine sont perdus). Modifie donc toujours `src/` : `world-code/` suit tout s
 
 ## Lobby, mers et variations (`src/gameplay/variations.js`)
 
+### ⏸ Les variations sont coupées pour l'instant
+
+En haut du fichier :
+
+```js
+export const VARIATIONS_ENABLED = false;
+```
+
+À `false`, le monde **n'utilise pas** les variations : pas de lobby, pas de couloir, pas de
+matchmaking. Le monde unique **est** la mer 1, donc les îles, les warps admin, les Settings et
+les flèches fonctionnent tout de suite — les joueurs et les testeurs n'attendent plus qu'une
+variation soit lancée. C'est le réglage livré par défaut tant que les variations ne marchent
+pas dans le monde.
+
+Ce que l'interrupteur change, concrètement :
+
+| Élément | Variations coupées | Variations actives |
+| --- | --- | --- |
+| `currentVariation()` | renvoie `"sea1"` | la variation du moteur (`default`, `sea1`…) |
+| `isLobby()` | toujours `false` | vrai dans `default` |
+| Connexion | le joueur n'est **pas** déplacé | tp au spawn du lobby |
+| `chooseTeam(id, team)` | enregistre la team + tp à son spawn (même monde) | matchmake vers `sea1` |
+| `continueJourney(id)` | tp à la position (même monde) | matchmake + tp |
+| `enterSea(id, n)` | tp sur place | matchmake |
+| `launch(id)` | tp au spawn de la team si elle existe, sinon rappel des recruteurs | hub 1re fois / reprise |
+| Zone neutre du lobby | inactive | active |
+| Sauvegarde `vp<N>` / `vsea` | aucune écriture | à chaque saut |
+
+Rien d'autre à modifier : `core/admin.js` et `core/UI.js` lisent la **même** fonction, donc
+les îles et les Settings suivent automatiquement (`currentIslands()` renvoie la table de
+`sea1`, le bouton `Warp to Island` existe, la catégorie `Settings` est créée).
+
+**Pour rallumer plus tard**, deux possibilités :
+
+```js
+// 1. definitif : remettre a true dans gameplay/variations.js, puis npm run build
+// 2. a chaud, sans recoller le World Code, depuis un Code Block :
+BPSea.setVariations(true);   // revient au parcours lobby -> mer
+BPSea.setVariations(false);  // re-coupe
+```
+
+---
+
+### Le fonctionnement complet (quand les variations sont actives)
+
 Le monde est découpé en **variations** Bloxd : le `default` (la variation de base) sert
 de **lobby**, puis une variation **par mer** (`sea1`, `sea2`…). Deux joueurs de mers
 différentes ne se croisent jamais, ce qui sépare les puissances sans multiplier les
 serveurs. Aucun renommage n'est nécessaire au join : le lobby reste `default`.
 
-**Parcours**
+**Parcours** (variations actives)
 
 | Moment | Ce qui se passe |
 | --- | --- |

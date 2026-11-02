@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**29 fichiers, 322 128 caracteres** (63 % de la limite de 512 000 du World Code, -49 % par rapport aux sources lisibles).
+**29 fichiers, 323 402 caracteres** (63 % de la limite de 512 000 du World Code, -49 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -30,11 +30,11 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 
 | Fichier | Caracteres | Source lisible |
 | --- | --- | --- |
-| `core/admin.js` | 60 719 | 98 901 |
+| `core/admin.js` | 60 667 | 99 216 |
 | `core/ranks.js` | 2 457 | 5 245 |
 | `core/team.js` | 18 617 | 44 605 |
 | `core/theme.js` | 14 922 | 32 455 |
-| `core/UI.js` | 14 701 | 36 928 |
+| `core/UI.js` | 14 701 | 37 083 |
 | `fruit/abilities.js` | 40 596 | 61 145 |
 | `fruit/fruitData.js` | 5 685 | 8 871 |
 | `fruit/func-abilities.js` | 21 150 | 28 739 |
@@ -47,7 +47,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/spawning.js` | 6 145 | 14 262 |
 | `gameplay/stamina.js` | 4 493 | 10 048 |
 | `gameplay/stats.js` | 4 776 | 10 726 |
-| `gameplay/variations.js` | 5 799 | 16 870 |
+| `gameplay/variations.js` | 7 125 | 21 692 |
 | `index.js` | 11 106 | 21 561 |
 | `utils/boss.js` | 4 932 | 9 086 |
 | `utils/combat.js` | 14 611 | 44 061 |
