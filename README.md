@@ -1220,6 +1220,44 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 
 ---
 
+## Glitchs fermés : clear admin et quête payée deux fois
+
+### 1. Le clear du panneau ne paie plus les dégâts
+
+Un mob supprimé par `Clear Entities` mourait « normalement » du point de vue du moteur :
+`onMobDespawned` / `onEntityDeleted` regardaient le dernier joueur qui l'avait frappé et lui
+versaient XP et argent. Il suffisait de taper un mob — sans le tuer — puis de demander un
+clear (ou d'attendre qu'un staff en fasse un) pour être payé.
+
+`blockKillCredit(mobId)` (`src/utils/killAttribution.js`) verrouille la cible **avant** le
+despawn, exactement comme un mob déjà crédité : `claimKill` refuse, donc plus aucun versement.
+Le clear admin (`src/core/admin.js`) l'appelle sur **chaque** id, dans les deux chemins
+(`api.getMobIds()` et les entités trouvées dans le rectangle), juste avant `api.despawnMob` —
+après, l'événement serait déjà parti.
+
+Le verrou est temporaire (20 s, comme un kill normal) et ne concerne que les mobs visés : un
+vrai kill reste payé, y compris juste après un clear.
+
+### 2. Une quête ne paie plus plusieurs fois
+
+`completeQuest()` payait **avant** de nettoyer l'état. Or la récompense contient de l'XP :
+si elle faisait gagner plusieurs niveaux, `addXP` appelait `checkQuestValidity`, qui voyait
+encore la quête terminée en mémoire, constatait `niveau > levelMax` et la **re-complétait** —
+en boucle. Un joueur au niveau 60 terminant sa quête touchait 2 × la récompense (reproduit :
+1 068 pièces au lieu de 534).
+
+| Avant | Après |
+| --- | --- |
+| état supprimé à la fin | état supprimé **avant** de payer |
+| `completeQuest` ré-entrant | `questBeingPaid` refuse une seconde entrée |
+| `completeQuest` ne renvoyait rien | renvoie `true` seulement s'il a réellement payé, et c'est ce retour qui déclenche `startQuest` |
+
+Résultat : **une seule** récompense, même sur un saut de plusieurs niveaux (ou de 60 à 423),
+et la quête suivante est celle du niveau réellement atteint. Les kills en trop après
+l'achèvement ne paient rien.
+
+---
+
 ## Vérifications
 
 ```bash
