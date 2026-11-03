@@ -111,16 +111,17 @@ const DB_BUTTONS = "sqB";
    quete posee par le Rich Man, et le warp du panneau admin. */
 export const SABER_ISLAND = { name: "Secret Island", pos: [2693, -911, -127], color: "#E5C15A" };
 
-/* Les deux structures ouvrables. `saved` retient les blocs retires, dans
-   l'ordre, pour pouvoir les remettre a l'identique. */
+/* Les deux structures ouvrables, decrites comme dans le monde : deux coins
+   et la matiere a remettre. `saved` retient ce qu'il y avait avant le
+   percement (pour pouvoir le remettre a l'identique si besoin). */
 const STRUCTS = {
     door: {
         step: S.DOOR,
         center: [1329, -914.5, 318],
-        blocks: [
-            [1329, -915, 318],
-            [1329, -914, 318],
-        ],
+        /* porte de la jungle : 2 blocs de haut */
+        a: [1329, -915, 318],
+        b: [1329, -914, 318],
+        material: "Stone",
         saved: null,
         openedAt: 0,
         arrowId: "saber-door",
@@ -129,21 +130,16 @@ const STRUCTS = {
     curtain: {
         step: S.CURTAIN,
         center: [612, -903, 1761],
-        blocks: curtainBlocks(),
+        /* rideau du desert : 3 x 3 en Purple Ceramic */
+        a: [612, -904, 1760],
+        b: [612, -902, 1762],
+        material: "Purple Ceramic",
         saved: null,
         openedAt: 0,
         arrowId: "saber-curtain",
         arrowLabel: "Burnt curtain",
     },
 };
-
-function curtainBlocks() {
-    const out = [];
-    for (let y = -904; y <= -902; y++) {
-        for (let z = 1760; z <= 1762; z++) out.push([612, y, z]);
-    }
-    return out;
-}
 
 /* ── 2. OUTILS ─────────────────────────────────────────────────────────── */
 
@@ -284,34 +280,73 @@ function resetQuest(playerId) {
 
 /* ── 4. STRUCTURES OUVERTES / REFERMEES ────────────────────────────────── */
 
+/* ORDRE DES ARGUMENTS : api.setBlock(x, y, z, nom) et
+   api.setBlockRect(pos1, pos2, nom). L'ancien code appelait
+   api.setBlock(0, x, y, z) : il posait un bloc a l'origine du monde et la
+   porte ne s'ouvrait donc JAMAIS physiquement. On passe maintenant par le
+   rectangle, exactement comme dans le monde. */
+function rectBlocks(a, b, name) {
+    try {
+        api.setBlockRect([a[0], a[1], a[2]], [b[0], b[1], b[2]], name);
+        return true;
+    } catch (e) {}
+    /* repli bloc par bloc si setBlockRect n'existe pas dans ce moteur */
+    let ok = false;
+    const x1 = Math.min(a[0], b[0]), x2 = Math.max(a[0], b[0]);
+    const y1 = Math.min(a[1], b[1]), y2 = Math.max(a[1], b[1]);
+    const z1 = Math.min(a[2], b[2]), z2 = Math.max(a[2], b[2]);
+    for (let x = x1; x <= x2; x++) {
+        for (let y = y1; y <= y2; y++) {
+            for (let z = z1; z <= z2; z++) {
+                try { api.setBlock(x, y, z, name); ok = true; } catch (err) {}
+            }
+        }
+    }
+    return ok;
+}
+
+/* Ce qu'il y a dans le rectangle avant de le percer. */
+function readRect(a, b) {
+    const out = [];
+    const x1 = Math.min(a[0], b[0]), x2 = Math.max(a[0], b[0]);
+    const y1 = Math.min(a[1], b[1]), y2 = Math.max(a[1], b[1]);
+    const z1 = Math.min(a[2], b[2]), z2 = Math.max(a[2], b[2]);
+    for (let x = x1; x <= x2; x++) {
+        for (let y = y1; y <= y2; y++) {
+            for (let z = z1; z <= z2; z++) {
+                out.push([x, y, z, blockAt(x, y, z)]);
+            }
+        }
+    }
+    return out;
+}
+
 function openStruct(key) {
     const s = STRUCTS[key];
     if (!s || s.saved) return false;
     startHousekeeping();
+    /* On note l'existant, puis on perce le rectangle d'un coup. */
+    s.saved = readRect(s.a, s.b);
+    if (!rectBlocks(s.a, s.b, "Air")) { s.saved = null; return false; }
     s.openedAt = nowMs();
-    const saved = [];
-    for (let i = 0; i < s.blocks.length; i++) {
-        const b = s.blocks[i];
-        const name = blockAt(b[0], b[1], b[2]);
-        if (!name) continue;
-        saved.push([b[0], b[1], b[2], name]);
-        if (name !== "Air") {
-            try { api.setBlock(0, b[0], b[1], b[2]); } catch (e) {}
-        }
-    }
-    s.saved = saved;
     return true;
 }
 
 function closeStruct(key) {
     const s = STRUCTS[key];
     if (!s || !s.saved) return false;
-    for (let i = 0; i < s.saved.length; i++) {
-        const e = s.saved[i];
-        try { api.setBlock(e[3], e[0], e[1], e[2]); } catch (err) {}
+    /* On remet la matiere declaree (Stone / Purple Ceramic). Si le rectangle
+       est refuse, on remet bloc par bloc ce qu'on avait note. */
+    let ok = rectBlocks(s.a, s.b, s.material);
+    if (!ok) {
+        for (let i = 0; i < s.saved.length; i++) {
+            const e = s.saved[i];
+            if (!e[3] || e[3] === "Air") continue;
+            try { api.setBlock(e[0], e[1], e[2], e[3]); ok = true; } catch (err) {}
+        }
     }
     s.saved = null;
-    return true;
+    return ok;
 }
 
 const KEEP_RADIUS = 15;
