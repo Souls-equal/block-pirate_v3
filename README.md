@@ -892,6 +892,21 @@ toucher.
 Tous passent par `buyItem()` : **la confirmation 3 s s'applique automatiquement**, il n'y a rien
 à ajouter pour un nouveau vendeur.
 
+### `Haki Buyer` : il rachète les Haki Fragments
+
+`Haki Buyer` (ou `Haki Fragment Buyer`) achète le butin de Garp à un **prix tiré au hasard entre 100
+et 300 Coins** par fragment, avec la même confirmation en deux clics que partout ailleurs.
+
+- le butin de Garp est un `Black Carpet` renommé **« Haki fragment »** (voir `dropHaki`,
+  `src/utils/boss.js`) ;
+- le PNJ ne vend **que** les items dont le nom affiché contient « Haki frag », **slot par slot**
+  (inventaire **et** Moonstone Chest, via `customItem`) : un joueur qui garde un `Black Carpet` pour
+  acheter le haki **ne le perd pas** en cliquant ici ;
+- le prix est tiré **une fois par offre** et mémorisé 3 s : la clé de confirmation est fixe, donc le
+  second clic retrouve exactement le prix annoncé au premier (sans ce cache, le prix changerait à
+  chaque clic et la vente ne se confirmerait jamais) ;
+- l'inventaire est **relu après confirmation** : on ne paie que ce qui est réellement retiré.
+
 ---
 
 ## Haki : le vendeur redonne l'item
@@ -1279,13 +1294,13 @@ pressés). Aucune autre donnée n'est écrite : tout se relit à la volée.
 | --- | --- | --- |
 | 0 | Jungle | cinq boutons cachés à presser |
 | 1 | Jungle | les 5 sont pressés : la porte s'ouvre (Torch derrière, don d'un Code Block) |
-| 2 | Désert | la Torch brûle le rideau et **disparaît** (Cup derrière, don d'un Code Block) |
+| 2 | Désert | la Torch brûle le rideau et **est consommée** (Cup derrière, don d'un Code Block) |
 | 3 | Désert | la Cup est remplie au point d'eau |
 | 4 | Old Man | il boit et envoie vers son fils |
 | 5 | Rich Man | il donne l'objectif, une flèche apparaît vers Secret Island |
 | 6 | Mob Leader | il est mort : un **Gold Grit** tombe au sol |
 | 7 | Rich Man | il reprend l'or et donne la relique **Magmaward Fuel** |
-| 8 | Mur | la relique téléporte derrière le mur, dans la salle de Shanks |
+| 8 | Mur | la relique **est consommée** et ouvre le passage, dans la salle de Shanks |
 | 9 | Shanks | le Saber Expert est vaincu : quête terminée |
 
 | Objet | Détail |
@@ -1304,17 +1319,24 @@ d'origine sans jamais enfermer quelqu'un derrière.
 
 ### Les items
 
-- la **Torch** ne peut pas être lâchée : `saberLockedItem("Torch")` est branché sur
-  `onPlayerDropItem`, à côté des items de capacité ;
-- la **Cup** est l'item `Bucket` : remplir ne change pas l'item, seulement ses attributs
-  (`customDisplayName: "Cup of Water"`), donc elle reste reconnaissable dans l'inventaire ;
-- le **Gold Grit** est l'item `Gold Block`, renommé au join dans `customItem.js` (nom **et**
-  description) comme les autres items custom ; le drop porte aussi ses attributs, pour rester lisible
-  même après un passage en coffre ;
-- la **Magmaward Fuel** est l'item `Obsidian`, renommé **uniquement dans les attributs du give** :
-  les blocs d'obsidienne des joueurs ne changent pas de nom.
+| Objet | Item | Donné par | Consommé à |
+| --- | --- | --- | --- |
+| **Torch** | `Torch` | Code Block (derrière la porte) | le rideau du désert |
+| **Cup** | `Bucket` (nom affiché `Cup of Water`) | Code Block (derrière le rideau) | l'Old Man |
+| **Gold Grit** | `Gold Grit` (vrai item) | le Mob Leader | le Rich Man |
+| **Magmaward Fuel** | `Magmaward Fuel` (vrai item) | le Rich Man | le mur scellé |
 
-### Le Mob Leader (niveau 200)
+- **Aucun item de la quête ne peut être lâché** : `saberLockedItem()` répond pour les quatre, et il
+  est branché sur `onPlayerDropItem`, à côté des items de capacité. Ils ne peuvent donc pas être
+  donnés à un autre joueur.
+- **Gold Grit** et **Magmaward Fuel** sont de **vrais items du jeu** : ils sont donnés et droppés par
+  leur nom, sans renommage ni attributs (rien dans `customItem.js`).
+- perte d'item (mort, filtre d'inventaire) : **aucun blocage**. Le point d'eau rend la Cup pleine, le
+  Rich Man rend la relique, et le retour de la relique ne peut pas en créer une deuxième (la garde est
+  l'absence de l'item **et** l'étape). Une fois la relique brûlée dans le mur, le passage reste
+  ouvert : sinon le joueur se retrouverait devant un mur qu'il ne peut plus ouvrir.
+
+### Le Mob Leader (niveau 200, mob `Glass Bro`)
 
 Il se lance **depuis un Code Block**, comme les mobs de quête, mais avec ses propres capacités :
 
@@ -1335,26 +1357,27 @@ Shanks lance le duel **dans l'arène du boss Haki** (`[-87,1014,-80]` → `[165,
 une salle inventée : le joueur y est téléporté, le boss posé à 8 blocs, comme Garp. Refus si
 quelqu'un d'autre est déjà dans l'arène.
 
-Il est **plus fort que l'exemple fourni** (Draugr Knight, 400 PV, 4 capacités) : 6 000 PV, échelle
+Il est **plus fort que l'exemple fourni** (400 PV, 4 capacités) : 6 000 PV sur le mob `Lord Vulcan`,
+échelle
 1,8, cinq capacités — `RUSH` (ruée), `AIR SLASH` (**deux ondes indépendantes**), `SLAM` (onde de
 choc + ralentissement), `GRAB` (attire le joueur puis frappe et affaiblit) — plus, à 50 % de vie, une
 **phase 2** : nametag rouge, vitesse augmentée, délais raccourcis de 25 % et `BLADE TEMPEST` (six
 ondes en étoile). Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone et de
 protection PvP respectées) et non par un `applyHealthChange` brut.
 
-### Secret Island
+### Secret Island (`2693,-911,-127`)
 
-La position n'est **pas** codée en dur : `SABER_ISLAND.pos` vaut `null` tant que l'auteur du monde ne
-l'a pas posée.
+La position est dans `SABER_ISLAND` (`src/gameplay/saber.js`) et se corrige sans recoller le World
+Code :
 
 ```js
-setSecretIsland(x, y, z)   // depuis un Code Block ou la console
+setSecretIsland(x, y, z)   // depuis un Code Block
 ```
 
-Tant qu'elle est nulle, **aucune flèche** n'est posée et **aucun warp** n'est proposé : rien de cassé.
-Dès qu'elle existe, `Rich Man` pose la flèche de quête (id `saber-isle`) et l'île apparaît dans
-`Warp to Island` du panneau admin (`adminIslands()`) — **et seulement là** : elle ne figure ni dans
-les flèches d'île des joueurs, ni dans Settings, puisqu'elle est censée être secrète.
+`Rich Man` pose la flèche de quête (id `saber-isle`) et l'île apparaît dans `Warp to Island` du
+panneau admin (`adminIslands()`) — **et seulement là** : elle ne figure ni dans les flèches d'île des
+joueurs, ni dans Settings, puisqu'elle est censée être secrète. Si la position valait `null`, ni
+flèche ni warp ne seraient proposés (rien de cassé).
 
 ---
 

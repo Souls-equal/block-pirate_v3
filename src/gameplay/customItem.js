@@ -219,12 +219,6 @@ export function itemJoin(playerId) {
     })
     api.removeItemCraftingRecipes(playerId, null)
     api.setItemStat(playerId, "M1911", "displayName", "Flintlock")
-    /* SABER QUEST : le butin du Mob Leader. Comme les autres renommages de
-       ce fichier, il porte sur l'item de BASE ("Gold Block") : tout l'or
-       du joueur s'affiche donc "Gold Grit", et le nom reste coherent meme
-       si le drop a perdu ses attributs (coffre, filtre, respawn). */
-    api.setItemStat(playerId, "Gold Block", "displayName", "Gold Grit")
-    api.setItemStat(playerId, "Gold Block", "description", "The money the Mob Leader stole. Bring it back to the Rich Man.")
     api.setItemStat(playerId, "M1911", "gunStats", {
         fireRate:80,
         damage: 30,
