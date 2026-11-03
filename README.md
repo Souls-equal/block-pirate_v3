@@ -1304,10 +1304,18 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 trois PNJ, le Mob Leader et le Saber Expert. Un seul fichier, parce que la limite des 30 fichiers du
 World Code ne laisse pas de place à un second.
 
-L'état tient dans **une seule clé de base** par joueur, `sq` (0 → 9), plus `sqB` (les boutons déjà
-pressés). Aucune autre donnée n'est écrite : tout se relit à la volée.
+### L'état de la quête ne se sauvegarde pas
 
-| `sq` | Étape | Ce qui se passe |
+La progression vit **en mémoire**, dans `saber.js` (`quests[playerId]`), et se **remet à zéro** :
+
+- **quand le joueur quitte** (déconnexion) — il n'y a donc rien à relire au retour, et rien à migrer ;
+- **quand il termine la quête**, c'est-à-dire quand le Saber Expert tombe : l'étape *et* les boutons
+  repartent de zéro, la quête est rejouable telle quelle.
+
+Conséquence assumée : un redémarrage du monde efface aussi la progression. Les deux anciennes clés db
+(`sq`, `sqB`) sont supprimées au join pour ne pas laisser de vieux reste chez les joueurs existants.
+
+| Étape | Zone | Ce qui se passe |
 | --- | --- | --- |
 | 0 | Jungle | cinq boutons cachés à presser |
 | 1 | Jungle | les 5 sont pressés : la porte s'ouvre (Torch derrière, don d'un Code Block) |
@@ -1318,7 +1326,7 @@ pressés). Aucune autre donnée n'est écrite : tout se relit à la volée.
 | 6 | Mob Leader | il est mort : un **Gold Grit** tombe au sol |
 | 7 | Rich Man | il reprend l'or et donne la relique **Magmaward Fuel** |
 | 8 | Mur | la relique **est consommée** et ouvre le passage, dans la salle de Shanks |
-| 9 | Shanks | le Saber Expert est vaincu : quête terminée |
+| 9 | Shanks | le Saber Expert est vaincu : la quête est terminée **et remise à zéro** |
 
 | Objet | Détail |
 | --- | --- |
@@ -1334,23 +1342,36 @@ personne à 15 blocs** (`KEEP_RADIUS`). La vérification passe toutes les 220 ti
 a déjà validé l'étape les voit se rouvrir tout seul quand il revient : le monde reste dans son état
 d'origine sans jamais enfermer quelqu'un derrière.
 
+**Délai de grâce de 60 s** (`GRACE_MS`) : une ouverture reste ouverte au moins une minute, même si
+le joueur qui l'a déclenchée s'éloigne. Sans ça, les cinq boutons étant dispersés dans la jungle, la
+porte se refermait pendant qu'il cherchait ce qui venait de s'ouvrir. En plus, le cinquième bouton
+pose une **flèche temporaire** (`saber-door`) vers la porte, qui s'efface dès qu'on est à 6 blocs
+d'elle — donc on sait où aller, et on n'a pas une flèche dans le dos pour le reste de la quête.
+
 ### Les items
 
 | Objet | Item | Donné par | Consommé à |
 | --- | --- | --- | --- |
 | **Torch** | `Torch` | Code Block (derrière la porte) | le rideau du désert |
-| **Cup** | `Bucket` (nom affiché `Cup of Water`) | Code Block (derrière le rideau) | l'Old Man |
+| **Cup** | `Bucket` vide → **`Water Bucket`** (nom affiché `Cup of Water`) | Code Block (derrière le rideau) | l'Old Man |
 | **Gold Grit** | `Gold Grit` (vrai item) | le Mob Leader | le Rich Man |
 | **Magmaward Fuel** | `Magmaward Fuel` (vrai item) | le Rich Man | le mur scellé |
 
-- **Aucun item de la quête ne peut être lâché** : `saberLockedItem()` répond pour les quatre, et il
+- **La Cup est un vrai seau du jeu** : vide c'est `Bucket`, pleine c'est `Water Bucket` (nom affiché
+  `Cup of Water`). Le remplissage ne fait **pas** `removeItem` puis `giveItem` : `fillCup()` cherche le
+  slot qui contient le seau (`scanAllItems`) et réécrit **ce slot-là** avec `setItemSlot`, attributs
+  compris. L'item ne quitte jamais sa case, donc rien ne peut se dupliquer et un inventaire plein ne
+  peut pas avaler la Cup. Si la pile contenait plusieurs seaux, un seul est rempli et le reste est
+  rendu — après la réécriture du slot, jamais avant.
+- **Aucun item de la quête ne peut être lâché** : `saberLockedItem()` répond pour les cinq noms
+  (`Torch`, `Bucket`, `Water Bucket`, `Gold Grit`, `Magmaward Fuel`), et il
   est branché sur `onPlayerDropItem`, à côté des items de capacité. Ils ne peuvent donc pas être
   donnés à un autre joueur.
 - **Gold Grit** et **Magmaward Fuel** sont de **vrais items du jeu** : ils sont donnés et droppés par
-  leur nom, sans attributs. `customItem.js` ne les renomme pas, il leur pose à chaque join le nom et
-  la description que le joueur doit lire : `Gold Grit` est un **tas de pièces et de trésor** volé par
-  le Mob Leader, et `Magmaward Fuel` n'est pas un carburant mais une **relique** ancienne encore
-  chaude du volcan.
+  leur nom d'item, sans attributs. `customItem.js` ne renomme pas d'item, il leur pose à chaque join le
+  **nom affiché** et la **description** que le joueur doit lire : `Gold Grit` s'affiche **Gold Dust**
+  (un tas de pièces et de trésor volé par le Mob Leader) et `Magmaward Fuel` s'affiche **Ancient
+  Relic** — ce n'est pas un carburant, mais une relique marquée par le temps.
 - perte d'item (mort, filtre d'inventaire) : **aucun blocage**. Le point d'eau rend la Cup pleine, le
   Rich Man rend la relique, et le retour de la relique ne peut pas en créer une deuxième (la garde est
   l'absence de l'item **et** l'étape). Une fois la relique brûlée dans le mur, le passage reste
@@ -1372,9 +1393,20 @@ l'infini.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
 (`20 + 200^1.6 × 8` ≈ 38 500 PV, `3 + 200^1.3 × 0.8` ≈ 786 dégâts par coup). Les deux valeurs se
-retouchent en tête de `saber.js` (`LEADER.LEVEL`) si le combat est trop long ou trop violent. Trois
-capacités : ruée, volée d'or (onde), et un coup de poing au sol qui ralentit. Un second appel est
-refusé tant que le premier est vivant, et le monde ne peut pas le despawner en plein combat.
+retouchent en tête de `saber.js` (`LEADER.LEVEL`) si le combat est trop long ou trop violent.
+
+Quatre capacités, dont une qui punit vraiment le corps à corps :
+
+- **ruée** — il fonce et percute ;
+- **volée d'or** — une onde lancée à distance ;
+- **coup de poing au sol** — zone proche, ralentissement ;
+- **le cercle d'or** (`leaderRing`) — un anneau de particules se dessine autour de lui pendant 1,4 s,
+  puis éclate. Qui est encore **dans le rayon** (6,5 blocs) encaisse **un coup de corps à corps de
+  plus** : exactement `leaderDmg()`, les dégâts normaux du mob. Le cercle est visible pendant toute
+  la préparation, donc il s'esquive — reculer de quelques blocs suffit.
+
+Un second appel est refusé tant que le premier est vivant, et le monde ne peut pas le despawner en
+plein combat.
 
 ### Le Saber Expert
 
@@ -1382,13 +1414,25 @@ Shanks lance le duel **dans l'arène du boss Haki** (`[-87,1014,-80]` → `[165,
 une salle inventée : le joueur y est téléporté, le boss posé à 8 blocs, comme Garp. Refus si
 quelqu'un d'autre est déjà dans l'arène.
 
-Il est **plus fort que l'exemple fourni** (400 PV, 4 capacités) : 6 000 PV sur le mob `Lord Vulcan`,
-échelle
-1,8, cinq capacités — `RUSH` (ruée), `AIR SLASH` (**deux ondes indépendantes**), `SLAM` (onde de
-choc + ralentissement), `GRAB` (attire le joueur puis frappe et affaiblit) — plus, à 50 % de vie, une
-**phase 2** : nametag rouge, vitesse augmentée, délais raccourcis de 25 % et `BLADE TEMPEST` (six
-ondes en étoile). Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone et de
-protection PvP respectées) et non par un `applyHealthChange` brut.
+Il est dur par ses **attaques**, pas par ses chiffres : **4 200 PV** (et non 6 000) et **70** de
+corps à corps, sur le mob `Lord Vulcan`, échelle 1,8. Sept attaques, **une seule à la fois**, et
+jamais deux fois la même d'affilée (`saber.last` : sans cette rotation, la saisie et le coup au sol,
+de portée courte, sortaient en boucle et les autres ne se voyaient jamais).
+
+| Attaque | Portée | Ce qu'elle fait |
+| --- | --- | --- |
+| **Blade Dash** | 3 → 24 | il charge tout droit ; le coup suit le **segment parcouru** (on ne le traverse pas entre deux images), traînée de lames |
+| **Air Slash** | > 4 | **deux ondes indépendantes** qui ne partent pas du même point |
+| **Saber Slam** | < 9 | onde de choc au sol, projection + ralentissement |
+| **Saber Grab** | < 9 | un **fil rouge** part de sa main pendant 0,7 s : rester à moins de 8 blocs = aspiré, frappé, affaibli. Sortir de la portée annule la saisie |
+| **Blade Storm** | < 9,5 | tourbillon de 2,6 s : deux anneaux de lames qui tournent, dégâts toutes les 0,4 s. On ne reste pas collé à lui |
+| **Saber Beam** | 6 → 40 | il vise la position du joueur **à cet instant**, dessine la ligne et la marque au sol pendant 0,9 s, puis frappe cette zone. Bouger suffit |
+| **Blade Tempest** | < 16 | six ondes en étoile — **phase 2 uniquement** |
+
+À 50 % de vie, **phase 2** : nametag rouge, vitesse augmentée, délais raccourcis et `BLADE TEMPEST`
+débloquée. Toutes les valeurs (PV, dégâts, délais, rayons) sont en tête de `saber.js`, dans `SABER`.
+Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone et de protection PvP
+respectées) et non par un `applyHealthChange` brut.
 
 ### Secret Island (`2693,-911,-127`)
 
