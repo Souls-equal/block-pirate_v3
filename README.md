@@ -867,6 +867,21 @@ Maintenant :
 Le combat démarre donc dans la seconde, et les gardes apparaissent autour du boss, donc autour du
 joueur.
 
+### En jeu : le PNJ `Garp Summoner`
+
+Garp n'avait **aucun point d'entrée** hors d'un Code Block (le portail appelait `startBoss(playerId)`).
+Un PNJ le lance maintenant comme un marchand : premier clic = ce qui va se passer (arène, gardes, ce
+qu'il lâche), second clic dans les 3 s = téléportation dans l'arène et combat.
+
+```js
+startGarpBoss(playerId)   // le chemin unique, exporté pour le PNJ
+startBoss(playerId)       // ancien nom du Code Block : il ne fait que relayer
+```
+
+Les deux clics sont gratuits : ce n'est pas un achat mais une mise en garde, on ne téléporte pas
+quelqu'un dans une arène de boss sur un clic malheureux. Le refus « quelqu'un se bat déjà » vient du
+combat lui-même, pas du PNJ (pas de message en double).
+
 ---
 
 ## PNJ : ce que vend chaque nom
@@ -1343,20 +1358,17 @@ d'origine sans jamais enfermer quelqu'un derrière.
 
 ### Le Mob Leader (niveau 200, mob `Glass Bro`)
 
-En jeu, il se lance en parlant au PNJ **`Mob Leader Summoner`** (ou `Mob Leader Starter`) : premier
-clic = rappel de ce qui va sortir, second clic dans les 3 s = le boss apparaît **à côté du PNJ** et
-vise le joueur. Aucun avant l'objectif du `Rich Man` (le boss appartient à la quête), et un seul
-Mob Leader à la fois.
-
-Un Code Block peut aussi le lancer directement :
+Il se lance **depuis un Code Block**, posé là où l'auteur du monde veut le faire apparaître (Secret
+Island) :
 
 ```js
 spawnMobLeader(x, y, z)            // à l'endroit voulu
 spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
 ```
 
-Le **Gold Grit** ne tombe que tant que la quête le demande (étapes 5 et 6) : un joueur qui relance le
-boss après avoir été payé ne fabrique pas de l'or à l'infini, il ne récolte que le plaisir du combat.
+Un second appel est refusé tant que le premier est vivant. Le **Gold Grit** ne tombe que tant que la
+quête le demande (étapes 5 et 6) : relancer le boss après avoir été payé ne fabrique pas de l'or à
+l'infini.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
 (`20 + 200^1.6 × 8` ≈ 38 500 PV, `3 + 200^1.3 × 0.8` ≈ 786 dégâts par coup). Les deux valeurs se

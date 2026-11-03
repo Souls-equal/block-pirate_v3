@@ -42,7 +42,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 import { say, C } from "../core/theme";
-import { confirmAction, getStat, setStat } from "../utils/data";
+import { getStat, setStat } from "../utils/data";
 import { setInterval as every, nowMs } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
@@ -555,52 +555,6 @@ function payRichard(playerId) {
     tell(playerId, speech("fa-solid fa-trophy", C.SUCCESS, "Rich Man",
         "Thank you for getting my money back, you can keep this ancient relic as your reward.",
         "You received " + ITEM_RELIC + "."));
-    return true;
-}
-
-/* ── 6 bis. LE PNJ QUI LANCE LE MOB LEADER ─────────────────────────────── */
-
-/* Un PNJ pose sur Secret Island (ou ailleurs) : au clic, il rappelle ce qui
-   va sortir, et le second clic, dans la meme fenetre que tous les autres
-   achats (confirmAction, 3 s), lance le Mob Leader a ses pieds.
-
-   Le boss apparait PRES DU PNJ, jamais dans le vide : on lit sa position,
-   on decale de quelques blocs et spawnMobLeader() pose le mob au sol.
-   Garde-fous : rien avant l'objectif du Rich Man (le boss appartient a la
-   quete), et un seul Mob Leader a la fois. */
-export function saberLeaderSummon(playerId, npcId) {
-    if (!playerId) return true;
-
-    if (leader && alive(leader.id)) {
-        tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Mob Leader Summoner",
-            "He is already out there. Finish him first."));
-        return true;
-    }
-
-    const step = stepOf(playerId);
-    if (step < S.HUNT) {
-        tell(playerId, speech("fa-solid fa-coins", C.MONEY, "Mob Leader Summoner",
-            "I have no contract for you yet. Help the Rich Man first."));
-        return true;
-    }
-
-    if (!confirmAction(playerId, "saberLeader", [
-        { icon: "fa-solid fa-skull", style: { color: "#FFD166" } },
-        { str: " Summon the ", style: { color: C.INFO } },
-        { str: "MOB LEADER", style: { color: "#FFD166", fontWeight: "bold" } },
-        { str: " (level ", style: { color: C.INFO } },
-        { str: LEADER.LEVEL + "", style: { color: C.DANGER, fontWeight: "bold" } },
-        { str: ")? He hits hard and he will come straight at you.", style: { color: C.INFO } },
-    ])) return true;
-
-    const base = npcId ? safePosition(npcId) : safePosition(playerId);
-    const at = base
-        ? [base[0] + 3, base[1], base[2] + 3]
-        : (safePosition(playerId) || [0, 0, 0]);
-    if (!spawnMobLeader(at[0], at[1], at[2], playerId)) {
-        tell(playerId, speech("fa-solid fa-xmark", C.DANGER, "Mob Leader Summoner",
-            "He is already out there. Finish him first."));
-    }
     return true;
 }
 
