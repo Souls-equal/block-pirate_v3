@@ -1,5 +1,5 @@
 // NPCs.js
-import { buyArmamentHaki } from "../utils/haki"
+import { buyArmamentHaki, startGarpBoss } from "../utils/haki"
 import { startQuest } from "./quest";
 import { buyItem, changeMoney, confirmAction, CONFIRM_MS } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
@@ -9,7 +9,7 @@ import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
-import { saberLeaderSummon, saberOldMan, saberRichMan, saberShanks } from "./saber";
+import { saberOldMan, saberRichMan, saberShanks } from "./saber";
 import { clearItem, scanAllItems } from "./customItem";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM
@@ -195,6 +195,39 @@ function sellHakiFragments(playerId) {
     ]);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PNJ QUI LANCE GARP
+
+   Garp n'avait AUCUN point d'entree en jeu : le combat ne partait que d'un
+   Code Block appele `startBoss(playerId)` (portail). Ce PNJ fait la meme
+   chose, avec la confirmation commune a tous les achats :
+
+     clic 1 -> ce qui va se passer (arene, gardes, ce qu'il lache)
+     clic 2 (3 s) -> startGarpBoss(), le chemin unique de utils/haki.js
+
+   Les deux clics ne coutent rien : ce n'est pas un achat mais une mise en
+   garde, parce qu'on ne teleporte pas quelqu'un dans une arene de boss sur un
+   clic malheureux. Le refus "quelqu'un se bat deja" vient du combat lui-meme.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function startGarpFight(playerId) {
+    if (!confirmAction(playerId, "garpBoss", [
+        { icon: "fa-solid fa-skull", style: { color: C.DANGER } },
+        { str: " Fight ", style: { color: C.INFO } },
+        { str: "GARP", style: { color: "#7EC8FF", fontWeight: "bold" } },
+        { str: ", the Marine Protector? ", style: { color: C.INFO } },
+        { str: "You will be teleported into his arena and his guards will wake up.",
+            style: { color: "#94A3B8" } },
+        { str: "\nHe drops a Haki fragment, which the Haki Buyer will take off your hands.",
+            style: { color: "#94A3B8" } },
+    ])) return;
+
+    /* Pas de message ici en cas d'echec : le combat parle lui-meme
+       ("A player is already fighting the boss.", ou "You can't awaken GARP.").
+       Deux messages pour le meme refus, c'est du bruit. */
+    startGarpBoss(playerId);
+}
+
 export function attackNPC(playerId, mobId) {
 
     const name = safeEntityName(mobId);
@@ -224,9 +257,10 @@ export function attackNPC(playerId, mobId) {
     else if (name === "Shanks") {
         saberShanks(playerId);
     }
-    /* Lance le Mob Leader devant le PNJ, avec la confirmation commune. */
-    else if (name === "Mob Leader Summoner" || name === "Mob Leader Starter") {
-        saberLeaderSummon(playerId, mobId);
+    /* Boss Garp : le PNJ remplace le portail (meme confirmation que les
+       marchands, meme arene que le Code Block startBoss). */
+    else if (name === "Garp Summoner" || name === "Garp Starter") {
+        startGarpFight(playerId);
     }
 
     else if (name === "Fruit Dealer") {

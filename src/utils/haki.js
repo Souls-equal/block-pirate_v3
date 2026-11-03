@@ -273,7 +273,7 @@ function hakiBossStart(playerId, posA, posB) {
     // Si un autre joueur est déjà là → refuser
     if (playersInZone.length > 0 && !playersInZone.includes(playerId)) {
         say(playerId, "A player is already fighting the boss.");
-        return;
+        return false;
     }
 
     // Cleanup mobs SEULEMENT si personne dans la zone
@@ -297,7 +297,7 @@ function hakiBossStart(playerId, posA, posB) {
     // Spawn boss : a 8 blocs du joueur, jamais a l'autre bout de l'arene.
     bossPos = bossPositionNear(playerPos, posA, posB);
     spawnBoss(bossPos);
-}
+    return true;}
 
 
 // Distance
@@ -308,8 +308,26 @@ function distance(a, b) {
     return Math.sqrt(dx*dx + dy*dy + dz*dz);
 }
 
-startBoss = (playerId) => {
-    const posA=[-87, 1014, -80];
-    const posB=[165, 1014, 206];
-    hakiBossStart(playerId, posA, posB)
+/* ARENE DU BOSS GARP — la meme salle que le Saber Expert (gameplay/saber). */
+const GARP_ARENA_A = [-87, 1014, -80];
+const GARP_ARENA_B = [165, 1014, 206];
+
+/* POINT D'ENTREE UNIQUE DU COMBAT DE GARP.
+
+   Il est exporte pour que le PNJ "Garp Summoner" (gameplay/NPCs) lance le
+   combat avec la meme confirmation que les marchands. Le Code Block du portail
+   garde son nom historique `startBoss(playerId)` : il ne fait plus que
+   relayer, donc les deux chemins passent exactement par le meme code (meme
+   arene, meme refus si quelqu'un s'y bat deja).
+
+   Retourne true quand le combat a vraiment demarre. */
+export function startGarpBoss(playerId) {
+    if (!playerId) return false;
+    try {
+        return hakiBossStart(playerId, GARP_ARENA_A, GARP_ARENA_B) === true;
+    } catch (e) {
+        return false;
+    }
 }
+
+startBoss = (playerId) => startGarpBoss(playerId);
