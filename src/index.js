@@ -23,7 +23,7 @@ import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
-import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, setSecretIsland as spIsland, spawnMobLeader as spLeader } from "./gameplay/saber";
+import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
 import { installTheme as installTheme, shout } from "./core/theme";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
@@ -49,13 +49,11 @@ chooseTeam = (playerId, teamId) => bpChooseTeam(playerId, teamId);
 continueJourney = (playerId) => bpContinue(playerId);
 enterSea = (playerId, seaNumber) => bpEnterSea(playerId, seaNumber);
 /* Saber Quest : le Mob Leader se lance depuis un Code Block (comme les quetes
-   normales, mais avec ses propres capacites) :
+   normales, mais avec ses propres capacites). En jeu, c'est le PNJ
+   "Mob Leader Summoner" qui fait le travail :
        spawnMobLeader(x, y, z)            -> a l'endroit voulu
-       spawnMobLeader(x, y, z, playerId)  -> et il vise ce joueur
-   Et la position de Secret Island se pose sans recoller le World Code :
-       setSecretIsland(x, y, z) */
+       spawnMobLeader(x, y, z, playerId)  -> et il vise ce joueur */
 spawnMobLeader = (x, y, z, playerId) => spLeader(x, y, z, playerId);
-setSecretIsland = (x, y, z) => spIsland(x, y, z);
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */

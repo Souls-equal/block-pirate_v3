@@ -9,7 +9,7 @@ import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
-import { saberOldMan, saberRichMan, saberShanks } from "./saber";
+import { saberLeaderSummon, saberOldMan, saberRichMan, saberShanks } from "./saber";
 import { clearItem, scanAllItems } from "./customItem";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM
@@ -101,15 +101,16 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
 /* ══════════════════════════════════════════════════════════════════════════
    RACHAT DES HAKI FRAGMENTS
 
-   Garp lache un "Haki fragment" : c'est un Black Carpet renomme (voir
-   dropHaki dans utils/boss.js). Ce PNJ le rachete a un prix TIRE AU HASARD
-   entre 100 et 300 Coins par fragment.
+   Garp lache un "Haki fragment" : c'est un Black Carpet (voir dropHaki dans
+   utils/boss.js). Le Haki Seller demande ce MEME item pour apprendre le
+   haki, et c'est voulu : un joueur qui refarme le boss gagne de l'argent au
+   lieu de stocker un item qui ne lui sert plus une fois le haki appris. Le
+   PNJ rachete donc les Black Carpets, quel que soit leur nom affiche, au
+   prix TIRE AU HASARD entre 100 et 300 Coins chacun.
 
-   POURQUOI ON NE COMPTE PAS PAR NOM D'ITEM : le Black Carpet est AUSSI
-   l'item qu'il faut donner au Haki Seller pour apprendre le haki. Un joueur
-   qui en garde un pour l'acheter ne doit pas le perdre en cliquant ici. On
-   ne vend donc QUE les items dont le nom affiche est "Haki fragment", slots
-   par slots (inventaire ET Moonstone Chest), via customItem.
+   LE JOUEUR EST PREVENU : la confirmation rappelle que le lot comprend les
+   Black Carpets gardes pour le Haki Seller. Rien n'est vendu sans le second
+   clic, et le total est annonce avant.
 
    Le prix est tire UNE fois par offre : la cle de confirmation est fixe,
    donc le second clic (dans les 3 s) retrouve exactement le prix annonce
@@ -117,16 +118,14 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
    confirmation ne tomberait jamais juste.
    ══════════════════════════════════════════════════════════════════════════ */
 
-const FRAGMENT_LABEL = "haki frag";
+const FRAGMENT_ITEM = "Black Carpet";
 const HAKI_DEAL = {}; /* playerId -> { price, until } */
 
+/* Slots (inventaire + Moonstone Chest) qui contiennent des fragments. */
 function fragmentSpots(playerId) {
     const spots = [];
     scanAllItems(playerId, function (item, where, slot) {
-        if (!item || !item.name) return;
-        const attrs = item.attributes && typeof item.attributes === "object" ? item.attributes : null;
-        const shown = attrs && typeof attrs.customDisplayName === "string" ? attrs.customDisplayName : "";
-        if (shown.toLowerCase().indexOf(FRAGMENT_LABEL) === -1) return;
+        if (!item || item.name !== FRAGMENT_ITEM) return;
         const n = typeof item.amount === "number" && item.amount > 0 ? item.amount : 1;
         spots.push({ where: where, slot: slot, n: n });
     });
@@ -160,7 +159,7 @@ function sellHakiFragments(playerId) {
         { str: " for ", style: { color: C.INFO } },
         { str: price + " Coins each", style: { color: C.MONEY, fontWeight: "bold" } },
         { str: " (" + total * price + " Coins total)?", style: { color: C.INFO } },
-        { str: "\nOnly Haki Fragments are sold: your other Black Carpets stay with you.",
+        { str: "\nThey are Black Carpets: any kept for the Haki Seller goes too.",
             style: { color: "#94A3B8" } },
     ])) {
         HAKI_DEAL[playerId] = { price: price, until: now + CONFIRM_MS };
@@ -224,6 +223,10 @@ export function attackNPC(playerId, mobId) {
     }
     else if (name === "Shanks") {
         saberShanks(playerId);
+    }
+    /* Lance le Mob Leader devant le PNJ, avec la confirmation commune. */
+    else if (name === "Mob Leader Summoner" || name === "Mob Leader Starter") {
+        saberLeaderSummon(playerId, mobId);
     }
 
     else if (name === "Fruit Dealer") {

@@ -42,7 +42,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 import { say, C } from "../core/theme";
-import { getStat, setStat } from "../utils/data";
+import { confirmAction, getStat, setStat } from "../utils/data";
 import { setInterval as every, nowMs } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
@@ -95,19 +95,10 @@ const S = {
 const DB_STEP = "sq";
 const DB_BUTTONS = "sqB";
 
-/* L'ile secrete de la quete. Sa position est donnee par l'auteur du monde :
-   elle est posee ici en dur, et `setSecretIsland()` permet de la corriger a
-   chaud (y compris depuis un Code Block) sans recoller le World Code. Si elle
-   valait null, aucune fleche ne serait posee et aucun point de warp ne serait
-   propose au staff. */
+/* L'ile secrete de la quete : sa position est une constante du monde, comme
+   les boutons ou le mur. Elle sert a deux choses seulement : la fleche de
+   quete posee par le Rich Man, et le warp du panneau admin. */
 export const SABER_ISLAND = { name: "Secret Island", pos: [2693, -911, -127], color: "#E5C15A" };
-
-export function setSecretIsland(x, y, z) {
-    const px = Number(x), py = Number(y), pz = Number(z);
-    if (!isFinite(px) || !isFinite(py) || !isFinite(pz)) return false;
-    SABER_ISLAND.pos = [px, py, pz];
-    return true;
-}
 
 /* Les deux structures ouvrables. `saved` retient les blocs retires, dans
    l'ordre, pour pouvoir les remettre a l'identique. */
@@ -564,6 +555,52 @@ function payRichard(playerId) {
     tell(playerId, speech("fa-solid fa-trophy", C.SUCCESS, "Rich Man",
         "Thank you for getting my money back, you can keep this ancient relic as your reward.",
         "You received " + ITEM_RELIC + "."));
+    return true;
+}
+
+/* ── 6 bis. LE PNJ QUI LANCE LE MOB LEADER ─────────────────────────────── */
+
+/* Un PNJ pose sur Secret Island (ou ailleurs) : au clic, il rappelle ce qui
+   va sortir, et le second clic, dans la meme fenetre que tous les autres
+   achats (confirmAction, 3 s), lance le Mob Leader a ses pieds.
+
+   Le boss apparait PRES DU PNJ, jamais dans le vide : on lit sa position,
+   on decale de quelques blocs et spawnMobLeader() pose le mob au sol.
+   Garde-fous : rien avant l'objectif du Rich Man (le boss appartient a la
+   quete), et un seul Mob Leader a la fois. */
+export function saberLeaderSummon(playerId, npcId) {
+    if (!playerId) return true;
+
+    if (leader && alive(leader.id)) {
+        tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Mob Leader Summoner",
+            "He is already out there. Finish him first."));
+        return true;
+    }
+
+    const step = stepOf(playerId);
+    if (step < S.HUNT) {
+        tell(playerId, speech("fa-solid fa-coins", C.MONEY, "Mob Leader Summoner",
+            "I have no contract for you yet. Help the Rich Man first."));
+        return true;
+    }
+
+    if (!confirmAction(playerId, "saberLeader", [
+        { icon: "fa-solid fa-skull", style: { color: "#FFD166" } },
+        { str: " Summon the ", style: { color: C.INFO } },
+        { str: "MOB LEADER", style: { color: "#FFD166", fontWeight: "bold" } },
+        { str: " (level ", style: { color: C.INFO } },
+        { str: LEADER.LEVEL + "", style: { color: C.DANGER, fontWeight: "bold" } },
+        { str: ")? He hits hard and he will come straight at you.", style: { color: C.INFO } },
+    ])) return true;
+
+    const base = npcId ? safePosition(npcId) : safePosition(playerId);
+    const at = base
+        ? [base[0] + 3, base[1], base[2] + 3]
+        : (safePosition(playerId) || [0, 0, 0]);
+    if (!spawnMobLeader(at[0], at[1], at[2], playerId)) {
+        tell(playerId, speech("fa-solid fa-xmark", C.DANGER, "Mob Leader Summoner",
+            "He is already out there. Finish him first."));
+    }
     return true;
 }
 
@@ -1115,18 +1152,30 @@ export function saberKilledMob(playerId, mobId) {
         const p = safePosition(mobId);
         stopLeader();
         despawnIfAlive(mobId);
-        if (p) {
+        /* L'or n'est lache QUE tant que la quete le demande : le Mob Leader
+           peut etre relance pour le plaisir, il ne doit pas fabriquer des
+           Gold Grit a l'infini. Apres le paiement du Rich Man, il ne lache
+           donc plus rien. */
+        const st = playerId ? stepOf(playerId) : S.NONE;
+        const wantGold = st === S.HUNT || st === S.GOLD;
+        if (p && wantGold) {
             try { api.createItemDrop(p[0], p[1] + 0.5, p[2], ITEM_GOLD, 1, false); } catch (e) {}
             soundAt(p, "coin", 1, 0.9, 40);
         }
         if (playerId) {
-            if (stepOf(playerId) === S.HUNT) setStep(playerId, S.GOLD);
-            tell(playerId, [
-                { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-                { str: " The Mob Leader drops ", style: { color: C.INFO } },
-                { str: ITEM_GOLD, style: { color: C.MONEY, fontWeight: "bold" } },
-                { str: ". Take it back to the Rich Man.", style: { color: C.INFO } },
-            ]);
+            if (st === S.HUNT) setStep(playerId, S.GOLD);
+            tell(playerId, wantGold
+                ? [
+                    { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
+                    { str: " The Mob Leader drops ", style: { color: C.INFO } },
+                    { str: ITEM_GOLD, style: { color: C.MONEY, fontWeight: "bold" } },
+                    { str: ". Take it back to the Rich Man.", style: { color: C.INFO } },
+                ]
+                : [
+                    { icon: "fa-solid fa-skull", style: { color: C.SUCCESS } },
+                    { str: " The Mob Leader is down. ", style: { color: C.INFO } },
+                    { str: "Nothing left to take from him.", style: { color: "#94A3B8" } },
+                ]);
         }
         return true;
     }
