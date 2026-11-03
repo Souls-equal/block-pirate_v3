@@ -53,10 +53,16 @@ import { boom, point, at as soundAt, TEX, rgba } from "../utils/fx";
 const ITEM_TORCH = "Torch";
 const ITEM_CUP = "Bucket";
 const CUP_FULL = "Cup of Water";
-const ITEM_GOLD = "Gold Block";
-const GOLD_NAME = "Gold Grit";
-const ITEM_RELIC = "Obsidian";
-const RELIC_NAME = "Magmaward Fuel";
+/* Gold Grit et Magmaward Fuel sont de VRAIS items du jeu (ajoutes
+   recemment) : on les donne par leur nom, sans renommage ni attributs. */
+const ITEM_GOLD = "Gold Grit";
+const ITEM_RELIC = "Magmaward Fuel";
+
+/* TOUS les items de la quete sont verrouilles : ils ne doivent jamais
+   pouvoir etre laches (donc donnes a un autre joueur), et chacun est
+   consomme a l'usage (Torch au rideau, Cup a l'Old Man, or au Rich Man,
+   relique au mur). */
+const LOCKED_ITEMS = [ITEM_TORCH, ITEM_CUP, ITEM_GOLD, ITEM_RELIC];
 
 /* Les cinq boutons caches de la jungle. */
 const BUTTONS = [
@@ -90,10 +96,11 @@ const DB_STEP = "sq";
 const DB_BUTTONS = "sqB";
 
 /* L'ile secrete de la quete. Sa position est donnee par l'auteur du monde :
-   tant qu'elle vaut null, aucune fleche n'est posee et aucun point de warp
-   n'est propose au staff (rien de casse). `setSecretIsland()` la remplit a
-   chaud, y compris depuis un Code Block. */
-export const SABER_ISLAND = { name: "Secret Island", pos: null, color: "#E5C15A" };
+   elle est posee ici en dur, et `setSecretIsland()` permet de la corriger a
+   chaud (y compris depuis un Code Block) sans recoller le World Code. Si elle
+   valait null, aucune fleche ne serait posee et aucun point de warp ne serait
+   propose au staff. */
+export const SABER_ISLAND = { name: "Secret Island", pos: [2693, -911, -127], color: "#E5C15A" };
 
 export function setSecretIsland(x, y, z) {
     const px = Number(x), py = Number(y), pz = Number(z);
@@ -195,7 +202,7 @@ function heldItemName(playerId) {
 
 /* L'item est-il interdit au lacher ? (branche dans onPlayerDropItem) */
 export function saberLockedItem(itemName) {
-    return itemName === ITEM_TORCH;
+    return LOCKED_ITEMS.indexOf(itemName) !== -1;
 }
 
 /* ── 3. ETAT DU JOUEUR (db) ────────────────────────────────────────────── */
@@ -389,9 +396,27 @@ function burnCurtain(playerId) {
     return true;
 }
 
+/* Donne la Cup pleine. Un seul item : la Cup est un Bucket dont le nom
+   affiche change, donc elle reste reconnaissable dans l'inventaire. */
+function giveFullCup(playerId) {
+    try {
+        api.giveItem(playerId, ITEM_CUP, 1, {
+            customDisplayName: CUP_FULL,
+            customDescription: "A cup full of fresh water. Someone must be thirsty.",
+        });
+        return true;
+    } catch (e) { return false; }
+}
+
 function fillCup(playerId) {
     const step = stepOf(playerId);
     if (step >= S.WATER) {
+        /* Cup perdue en route (mort, filtre d'inventaire) : on la rend plutot
+           que d'annoncer une etape que le joueur ne peut plus jouer. */
+        if (!hasItem(playerId, ITEM_CUP) && giveFullCup(playerId)) {
+            tell(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
+            return true;
+        }
         tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
         return true;
     }
@@ -401,15 +426,9 @@ function fillCup(playerId) {
         return true;
     }
 
-    /* Meme item, nouveaux attributs : c'est le nom affiche qui fait la Cup
-       pleine, donc la tasse reste identifiable dans l'inventaire. */
+    /* La Cup vide est remplacee par la pleine : la tasse ne se duplique pas. */
     try { api.removeItemName(playerId, ITEM_CUP, 1); } catch (e) {}
-    try {
-        api.giveItem(playerId, ITEM_CUP, 1, {
-            customDisplayName: CUP_FULL,
-            customDescription: "A cup full of fresh water. Someone must be thirsty.",
-        });
-    } catch (e) {}
+    giveFullCup(playerId);
     setStep(playerId, S.WATER);
     soundAt(playerId, "coin", 0.5, 1.5, 20);
     tell(playerId, [
@@ -421,24 +440,40 @@ function fillCup(playerId) {
     return true;
 }
 
+/* Le mur : la relique y est CONSOMMEE (elle brule dans la roche). Le passage
+   reste ensuite ouvert pour ce joueur : sans ca, un joueur qui revient se
+   retrouverait devant un mur qu'il ne peut plus ouvrir, puisqu'il n'a plus la
+   relique (elle est unique et non lachable). */
 function passWall(playerId) {
     const step = stepOf(playerId);
     if (step < S.RELIC) return false;
-    if (!hasItem(playerId, ITEM_RELIC)) {
-        tell(playerId, line("fa-solid fa-lock", C.DANGER, "This wall is sealed. Only the ancient relic can open it."));
-        return true;
+
+    const burned = step >= S.WALL;
+    if (!burned) {
+        if (!hasItem(playerId, ITEM_RELIC)) {
+            tell(playerId, line("fa-solid fa-lock", C.DANGER, "This wall is sealed. Only the ancient relic can open it."));
+            return true;
+        }
+        try { api.removeItemName(playerId, ITEM_RELIC, 1); } catch (e) {}
     }
+
     try { api.setPosition(playerId, WALL_BEHIND[0], WALL_BEHIND[1], WALL_BEHIND[2]); }
     catch (e) { return true; }
-    if (step < S.WALL) setStep(playerId, S.WALL);
+    if (!burned) setStep(playerId, S.WALL);
     soundAt(playerId, "glass1", 1, 1.3, 25);
     const p = safePosition(playerId);
     if (p) point(p, { tex: TEX.soul, count: 12, colors: [rgba(255, 90, 40), rgba(40, 10, 0, 0)] });
-    tell(playerId, [
-        { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
-        { str: " The " + RELIC_NAME + " burns through the wall ", style: { color: C.INFO } },
-        { str: "and drags you behind it.", style: { color: C.SUCCESS } },
-    ]);
+    tell(playerId, burned
+        ? [
+            { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
+            { str: " The hole in the wall is still warm. ", style: { color: C.INFO } },
+            { str: "You slip through it.", style: { color: C.SUCCESS } },
+        ]
+        : [
+            { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
+            { str: " The " + ITEM_RELIC + " burns through the wall ", style: { color: C.INFO } },
+            { str: "and is consumed by the rock.", style: { color: C.SUCCESS } },
+        ]);
     return true;
 }
 
@@ -502,6 +537,16 @@ export function saberRichMan(playerId) {
         return true;
     }
 
+    /* Relique perdue (mort) alors que le mur n'est pas encore ouvert : on la
+       rend gratuitement, comme le vendeur de haki rend son pod. Il n'y a
+       jamais deux reliques : la garde est l'absence de l'item ET l'etape. */
+    if (step === S.RELIC && !hasItem(playerId, ITEM_RELIC)) {
+        try { api.giveItem(playerId, ITEM_RELIC, 1); } catch (e) {}
+        tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
+            "You lost the relic? Here it is again. Burn that wall."));
+        return true;
+    }
+
     tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
         "The relic is yours. Use it on the sealed wall."));
     return true;
@@ -514,16 +559,11 @@ function payRichard(playerId) {
     try { api.removeItemName(playerId, ITEM_GOLD, 1); } catch (e) {}
     setStep(playerId, S.RELIC);
     clearSecretArrow(playerId);
-    try {
-        api.giveItem(playerId, ITEM_RELIC, 1, {
-            customDisplayName: RELIC_NAME,
-            customDescription: "An ancient volcanic relic. It opens what no blade can cut.",
-        });
-    } catch (e) {}
+    try { api.giveItem(playerId, ITEM_RELIC, 1); } catch (e) {}
     soundAt(playerId, "exp_levelup", 1, 0.9, 20);
     tell(playerId, speech("fa-solid fa-trophy", C.SUCCESS, "Rich Man",
         "Thank you for getting my money back, you can keep this ancient relic as your reward.",
-        "You received " + RELIC_NAME + "."));
+        "You received " + ITEM_RELIC + "."));
     return true;
 }
 
@@ -541,7 +581,9 @@ export function saberShanks(playerId) {
             "Come back with something worth my time."));
         return true;
     }
-    if (!hasItem(playerId, ITEM_RELIC)) {
+    /* La relique est CONSOMMEE au mur : une fois le passage brule (etape WALL),
+       Shanks n'a plus a la reclamer. Avant, il la demande encore. */
+    if (step < S.WALL && !hasItem(playerId, ITEM_RELIC)) {
         tell(playerId, line("fa-solid fa-lock", C.DANGER, "Shanks: \"The relic is the key. Bring it back.\""));
         return true;
     }
@@ -576,7 +618,7 @@ function clearSecretArrow(playerId) {
 
 const LEADER = {
     LEVEL: 200,
-    MOB: "Draugr Zombie",
+    MOB: "Glass Bro",
     NAME: "MOB LEADER",
     TITLE: "Level 200",
     SCALE: 1.6,
@@ -726,7 +768,7 @@ function leaderVolley(p, tp) {
 const ARENA = { a: [-87, 1014, -80], b: [165, 1014, 206] };
 
 const SABER = {
-    MOB: "Draugr Knight",
+    MOB: "Lord Vulcan",
     NAME: "SABER EXPERT",
     TITLE: "Guardian of the Ancient Blade",
     HP: 6000,
@@ -1074,12 +1116,7 @@ export function saberKilledMob(playerId, mobId) {
         stopLeader();
         despawnIfAlive(mobId);
         if (p) {
-            try {
-                api.createItemDrop(p[0], p[1] + 0.5, p[2], ITEM_GOLD, 1, false, {
-                    customDisplayName: GOLD_NAME,
-                    customDescription: "The money the Mob Leader stole. Bring it back to the Rich Man.",
-                });
-            } catch (e) {}
+            try { api.createItemDrop(p[0], p[1] + 0.5, p[2], ITEM_GOLD, 1, false); } catch (e) {}
             soundAt(p, "coin", 1, 0.9, 40);
         }
         if (playerId) {
@@ -1087,7 +1124,7 @@ export function saberKilledMob(playerId, mobId) {
             tell(playerId, [
                 { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
                 { str: " The Mob Leader drops ", style: { color: C.INFO } },
-                { str: GOLD_NAME, style: { color: C.MONEY, fontWeight: "bold" } },
+                { str: ITEM_GOLD, style: { color: C.MONEY, fontWeight: "bold" } },
                 { str: ". Take it back to the Rich Man.", style: { color: C.INFO } },
             ]);
         }

@@ -1,15 +1,16 @@
 // NPCs.js
 import { buyArmamentHaki } from "../utils/haki"
 import { startQuest } from "./quest";
-import { buyItem, confirmAction } from "../utils/data";
+import { buyItem, changeMoney, confirmAction, CONFIRM_MS } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
 import { getPlayerTeam, getTeamData } from "../core/team";
-import { say } from "../core/theme";
+import { C, say } from "../core/theme";
 import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
 import { saberOldMan, saberRichMan, saberShanks } from "./saber";
+import { clearItem, scanAllItems } from "./customItem";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM
 
@@ -97,6 +98,104 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
     ]);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   RACHAT DES HAKI FRAGMENTS
+
+   Garp lache un "Haki fragment" : c'est un Black Carpet renomme (voir
+   dropHaki dans utils/boss.js). Ce PNJ le rachete a un prix TIRE AU HASARD
+   entre 100 et 300 Coins par fragment.
+
+   POURQUOI ON NE COMPTE PAS PAR NOM D'ITEM : le Black Carpet est AUSSI
+   l'item qu'il faut donner au Haki Seller pour apprendre le haki. Un joueur
+   qui en garde un pour l'acheter ne doit pas le perdre en cliquant ici. On
+   ne vend donc QUE les items dont le nom affiche est "Haki fragment", slots
+   par slots (inventaire ET Moonstone Chest), via customItem.
+
+   Le prix est tire UNE fois par offre : la cle de confirmation est fixe,
+   donc le second clic (dans les 3 s) retrouve exactement le prix annonce
+   au premier. Sans ce cache, le prix serait retire a chaque clic et la
+   confirmation ne tomberait jamais juste.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const FRAGMENT_LABEL = "haki frag";
+const HAKI_DEAL = {}; /* playerId -> { price, until } */
+
+function fragmentSpots(playerId) {
+    const spots = [];
+    scanAllItems(playerId, function (item, where, slot) {
+        if (!item || !item.name) return;
+        const attrs = item.attributes && typeof item.attributes === "object" ? item.attributes : null;
+        const shown = attrs && typeof attrs.customDisplayName === "string" ? attrs.customDisplayName : "";
+        if (shown.toLowerCase().indexOf(FRAGMENT_LABEL) === -1) return;
+        const n = typeof item.amount === "number" && item.amount > 0 ? item.amount : 1;
+        spots.push({ where: where, slot: slot, n: n });
+    });
+    return spots;
+}
+
+function sellHakiFragments(playerId) {
+    const spots = fragmentSpots(playerId);
+    let total = 0;
+    for (let i = 0; i < spots.length; i++) total += spots[i].n;
+
+    if (!total) {
+        say(playerId, [
+            { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
+            { str: " Haki Buyer: Bring me Haki Fragments and I will pay well for them.",
+                style: { color: C.INFO } },
+        ]);
+        return;
+    }
+
+    const now = Date.now();
+    const pending = HAKI_DEAL[playerId];
+    const price = pending && pending.until > now
+        ? pending.price
+        : 100 + Math.floor(Math.random() * 201); /* 100 a 300 inclus */
+
+    if (!confirmAction(playerId, "hakiFragments", [
+        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
+        { str: " Sell ", style: { color: C.INFO } },
+        { str: total + " Haki Fragment" + (total > 1 ? "s" : ""), style: { color: "#E8B4A0", fontWeight: "bold" } },
+        { str: " for ", style: { color: C.INFO } },
+        { str: price + " Coins each", style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: " (" + total * price + " Coins total)?", style: { color: C.INFO } },
+        { str: "\nOnly Haki Fragments are sold: your other Black Carpets stay with you.",
+            style: { color: "#94A3B8" } },
+    ])) {
+        HAKI_DEAL[playerId] = { price: price, until: now + CONFIRM_MS };
+        return;
+    }
+
+    delete HAKI_DEAL[playerId];
+
+    /* On recompte : entre les deux clics, l'inventaire a pu changer (mort,
+       coffre, autre achat). On ne paie que ce qu'on retire vraiment. */
+    const again = fragmentSpots(playerId);
+    let sold = 0;
+    for (let i = 0; i < again.length; i++) {
+        if (clearItem(playerId, again[i].where, again[i].slot)) sold += again[i].n;
+    }
+    if (!sold) {
+        say(playerId, [
+            { icon: "fa-solid fa-xmark", style: { color: C.DANGER } },
+            { str: " Nothing left to sell.", style: { color: C.DANGER } },
+        ]);
+        return;
+    }
+
+    changeMoney(playerId, sold * price, false);
+    try { api.playSound(playerId, "coin", 1, 1); } catch (e) {}
+    say(playerId, [
+        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
+        { str: " Sold ", style: { color: C.INFO } },
+        { str: sold + " Haki Fragment" + (sold > 1 ? "s" : ""), style: { color: "#E8B4A0", fontWeight: "bold" } },
+        { str: " for ", style: { color: C.INFO } },
+        { str: sold * price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
+        { str: ".", style: { color: C.INFO } },
+    ]);
+}
+
 export function attackNPC(playerId, mobId) {
 
     const name = safeEntityName(mobId);
@@ -134,6 +233,8 @@ export function attackNPC(playerId, mobId) {
         rollFruit(playerId, 1.25);
     } else if (name === "Haki Seller") {
         buyArmamentHaki(playerId);
+    } else if (name === "Haki Buyer" || name === "Haki Fragment Buyer") {
+        sellHakiFragments(playerId);
     } else if (name === "Combat Teacher") {
         buyFightingStyle(playerId, "Combat");
     } else if (name === "Dark Step Teacher") {
