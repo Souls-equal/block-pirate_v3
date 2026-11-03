@@ -9,6 +9,7 @@ import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
+import { saberOldMan, saberRichMan, saberShanks } from "./saber";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM
 
@@ -111,6 +112,19 @@ export function attackNPC(playerId, mobId) {
 
     if (name === "Quest Dealer") {
         startQuest(playerId);
+    }
+
+    /* SABER QUEST (gameplay/saber) : trois PNJ, trois etapes.
+       Old Man ne parle d'eau qu'une fois la Cup remplie ; Rich Man donne
+       l'objectif puis paie ; Shanks ouvre le duel du Saber Expert. */
+    else if (name === "Old Man") {
+        saberOldMan(playerId);
+    }
+    else if (name === "Rich Man") {
+        saberRichMan(playerId);
+    }
+    else if (name === "Shanks") {
+        saberShanks(playerId);
     }
 
     else if (name === "Fruit Dealer") {
