@@ -230,10 +230,10 @@ export function itemJoin(playerId) {
            quel (c'est l'item du jeu), la description dit ce qu'il est.
        Les textes sont poses a chaque join, comme les autres items custom :
        un item deja en banque les retrouve tout seul. */
-    api.setItemStat(playerId, "Gold Grit", "displayName", "Gold Grit")
+    api.setItemStat(playerId, "Gold Grit", "displayName", "Gold Dust")
     api.setItemStat(playerId, "Gold Grit", "description", "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.")
-    api.setItemStat(playerId, "Magmaward Fuel", "displayName", "Magmaward Fuel")
-    api.setItemStat(playerId, "Magmaward Fuel", "description", "Not fuel at all: an ancient relic still warm from the volcano. It opens what no blade can cut.")
+    api.setItemStat(playerId, "Magmaward Fuel", "displayName", "Ancient Relic")
+    api.setItemStat(playerId, "Magmaward Fuel", "description", "An ancient Relic bearing the marks of time. It opens what no blade can cut, right where it's marked")
     api.setItemStat(playerId, "M1911", "gunStats", {
         fireRate:80,
         damage: 30,
