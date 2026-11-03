@@ -23,6 +23,7 @@ import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
+import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, setSecretIsland as spIsland, spawnMobLeader as spLeader } from "./gameplay/saber";
 import { installTheme as installTheme, shout } from "./core/theme";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
@@ -47,6 +48,14 @@ withEffectSource = (casterId, abilityId, fn) => bpWithEffectSource(casterId, abi
 chooseTeam = (playerId, teamId) => bpChooseTeam(playerId, teamId);
 continueJourney = (playerId) => bpContinue(playerId);
 enterSea = (playerId, seaNumber) => bpEnterSea(playerId, seaNumber);
+/* Saber Quest : le Mob Leader se lance depuis un Code Block (comme les quetes
+   normales, mais avec ses propres capacites) :
+       spawnMobLeader(x, y, z)            -> a l'endroit voulu
+       spawnMobLeader(x, y, z, playerId)  -> et il vise ce joueur
+   Et la position de Secret Island se pose sans recoller le World Code :
+       setSecretIsland(x, y, z) */
+spawnMobLeader = (x, y, z, playerId) => spLeader(x, y, z, playerId);
+setSecretIsland = (x, y, z) => spIsland(x, y, z);
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
@@ -170,7 +179,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     Qt(t), Gt("fruit", () => y(t)), Gt("codes", () => X(t)), Gt("admin", () => Rt(t)),
     Gt("haki", () => Ht(t)), Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
     Gt("nametag", () => m(t)), Gt("weapons", () => i(t)), Gt("chat", () => e(t)),
-    Gt("leaderboard", () => S(t)), Gt("sidebar", () => K(t)), Gt("quest", () => T(t)),
+    Gt("leaderboard", () => S(t)), Gt("sidebar", () => K(t)), Gt("quest", () => T(t)), Gt("saber", () => spJoin(t)),
     Gt("crew", () => o(t)), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)),
     Gt("rank", () => G(t)), Gt("sp", () => _(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
@@ -187,7 +196,8 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
     Gt("leave.fruit", () => Y(t)), Gt("leave.codes", () => J(t)),
     Gt("leave.fruitCallbacks", () => s(t)), Gt("leave.haki", () => V(t)),
     Gt("leave.items", () => it(t)), Gt("leave.admin", () => Wt(t)),
-    Gt("leave.pvp", () => pvClear(t)), Gt("leave.settings", () => bpSettingsLeave(t));
+    Gt("leave.pvp", () => pvClear(t)), Gt("leave.settings", () => bpSettingsLeave(t)),
+    Gt("leave.saber", () => spLeave(t));
     try {
         lt(t);
     } catch (t) {
@@ -221,6 +231,10 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         return;
     }
     /* Pendant un dash, aucun coup de poing (style ou capacité en cooldown). */
+    /* Saber Quest : boutons caches, rideau, eau, mur scelle. Le clic est
+       consomme seulement quand la quete fait quelque chose : le reste du
+       temps, la main reste une main. */
+    if (Gt("saber", () => spClick(t, r, a, i, e, o, m))) return;
     const canPunch = !isDash(t);
     let s = !1;
     try {
@@ -356,6 +370,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         e = null, _t("getLastDamager", t);
     }
     Ft(e || t, r, a, i);
+    Gt("saberKill", () => spKill(e || t, r));
     if (!e || !r) {
         try {
             lt(r);
@@ -385,7 +400,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
        seul moyen de le donner à un autre joueur — et un bloc de construction
        qui partage son nom avec le fruit équipé (Stone, Ice, Sand, Glass...). */
     const l = "string" == typeof e ? e : e?.name || e?.type;
-    return l && (C(l) || fsItemName(l)) ? "preventDrop" : void 0;
+    return l && (C(l) || fsItemName(l) || spLocked(l)) ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
@@ -441,7 +456,7 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
         _t("onEntityDeleted.releaseKill", e);
     }
     dt(t);
-}, onWorldAttemptDespawnMob = t => F(t) ? "preventDespawn" : Ot(t), onEntityCollision = (t, r) => b(t, r);
+}, onWorldAttemptDespawnMob = t => F(t) ? "preventDespawn" : (spDespawn(t) || Ot(t)), onEntityCollision = (t, r) => b(t, r);
 
 let $t = 0;
 
@@ -493,4 +508,5 @@ doPeriodicSave = () => {
     }
 }, 20), onClose = () => {
     Bt();
+    Gt("saberClose", () => spClose());
 };

@@ -1031,6 +1031,7 @@ pour un rang immunisé dans tous les cas, c'est le point le plus simple à teste
 │   │   └── ranks.js              # grades + permissions
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   │   ├── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
+│   │   ├── saber.js              # ⭐ Saber Quest : boutons, porte, PNJ, 2 boss
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
@@ -1262,6 +1263,98 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 `realMob` (l'espèce réellement invoquée), son `mob.rank`, son `killAmount` et sa `position`
 (l'endroit où le PNJ de quête doit être). `realMob` sert aux messages : le joueur lit
 « Sky Bandit 1 », pas « Draugr Zombie ».
+
+---
+
+## La Saber Quest (dernière grande quête de la mer 1)
+
+`src/gameplay/saber.js` porte **toute** la quête : les boutons, les deux structures ouvrables, les
+trois PNJ, le Mob Leader et le Saber Expert. Un seul fichier, parce que la limite des 30 fichiers du
+World Code ne laisse pas de place à un second.
+
+L'état tient dans **une seule clé de base** par joueur, `sq` (0 → 9), plus `sqB` (les boutons déjà
+pressés). Aucune autre donnée n'est écrite : tout se relit à la volée.
+
+| `sq` | Étape | Ce qui se passe |
+| --- | --- | --- |
+| 0 | Jungle | cinq boutons cachés à presser |
+| 1 | Jungle | les 5 sont pressés : la porte s'ouvre (Torch derrière, don d'un Code Block) |
+| 2 | Désert | la Torch brûle le rideau et **disparaît** (Cup derrière, don d'un Code Block) |
+| 3 | Désert | la Cup est remplie au point d'eau |
+| 4 | Old Man | il boit et envoie vers son fils |
+| 5 | Rich Man | il donne l'objectif, une flèche apparaît vers Secret Island |
+| 6 | Mob Leader | il est mort : un **Gold Grit** tombe au sol |
+| 7 | Rich Man | il reprend l'or et donne la relique **Magmaward Fuel** |
+| 8 | Mur | la relique téléporte derrière le mur, dans la salle de Shanks |
+| 9 | Shanks | le Saber Expert est vaincu : quête terminée |
+
+| Objet | Détail |
+| --- | --- |
+| Boutons | `[1439,-918,300] [1334,-915,261] [1302,-915,382] [1516,-916,165] [1449,-903,128]` |
+| Porte | `[1329,-915,318]` + `[1329,-914,318]` |
+| Rideau | `[612,-904…-902,1760…1762]` (9 blocs) |
+| Point d'eau | `[2534,-897,449]` (cliquable à travers l'eau, rayon 4 blocs) |
+| Mur scellé | `[1318…1320,-911…-909,321]` → arrive en `[1319,-912,323]` |
+
+**Les blocs sont réellement retirés** (`api.setBlock` → Air) puis **remis dès qu'il n'y a plus
+personne à 15 blocs** (`KEEP_RADIUS`). La vérification passe toutes les 220 ticks — les minuteries de
+`utils/timer` comptent en ticks de 50 ms, donc 11 s — et ne coûte que deux structures. Un joueur qui
+a déjà validé l'étape les voit se rouvrir tout seul quand il revient : le monde reste dans son état
+d'origine sans jamais enfermer quelqu'un derrière.
+
+### Les items
+
+- la **Torch** ne peut pas être lâchée : `saberLockedItem("Torch")` est branché sur
+  `onPlayerDropItem`, à côté des items de capacité ;
+- la **Cup** est l'item `Bucket` : remplir ne change pas l'item, seulement ses attributs
+  (`customDisplayName: "Cup of Water"`), donc elle reste reconnaissable dans l'inventaire ;
+- le **Gold Grit** est l'item `Gold Block`, renommé au join dans `customItem.js` (nom **et**
+  description) comme les autres items custom ; le drop porte aussi ses attributs, pour rester lisible
+  même après un passage en coffre ;
+- la **Magmaward Fuel** est l'item `Obsidian`, renommé **uniquement dans les attributs du give** :
+  les blocs d'obsidienne des joueurs ne changent pas de nom.
+
+### Le Mob Leader (niveau 200)
+
+Il se lance **depuis un Code Block**, comme les mobs de quête, mais avec ses propres capacités :
+
+```js
+spawnMobLeader(x, y, z)            // à l'endroit voulu
+spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
+```
+
+Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
+(`20 + 200^1.6 × 8` ≈ 38 500 PV, `3 + 200^1.3 × 0.8` ≈ 786 dégâts par coup). Les deux valeurs se
+retouchent en tête de `saber.js` (`LEADER.LEVEL`) si le combat est trop long ou trop violent. Trois
+capacités : ruée, volée d'or (onde), et un coup de poing au sol qui ralentit. Un second appel est
+refusé tant que le premier est vivant, et le monde ne peut pas le despawner en plein combat.
+
+### Le Saber Expert
+
+Shanks lance le duel **dans l'arène du boss Haki** (`[-87,1014,-80]` → `[165,1014,206]`), pas dans
+une salle inventée : le joueur y est téléporté, le boss posé à 8 blocs, comme Garp. Refus si
+quelqu'un d'autre est déjà dans l'arène.
+
+Il est **plus fort que l'exemple fourni** (Draugr Knight, 400 PV, 4 capacités) : 6 000 PV, échelle
+1,8, cinq capacités — `RUSH` (ruée), `AIR SLASH` (**deux ondes indépendantes**), `SLAM` (onde de
+choc + ralentissement), `GRAB` (attire le joueur puis frappe et affaiblit) — plus, à 50 % de vie, une
+**phase 2** : nametag rouge, vitesse augmentée, délais raccourcis de 25 % et `BLADE TEMPEST` (six
+ondes en étoile). Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone et de
+protection PvP respectées) et non par un `applyHealthChange` brut.
+
+### Secret Island
+
+La position n'est **pas** codée en dur : `SABER_ISLAND.pos` vaut `null` tant que l'auteur du monde ne
+l'a pas posée.
+
+```js
+setSecretIsland(x, y, z)   // depuis un Code Block ou la console
+```
+
+Tant qu'elle est nulle, **aucune flèche** n'est posée et **aucun warp** n'est proposé : rien de cassé.
+Dès qu'elle existe, `Rich Man` pose la flèche de quête (id `saber-isle`) et l'île apparaît dans
+`Warp to Island` du panneau admin (`adminIslands()`) — **et seulement là** : elle ne figure ni dans
+les flèches d'île des joueurs, ni dans Settings, puisqu'elle est censée être secrète.
 
 ---
 
