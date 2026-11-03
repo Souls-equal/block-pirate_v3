@@ -1331,13 +1331,20 @@ Conséquence assumée : un redémarrage du monde efface aussi la progression. Le
 | Objet | Détail |
 | --- | --- |
 | Boutons | `[1439,-918,300] [1334,-915,261] [1302,-915,382] [1516,-916,165] [1449,-903,128]` |
-| Porte | `[1329,-915,318]` + `[1329,-914,318]` |
-| Rideau | `[612,-904…-902,1760…1762]` (9 blocs) |
+| Porte | `[1329,-915,318]` → `[1329,-914,318]`, **Stone** (2 blocs) |
+| Rideau | `[612,-904,1760]` → `[612,-902,1762]`, **Purple Ceramic** (3 × 3) |
 | Point d'eau | `[2534,-897,449]` (cliquable à travers l'eau, rayon 4 blocs) |
 | Mur scellé | `[1318…1320,-911…-909,321]` → arrive en `[1319,-912,323]` |
 
-**Les blocs sont réellement retirés** (`api.setBlock` → Air) puis **remis dès qu'il n'y a plus
-personne à 15 blocs** (`KEEP_RADIUS`). La vérification passe toutes les 220 ticks — les minuteries de
+**Les blocs sont réellement retirés** (`api.setBlockRect(pos1, pos2, "Air")`) puis **remis dès qu'il
+n'y a plus personne à 15 blocs** (`KEEP_RADIUS`), dans la matière du monde : `Stone` pour la porte,
+`Purple Ceramic` pour le rideau.
+
+> **Piège corrigé.** L'ordre des arguments est `api.setBlock(x, y, z, nom)` — pas
+> `api.setBlock(nom, x, y, z)`. L'ancien code appelait `api.setBlock(0, x, y, z)` : il posait un bloc
+> à l'origine du monde et **la porte ne s'ouvrait jamais physiquement** (seule l'étape changeait).
+> `rectBlocks()` perce maintenant le rectangle d'un coup et n'écrit rien ailleurs ; si `setBlockRect`
+> manquait, il retombe sur un `api.setBlock(x, y, z, nom)` bloc par bloc, dans le bon ordre. La vérification passe toutes les 220 ticks — les minuteries de
 `utils/timer` comptent en ticks de 50 ms, donc 11 s — et ne coûte que deux structures. Un joueur qui
 a déjà validé l'étape les voit se rouvrir tout seul quand il revient : le monde reste dans son état
 d'origine sans jamais enfermer quelqu'un derrière.
