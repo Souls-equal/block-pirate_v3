@@ -42,17 +42,27 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 import { say, C } from "../core/theme";
-import { getStat, setStat } from "../utils/data";
+import { deleteStat } from "../utils/data";
 import { setInterval as every, nowMs } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
-import { boom, point, at as soundAt, TEX, rgba } from "../utils/fx";
+import { boom, point, at as soundAt, ring, segDist, TEX, rgba } from "../utils/fx";
+import { scanAllItems, writeItem } from "./customItem";
 
 /* ── 1. CONFIGURATION ──────────────────────────────────────────────────── */
 
 const ITEM_TORCH = "Torch";
+/* La Cup est un VRAI seau du jeu : vide c'est `Bucket`, plein c'est
+   `Water Bucket` (nom affiche "Cup of Water"). Le remplissage ne retire
+   jamais l'item pour le redonner : le slot qui tient le seau est reecrit au
+   meme endroit (voir fillCup). */
 const ITEM_CUP = "Bucket";
+const ITEM_CUP_FULL = "Water Bucket";
 const CUP_FULL = "Cup of Water";
+const CUP_FULL_ATTRS = {
+    customDisplayName: CUP_FULL,
+    customDescription: "A cup full of fresh water. Someone must be thirsty.",
+};
 /* Gold Grit et Magmaward Fuel sont de VRAIS items du jeu (ajoutes
    recemment) : on les donne par leur nom, sans renommage ni attributs. */
 const ITEM_GOLD = "Gold Grit";
@@ -62,7 +72,7 @@ const ITEM_RELIC = "Magmaward Fuel";
    pouvoir etre laches (donc donnes a un autre joueur), et chacun est
    consomme a l'usage (Torch au rideau, Cup a l'Old Man, or au Rich Man,
    relique au mur). */
-const LOCKED_ITEMS = [ITEM_TORCH, ITEM_CUP, ITEM_GOLD, ITEM_RELIC];
+const LOCKED_ITEMS = [ITEM_TORCH, ITEM_CUP, ITEM_CUP_FULL, ITEM_GOLD, ITEM_RELIC];
 
 /* Les cinq boutons caches de la jungle. */
 const BUTTONS = [
@@ -89,7 +99,8 @@ const S = {
     GOLD: 6,
     RELIC: 7,
     WALL: 8,
-    DONE: 9,
+    /* Pas d'etape "termine" : finir la quete la remet a zero (voir
+       saberFallen). L'etat ne survit ni a la fin, ni a la deconnexion. */
 };
 
 const DB_STEP = "sq";
@@ -111,12 +122,18 @@ const STRUCTS = {
             [1329, -914, 318],
         ],
         saved: null,
+        openedAt: 0,
+        arrowId: "saber-door",
+        arrowLabel: "Hidden door",
     },
     curtain: {
         step: S.CURTAIN,
         center: [612, -903, 1761],
         blocks: curtainBlocks(),
         saved: null,
+        openedAt: 0,
+        arrowId: "saber-curtain",
+        arrowLabel: "Burnt curtain",
     },
 };
 
@@ -182,6 +199,31 @@ function hasItem(playerId, itemName) {
     catch (e) { return false; }
 }
 
+/* Tous les slots qui contiennent cet item, inventaire ET Moonstone Chest :
+   `[{ where, slot, amount }]`. Sert a transformer un item SUR PLACE au lieu
+   de le retirer puis de le redonner. */
+function slotsOf(playerId, itemName) {
+    const out = [];
+    try {
+        scanAllItems(playerId, function (item, where, slot) {
+            if (item && item.name === itemName) out.push({ where: where, slot: slot, amount: item.amount || 1 });
+        });
+    } catch (e) {}
+    return out;
+}
+
+function countOf(playerId, itemName) {
+    const slots = slotsOf(playerId, itemName);
+    let n = 0;
+    for (let i = 0; i < slots.length; i++) n += slots[i].amount || 1;
+    return n;
+}
+
+/* La Cup existe sous deux noms d'item (vide / pleine) : on compte les deux. */
+function cupAmount(playerId) {
+    return countOf(playerId, ITEM_CUP) + countOf(playerId, ITEM_CUP_FULL);
+}
+
 function heldItemName(playerId) {
     try {
         const h = api.getHeldItem(playerId);
@@ -196,26 +238,48 @@ export function saberLockedItem(itemName) {
     return LOCKED_ITEMS.indexOf(itemName) !== -1;
 }
 
-/* ── 3. ETAT DU JOUEUR (db) ────────────────────────────────────────────── */
+/* ── 3. ETAT DE LA QUETE (en memoire, pas en db) ───────────────────────── */
+
+/* La quete ne se sauvegarde PAS : l'etat vit dans ce module et disparait
+   quand le joueur quitte, quand il termine (le Saber Expert tombe), et au
+   redemarrage du monde. Consequences assumees :
+     - un joueur qui revient doit refaire les boutons et retrouver une Torch ;
+     - il n'y a aucune migration a maintenir, aucune cle db qui traine.
+   Les deux anciennes cles db sont nettoyees au join (voir saberJoin). */
+const quests = {}; // playerId -> { step, buttons }
+
+function questOf(playerId) {
+    if (!playerId) return null;
+    return quests[playerId] || null;
+}
 
 function stepOf(playerId) {
-    const v = getStat(playerId, DB_STEP, 0);
-    const n = typeof v === "number" ? v : parseInt(v, 10);
-    return isFinite(n) && n > 0 ? n : 0;
+    const q = questOf(playerId);
+    return q ? q.step : 0;
 }
 
 function setStep(playerId, step) {
-    try { setStat(playerId, DB_STEP, step); } catch (e) {}
+    if (!playerId) return;
+    const q = questOf(playerId) || (quests[playerId] = { step: 0, buttons: 0 });
+    q.step = step;
 }
 
 function buttonsOf(playerId) {
-    const v = getStat(playerId, DB_BUTTONS, 0);
-    const n = typeof v === "number" ? v : parseInt(v, 10);
-    return isFinite(n) && n > 0 ? n : 0;
+    const q = questOf(playerId);
+    return q ? q.buttons : 0;
 }
 
 function saveButtons(playerId, mask) {
-    try { setStat(playerId, DB_BUTTONS, mask || 0); } catch (e) {}
+    if (!playerId) return;
+    const q = questOf(playerId) || (quests[playerId] = { step: 0, buttons: 0 });
+    q.buttons = mask || 0;
+}
+
+/* Remise a zero COMPLETE : l'etape ET les boutons deja presses. */
+function resetQuest(playerId) {
+    if (!playerId) return false;
+    delete quests[playerId];
+    return true;
 }
 
 /* ── 4. STRUCTURES OUVERTES / REFERMEES ────────────────────────────────── */
@@ -224,6 +288,7 @@ function openStruct(key) {
     const s = STRUCTS[key];
     if (!s || s.saved) return false;
     startHousekeeping();
+    s.openedAt = nowMs();
     const saved = [];
     for (let i = 0; i < s.blocks.length; i++) {
         const b = s.blocks[i];
@@ -255,22 +320,54 @@ const KEEP_RADIUS = 15;
 const HOUSEKEEP_TICKS = 220;
 let houseTimer = null;
 
-/* Verification periodique : on remet les blocs des qu'il n'y a plus personne
-   autour, et on les retire de nouveau pour un joueur qui a deja valide
-   l'etape et qui revient. Le monde reste donc dans son etat d'origine, sans
-   jamais enfermer quelqu'un. */
+/* DELAI DE GRACE : une fois ouverte, une ouverture reste ouverte au moins ce
+   temps-la, meme si le joueur qui l'a declenchee s'eloigne. Sans ca, la porte
+   se refermait pendant qu'il cherchait ce qui venait de s'ouvrir (les 5
+   boutons sont disperses dans la jungle, on ne voit pas la porte depuis le
+   dernier). 60 s : largement le temps de traverser une zone. */
+const GRACE_MS = 60000;
+
+/* Fleche temporaire vers l'ouverture, pour la meme raison : elle indique ou
+   aller, et disparait des qu'on est arrive (ou au bout du delai de grace). */
+function armStructArrow(playerId, key) {
+    const s = STRUCTS[key];
+    if (!s || !playerId) return false;
+    try {
+        api.setDirectionArrow(playerId, s.arrowId, s.center, s.arrowLabel, true, {
+            color: "#4ADE80", fontSize: "16px", fontWeight: "bold",
+        });
+        return true;
+    } catch (e) { return false; }
+}
+
+function clearStructArrow(playerId, key) {
+    const s = STRUCTS[key];
+    if (!s || !playerId) return false;
+    try { api.clearDirectionArrow(playerId, s.arrowId); return true; } catch (e) { return false; }
+}
+
+/* Verification periodique : on remet les blocs quand il n'y a plus personne
+   autour ET que le delai de grace est passe, et on les retire de nouveau pour
+   un joueur qui a deja valide l'etape et qui revient. Le monde reste donc
+   dans son etat d'origine, sans jamais enfermer quelqu'un ni lui fermer la
+   porte au nez. */
 function tickStructures() {
     const players = getAlivePlayerIds();
+    const now = nowMs();
     for (const key in STRUCTS) {
         const s = STRUCTS[key];
         let near = false, allowed = false;
         for (let i = 0; i < players.length; i++) {
             const p = safePosition(players[i]);
-            if (!p || dist3(p, s.center) > KEEP_RADIUS) continue;
+            if (!p) continue;
+            const d = dist3(p, s.center);
+            /* La fleche a rempli son role des qu'on est devant l'ouverture. */
+            if (d <= 6) clearStructArrow(players[i], key);
+            if (d > KEEP_RADIUS) continue;
             near = true;
-            if (stepOf(players[i]) >= s.step) { allowed = true; break; }
+            if (stepOf(players[i]) >= s.step) { allowed = true; }
         }
-        if (s.saved && !near) closeStruct(key);
+        if (s.saved && !near && now - s.openedAt >= GRACE_MS) closeStruct(key);
         else if (!s.saved && near && allowed) openStruct(key);
     }
 }
@@ -339,11 +436,14 @@ function pressButton(playerId, index) {
         saveButtons(playerId, 0);
         setStep(playerId, S.DOOR);
         openStruct("door");
+        armStructArrow(playerId, "door");
         soundAt(playerId, "glass1", 1, 0.8, 40);
         tell(playerId, [
             { icon: "fa-solid fa-door-open", style: { color: C.SUCCESS } },
             { str: " All five hidden buttons are pressed: ", style: { color: C.SUCCESS } },
             { str: "a door grinds open deeper in the jungle.", style: { color: C.INFO } },
+            { str: "\nA marker points at it. It stays open for a minute.",
+                style: { color: "#94A3B8" } },
         ]);
     } else {
         soundAt(playerId, "coin", 0.6, 1.4, 20);
@@ -387,13 +487,13 @@ function burnCurtain(playerId) {
     return true;
 }
 
-/* Donne la Cup pleine. Un seul item : la Cup est un Bucket dont le nom
-   affiche change, donc elle reste reconnaissable dans l'inventaire. */
+/* Rend une Cup pleine la ou il y a de la place (reprise apres une perte :
+   mort, filtre d'inventaire). Ce n'est PAS le chemin normal du remplissage. */
 function giveFullCup(playerId) {
     try {
-        api.giveItem(playerId, ITEM_CUP, 1, {
-            customDisplayName: CUP_FULL,
-            customDescription: "A cup full of fresh water. Someone must be thirsty.",
+        api.giveItem(playerId, ITEM_CUP_FULL, 1, {
+            customDisplayName: CUP_FULL_ATTRS.customDisplayName,
+            customDescription: CUP_FULL_ATTRS.customDescription,
         });
         return true;
     } catch (e) { return false; }
@@ -402,24 +502,47 @@ function giveFullCup(playerId) {
 function fillCup(playerId) {
     const step = stepOf(playerId);
     if (step >= S.WATER) {
+        if (cupAmount(playerId) > 0) {
+            tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
+            return true;
+        }
         /* Cup perdue en route (mort, filtre d'inventaire) : on la rend plutot
            que d'annoncer une etape que le joueur ne peut plus jouer. */
-        if (!hasItem(playerId, ITEM_CUP) && giveFullCup(playerId)) {
+        if (giveFullCup(playerId)) {
             tell(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
             return true;
         }
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
+        tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
         return true;
     }
     if (step < S.CURTAIN) return false;
-    if (!hasItem(playerId, ITEM_CUP)) {
+
+    const slots = slotsOf(playerId, ITEM_CUP);
+    if (!slots.length) {
         tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You need a Cup to carry water."));
         return true;
     }
 
-    /* La Cup vide est remplacee par la pleine : la tasse ne se duplique pas. */
-    try { api.removeItemName(playerId, ITEM_CUP, 1); } catch (e) {}
-    giveFullCup(playerId);
+    /* REMPLISSAGE SUR PLACE : le slot qui tient le seau vide devient le seau
+       d'eau au meme endroit, avec son nom affiche. Aucun removeItem suivi
+       d'un giveItem : l'item ne quitte jamais sa case, donc rien ne peut se
+       dupliquer, et un inventaire plein ne peut pas avaler la Cup.
+       Un slot peut contenir plusieurs seaux : on n'en remplit qu'un et on
+       rend la pile restante (jamais dupliquee : le slot est d'abord reecrit). */
+    const holder = slots[0];
+    const rest = Math.max(0, (holder.amount | 0) - 1);
+    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1, {
+        customDisplayName: CUP_FULL_ATTRS.customDisplayName,
+        customDescription: CUP_FULL_ATTRS.customDescription,
+    });
+    if (!ok) {
+        tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
+        return true;
+    }
+    if (rest > 0) {
+        try { api.giveItem(playerId, ITEM_CUP, rest); } catch (e) {}
+    }
+
     setStep(playerId, S.WATER);
     soundAt(playerId, "coin", 0.5, 1.5, 20);
     tell(playerId, [
@@ -485,7 +608,7 @@ export function saberOldMan(playerId) {
     }
 
     /* Il boit : la Cup pleine disparait, l'etape est ecrite avant l'annonce. */
-    try { api.removeItemName(playerId, ITEM_CUP, 1); } catch (e) {}
+    try { api.removeItemName(playerId, ITEM_CUP_FULL, 1); } catch (e) {}
     setStep(playerId, S.OLD_MAN);
     soundAt(playerId, "coin", 0.8, 1.2, 20);
     tell(playerId, speech("Water", C.SUCCESS, "Old Man",
@@ -562,11 +685,6 @@ export function saberShanks(playerId) {
     if (!playerId) return false;
     const step = stepOf(playerId);
 
-    if (step >= S.DONE) {
-        tell(playerId, speech("fa-solid fa-swords", C.MONEY, "Shanks",
-            "You already carry a saber sharper than mine."));
-        return true;
-    }
     if (step < S.RELIC) {
         tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Shanks",
             "Come back with something worth my time."));
@@ -614,8 +732,14 @@ const LEADER = {
     TITLE: "Level 200",
     SCALE: 1.6,
     SPEED: 5,
-    CD: { rush: 7000, volley: 5000, shake: 6000 },
+    CD: { rush: 7000, volley: 5000, shake: 6000, ring: 9000 },
     DMG: { rush: 90, volley: 70, shake: 120 },
+    /* LE CERCLE D'OR : un anneau de particules se dessine autour du mob (il
+       reste visible pendant toute la preparation), puis il eclate. Prendre
+       l'eclat quand on est dedans coute UN coup de corps a corps du mob en
+       plus des degats normaux : rester colle a un mob de niveau 200 devient
+       vraiment puni. Rayon et delais se retouchent ici. */
+    RING: { RADIUS: 6.5, WARN: 1400, SCALE: 1 },
 };
 
 /* Memes formules que gameplay/spawning.js (mobBaseHp / mobBaseDmg), pour que
@@ -627,6 +751,7 @@ function leaderDmg() { return Math.round(3 + Math.pow(LEADER.LEVEL, 1.3) * 0.8);
 let leader = null; // { id, handle, cds, rushUntil, rushHit, waves }
 
 export function leaderHpForTest() { return leaderHp(); }
+export function leaderDmgForTest() { return leaderDmg(); }
 
 /* Lance par un Code Block :
        spawnMobLeader(x, y, z)              -> a l'endroit voulu
@@ -675,10 +800,11 @@ export function spawnMobLeader(x, y, z, playerId) {
 
     leader = {
         id: id,
-        cds: { rush: 0, volley: 0, shake: 0 },
+        cds: { rush: 0, volley: 0, shake: 0, ring: 0 },
         rushUntil: 0,
         rushHit: {},
         waves: [],
+        ring: null,
         aiTarget: playerId || null,
     };
     if (!leaderTimer) leaderTimer = every(thinkLeader, 4);
@@ -699,6 +825,7 @@ function thinkLeader() {
     if (!p) { despawnIfAlive(leader.id); stopLeader(); return; }
 
     advanceWaves(leader.waves, leader.id);
+    advanceLeaderRing(leader.id, p);
 
     if (nowMs() < leader.rushUntil) {
         const ids = getAlivePlayerIds();
@@ -721,6 +848,7 @@ function thinkLeader() {
     const d = dist3(p, tp);
     const now = nowMs();
 
+    if (now >= leader.cds.ring && d < 9) { leaderRing(p); return; }
     if (now >= leader.cds.shake && d < 7) { leaderShake(p); return; }
     if (now >= leader.cds.volley && d > 5 && d < 26) { leaderVolley(p, tp); return; }
     if (now >= leader.cds.rush && d > 4 && d < 20) { leaderRush(p, tp); return; }
@@ -745,6 +873,56 @@ function leaderShake(p) {
     soundAt(p, "ominousBellHit", 1, 0.7, 35);
 }
 
+/* Le cercle : preparation visible, puis eclat. Les degats sont exactement
+   ceux d'un coup de corps a corps du mob (leaderDmg()), donc "un coup de
+   plus", pas une deuxieme attaque inventee. */
+function leaderRing(p) {
+    leader.cds.ring = nowMs() + LEADER.CD.ring;
+    leader.ring = { until: nowMs() + LEADER.RING.WARN, hit: {} };
+    soundAt(p, "ominousBellHit", 1, 1.15, 35);
+}
+
+function advanceLeaderRing(id, p) {
+    const r = leader ? leader.ring : null;
+    if (!r) return;
+    const R = LEADER.RING.RADIUS;
+    const now = nowMs();
+
+    /* L'anneau se dessine a chaque passage (200 ms) : il tourne, il monte
+       legerement, il est impossible a ne pas voir. */
+    ring([p[0], p[1] + 0.15, p[2]], R, 20, {
+        tex: TEX.crit,
+        r: 0.12,
+        size: [0.26, 0.44],
+        life: [0.22, 0.45],
+        colors: [rgba(255, 210, 80), rgba(150, 90, 0, 0)],
+    }, now / 240);
+
+    if (now < r.until) return;
+
+    const ids = getAlivePlayerIds();
+    let touched = 0;
+    for (let i = 0; i < ids.length; i++) {
+        const t = ids[i];
+        if (r.hit[t]) continue;
+        const tp = safePosition(t);
+        if (!tp || dist3(tp, p) > R) continue;
+        r.hit[t] = 1;
+        touched++;
+        if (damage(t, Math.round(leaderDmg() * LEADER.RING.SCALE), id, "Gold Ring")) {
+            const dir = norm3([tp[0] - p[0], 0.6, tp[2] - p[2]]);
+            impulse(t, dir[0] * 8, 5, dir[2] * 8);
+        }
+    }
+    boom([p[0], p[1] + 0.2, p[2]], R * 0.8, {
+        tex: TEX.crit,
+        count: touched ? 70 : 40,
+        colors: [rgba(255, 210, 80), rgba(120, 60, 0, 0)],
+    });
+    soundAt(p, "glass1", 1, 0.65, 40);
+    leader.ring = null;
+}
+
 function leaderVolley(p, tp) {
     leader.cds.volley = nowMs() + LEADER.CD.volley;
     const dir = norm3([tp[0] - p[0], 0.15, tp[2] - p[2]]);
@@ -758,17 +936,32 @@ function leaderVolley(p, tp) {
    monde, on ne lui en invente pas une seconde. */
 const ARENA = { a: [-87, 1014, -80], b: [165, 1014, 206] };
 
+/* Le Saber Expert n'est plus "beaucoup de PV et de gros chiffres" : il a
+   MOINS de PV (4200 au lieu de 6000) et frappe moins fort au corps a corps
+   (70), mais il joue SEPT attaques qui demandent une reaction :
+     charge (dash)   - trainee de lames, on esquive sur le cote ;
+     entaille double - deux ondes qui ne partent pas du meme point ;
+     coup au sol     - zone proche, ralentit ;
+     saisie (grab)   - il te tire a lui, telegraphie par un fil rouge ;
+     tempete         - six ondes en cercle, phase 2 ;
+     tourbillon      - cercle de lames autour de lui, ticks de degats ;
+     rayon           - vise la position du joueur, telegraphie au sol.
+   Chaque valeur se retouche ici. */
 const SABER = {
     MOB: "Lord Vulcan",
     NAME: "SABER EXPERT",
     TITLE: "Guardian of the Ancient Blade",
-    HP: 6000,
+    HP: 4200,
     SCALE: 1.8,
     SPEED: 6.4,
-    MELEE: 90,
+    MELEE: 70,
     RUSH_SPEED: 20,
-    DMG: { rush: 190, slash: 150, slam: 210, grab: 240, tempest: 130 },
-    CD: { rush: 6500, slash: 4800, slam: 5200, grab: 5800, tempest: 8000 },
+    DMG: { rush: 120, slash: 110, slam: 150, grab: 170, tempest: 90, storm: 40, beam: 200 },
+    CD: { rush: 6000, slash: 4200, slam: 5000, grab: 6500, tempest: 8000, storm: 10000, beam: 7000 },
+    DASH_MS: 750,
+    STORM: { MS: 2600, TICK: 400, RADIUS: 4.5 },
+    BEAM: { WARN: 900, RADIUS: 2.6 },
+    GRAB: { WARN: 700 },
 };
 
 let saber = null; // { id, fighter, hp0, enraged, cds, waves, rushUntil, rushHit, aiTarget }
@@ -877,10 +1070,17 @@ function startSaberFight(playerId) {
         fighter: playerId,
         hp0: SABER.HP,
         enraged: false,
-        cds: { rush: nowMs() + 2500, slash: nowMs() + 1500, slam: 0, grab: 0, tempest: 0 },
+        cds: {
+            rush: nowMs() + 2500, slash: nowMs() + 1500, slam: 0, grab: 0,
+            tempest: 0, storm: 0, beam: 0,
+        },
         waves: [],
         rushUntil: 0,
         rushHit: {},
+        storm: null,
+        beam: null,
+        grab: null,
+        last: null,
         aiTarget: playerId,
     };
     if (saberTimer) saberTimer.stop();
@@ -915,20 +1115,12 @@ function thinkSaber() {
     if (!p) { despawnIfAlive(saber.id); stopSaber(); return; }
 
     advanceWaves(saber.waves, saber.id);
-
-    if (nowMs() < saber.rushUntil) {
-        const ids = getAlivePlayerIds();
-        for (let i = 0; i < ids.length; i++) {
-            const t = ids[i];
-            if (saber.rushHit[t]) continue;
-            const tp = safePosition(t);
-            if (!tp || dist3(tp, p) > 3.4) continue;
-            saber.rushHit[t] = 1;
-            damage(t, SABER.DMG.rush, saber.id, "Saber Rush");
-            const dir = norm3([tp[0] - p[0], 0.5, tp[2] - p[2]]);
-            impulse(t, dir[0] * 12, 6, dir[2] * 12);
-        }
-    }
+    /* Les quatre attaques "a preparation" se suivent ici : elles dessinent
+       leur zone d'abord, puis frappent. Une attaque a la fois. */
+    tickSaberDash(p);
+    tickSaberStorm(p);
+    tickSaberBeam(p);
+    tickSaberGrab(p);
 
     let target = saber.fighter && alive(saber.fighter) ? saber.fighter : null;
     if (!target) { endSaberFight("Your duel ended: the arena is empty."); return; }
@@ -940,15 +1132,50 @@ function thinkSaber() {
     const d = dist3(p, tp);
     const now = nowMs();
 
-    if (now >= saber.cds.grab && d < 7) { saberGrab(p, tp); return; }
-    if (now >= saber.cds.slam && d < 9) { saberSlam(p); return; }
-    if (saber.enraged && now >= saber.cds.tempest && d < 16) { saberTempest(p); return; }
-    if (now >= saber.cds.slash && d > 4) { saberSlash(p, tp); return; }
-    if (now >= saber.cds.rush && d > 3 && d < 24) { saberRush(p, tp); return; }
+    /* Aucune attaque ne se superpose a une autre. */
+    if (saberBusy(now)) return;
+
+    /* ROTATION : on liste ce qui est disponible a cette distance, puis on
+       ecarte la derniere attaque jouee. Sans ca, la saisie et le coup au sol
+       (portee courte, delai court) sortaient en boucle et les autres
+       attaques ne se voyaient jamais. */
+    const ready = [];
+    if (now >= saber.cds.grab && d < 9) ready.push("grab");
+    if (now >= saber.cds.slam && d < 9) ready.push("slam");
+    if (now >= saber.cds.beam && d > 6 && d < 40) ready.push("beam");
+    if (saber.enraged && now >= saber.cds.tempest && d < 16) ready.push("tempest");
+    if (now >= saber.cds.storm && d < SABER.STORM.RADIUS + 5) ready.push("storm");
+    if (now >= saber.cds.slash && d > 4) ready.push("slash");
+    if (now >= saber.cds.rush && d > 3 && d < 24) ready.push("rush");
+
+    let pick = null;
+    for (let i = 0; i < ready.length; i++) {
+        if (ready[i] !== saber.last) { pick = ready[i]; break; }
+    }
+    if (!pick && ready.length) pick = ready[0];
+    if (pick) {
+        if (pick === "grab") saberGrab(p, tp);
+        else if (pick === "slam") saberSlam(p);
+        else if (pick === "beam") saberBeam(p, tp);
+        else if (pick === "tempest") saberTempest(p);
+        else if (pick === "storm") saberStorm(p);
+        else if (pick === "slash") saberSlash(p, tp);
+        else saberRush(p, tp);
+        return;
+    }
+
     if (saber.aiTarget !== target) {
         try { api.setMobAiState(saber.id, "chasing", { targetId: target }); } catch (e) {}
         saber.aiTarget = target;
     }
+}
+
+function saberBusy(now) {
+    if (now < saber.rushUntil) return true;
+    if (saber.storm && now < saber.storm.until) return true;
+    if (saber.beam) return true;
+    if (saber.grab) return true;
+    return false;
 }
 
 /* Phase 2 : le boss accelere et raccourcit tous ses delais. */
@@ -969,17 +1196,55 @@ function enrage() {
     if (saber.fighter) tell(saber.fighter, line("fa-solid fa-fire", C.DANGER, "The Saber Expert is enraged!"));
 }
 
+/* LA CHARGE (dash) : il part tout droit, laisse une trainee de lames et
+   coupe tous ceux qu'il traverse. On l'esquive sur le cote - pas en reculant,
+   il va plus vite que le joueur. */
 function saberRush(p, tp) {
+    saber.last = "rush";
     saber.cds.rush = nowMs() + SABER.CD.rush * (saber.enraged ? 0.75 : 1);
-    saber.rushUntil = nowMs() + 750;
+    saber.rushUntil = nowMs() + SABER.DASH_MS;
     saber.rushHit = {};
+    saber.dashFrom = [p[0], p[1], p[2]];
     const dir = norm3([tp[0] - p[0], 0, tp[2] - p[2]]);
     setVel(saber.id, dir[0] * SABER.RUSH_SPEED, 3, dir[2] * SABER.RUSH_SPEED);
     try { api.setEntityHeading(saber.id, Math.atan2(dir[0], dir[2])); } catch (e) {}
     soundAt(p, "bearRoar1", 1, 1.35, 45);
 }
 
+function tickSaberDash(p) {
+    const prev = saber.dashFrom;
+    saber.dashFrom = [p[0], p[1], p[2]];
+    const now = nowMs();
+    if (now >= saber.rushUntil) return;
+
+    /* trainee : deux lames fantomes derriere lui */
+    point([p[0], p[1] + 1, p[2]], {
+        tex: TEX.glint, count: 4, r: 0.14,
+        size: [0.3, 0.55], life: [0.15, 0.32],
+        colors: [rgba(232, 180, 160), rgba(140, 40, 30, 0)],
+    });
+    if (!prev) return;
+
+    /* Le coup suit le SEGMENT parcouru entre deux passages : on ne peut pas
+       le traverser entre deux images. */
+    const ids = getAlivePlayerIds();
+    for (let i = 0; i < ids.length; i++) {
+        const t = ids[i];
+        if (saber.rushHit[t]) continue;
+        const tp = safePosition(t);
+        if (!tp) continue;
+        const near = segDist([tp[0], tp[1] + 0.9, tp[2]], prev, p);
+        if (near.d2 > 2.8 * 2.8) continue;
+        saber.rushHit[t] = 1;
+        if (damage(t, SABER.DMG.rush, saber.id, "Blade Dash")) {
+            const dir = norm3([tp[0] - p[0], 0.5, tp[2] - p[2]]);
+            impulse(t, dir[0] * 12, 6, dir[2] * 12);
+        }
+    }
+}
+
 function saberSlash(p, tp) {
+    saber.last = "slash";
     saber.cds.slash = nowMs() + SABER.CD.slash * (saber.enraged ? 0.75 : 1);
     const dir = norm3([tp[0] - p[0], 0.05, tp[2] - p[2]]);
     const side = [-dir[2], 0, dir[0]];
@@ -991,6 +1256,7 @@ function saberSlash(p, tp) {
 }
 
 function saberSlam(p) {
+    saber.last = "slam";
     saber.cds.slam = nowMs() + SABER.CD.slam * (saber.enraged ? 0.75 : 1);
     const ground = [p[0], p[1], p[2]];
     hitArea(ground, 6, saber.id, "Saber Slam", SABER.DMG.slam, {
@@ -1000,19 +1266,127 @@ function saberSlam(p) {
     soundAt(ground, "glass1", 1, 0.6, 45);
 }
 
+/* LA SAISIE : un fil rouge part de sa main vers le joueur pendant 0,7 s.
+   Il tire ensuite : s'il est encore a portee, le joueur est aspire, frappe
+   et affaibli. Sortir des 8 blocs pendant le delai annule la saisie. */
+const GRAB_RANGE = 8;
+
 function saberGrab(p, tp) {
+    saber.last = "grab";
     saber.cds.grab = nowMs() + SABER.CD.grab * (saber.enraged ? 0.75 : 1);
-    const victim = saber.fighter;
+    saber.grab = { until: nowMs() + SABER.GRAB.WARN, target: saber.fighter };
+    soundAt(p, "magicAccent1", 1, 0.8, 45);
+    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-hand-fist", C.DANGER, "The Saber Expert reaches for you: break away!"));
+}
+
+function tickSaberGrab(p) {
+    const g = saber.grab;
+    if (!g) return;
+    const now = nowMs();
+    const victim = g.target;
+    const tp = victim ? safePosition(victim) : null;
+
+    if (tp) {
+        /* le fil : une ligne de particules entre lui et le joueur */
+        for (let i = 1; i <= 10; i++) {
+            const t = i / 11;
+            point([p[0] + (tp[0] - p[0]) * t, p[1] + 1.2 + (tp[1] + 1 - p[1] - 1.2) * t, p[2] + (tp[2] - p[2]) * t], {
+                tex: TEX.square, count: 1, r: 0.07,
+                size: [0.16, 0.26], life: [0.1, 0.2],
+                colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)],
+            });
+        }
+    }
+    if (now < g.until) return;
+
+    saber.grab = null;
+    if (!victim || !tp) return;
+    if (dist3(tp, p) > GRAB_RANGE) {
+        tell(victim, line("fa-solid fa-person-running", C.SUCCESS, "You break out of the Saber Expert's reach."));
+        return;
+    }
     const dir = norm3([p[0] - tp[0], 0.35, p[2] - tp[2]]);
     try { setVel(victim, dir[0] * 18, 5, dir[2] * 18); } catch (e) {}
     if (damage(victim, SABER.DMG.grab, saber.id, "Saber Grab")) {
         eff(victim, "Weakness", 3000, { inbuiltLevel: 2 });
     }
-    soundAt(p, "magicAccent1", 1, 0.8, 45);
-    tell(victim, line("fa-solid fa-hand-fist", C.DANGER, "The Saber Expert grabs you!"));
+    boom([tp[0], tp[1] + 1, tp[2]], 2, { tex: TEX.crit, colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)] });
+    tell(victim, line("fa-solid fa-hand-fist", C.DANGER, "The Saber Expert grabs you and hurls you back!"));
+}
+
+/* LE TOURBILLON : un cercle de lames autour de lui pendant 2,6 s, qui blesse
+   par vagues (toutes les 0,4 s). On ne reste pas colle a lui. */
+function saberStorm(p) {
+    saber.last = "storm";
+    saber.cds.storm = nowMs() + SABER.CD.storm * (saber.enraged ? 0.8 : 1);
+    saber.storm = { until: nowMs() + SABER.STORM.MS, next: nowMs() };
+    soundAt(p, "bigDrumSwish1", 1, 0.9, 45);
+    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-tornado", C.DANGER, "The Saber Expert starts spinning: get away from him!"));
+}
+
+function tickSaberStorm(p) {
+    const st = saber.storm;
+    if (!st) return;
+    const now = nowMs();
+    if (now >= st.until) { saber.storm = null; return; }
+
+    /* deux anneaux, l'un tourne a l'envers de l'autre */
+    ring([p[0], p[1] + 0.6, p[2]], SABER.STORM.RADIUS, 18, {
+        tex: TEX.glint, r: 0.1, size: [0.26, 0.46], life: [0.18, 0.34],
+        colors: [rgba(232, 180, 160), rgba(120, 30, 30, 0)],
+    }, now / 170);
+    ring([p[0], p[1] + 1.6, p[2]], SABER.STORM.RADIUS * 0.6, 12, {
+        tex: TEX.glint, r: 0.09, size: [0.22, 0.4], life: [0.16, 0.3],
+        colors: [rgba(255, 255, 255), rgba(200, 120, 90, 0)],
+    }, -now / 130);
+
+    if (now < st.next) return;
+    st.next = now + SABER.STORM.TICK;
+    hitArea([p[0], p[1] + 0.6, p[2]], SABER.STORM.RADIUS, saber.id, "Blade Storm", SABER.DMG.storm, {});
+}
+
+/* LE RAYON : il vise la position ou le joueur se trouve A CET INSTANT, dessine
+   la ligne au sol, puis frappe. Bouger suffit : c'est une attaque de zone,
+   pas un aimbot. */
+function saberBeam(p, tp) {
+    saber.last = "beam";
+    saber.cds.beam = nowMs() + SABER.CD.beam * (saber.enraged ? 0.8 : 1);
+    saber.beam = { to: [tp[0], tp[1], tp[2]], until: nowMs() + SABER.BEAM.WARN };
+    soundAt(p, "magicAccent1", 0.85, 0.65, 50);
+    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-crosshairs", C.DANGER, "The Saber Expert aims at you: move!"));
+}
+
+function tickSaberBeam(p) {
+    const b = saber.beam;
+    if (!b) return;
+    const now = nowMs();
+
+    /* la ligne de visee + la marque au sol */
+    for (let i = 1; i <= 14; i++) {
+        const t = i / 14;
+        point([p[0] + (b.to[0] - p[0]) * t, p[1] + 1.2 + (b.to[1] + 0.5 - p[1] - 1.2) * t, p[2] + (b.to[2] - p[2]) * t], {
+            tex: TEX.glint, count: 1, r: 0.07,
+            size: [0.18, 0.3], life: [0.1, 0.2],
+            colors: [rgba(255, 200, 180), rgba(180, 40, 40, 0)],
+        });
+    }
+    ring([b.to[0], b.to[1] + 0.1, b.to[2]], SABER.BEAM.RADIUS, 12, {
+        tex: TEX.crit, r: 0.09, size: [0.2, 0.34], life: [0.15, 0.3],
+        colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)],
+    }, now / 200);
+
+    if (now < b.until) return;
+
+    hitArea([b.to[0], b.to[1] + 0.5, b.to[2]], SABER.BEAM.RADIUS, saber.id, "Saber Beam", SABER.DMG.beam, {
+        knock: 6, lift: 4,
+    });
+    boom([b.to[0], b.to[1] + 0.8, b.to[2]], 3, { tex: TEX.crit, count: 80, colors: [rgba(255, 220, 200), rgba(150, 20, 20, 0)] });
+    soundAt(b.to, "cannonFire3", 0.9, 1.1, 50);
+    saber.beam = null;
 }
 
 function saberTempest(p) {
+    saber.last = "tempest";
     saber.cds.tempest = nowMs() + SABER.CD.tempest;
     for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
@@ -1071,13 +1445,17 @@ function saberFallen() {
         soundAt(p, "exp_levelup", 1, 0.8, 50);
     }
     if (fighter) {
-        setStep(fighter, S.DONE);
-        clearSecretArrow(fighter);
         tell(fighter, [
             { icon: "fa-solid fa-trophy", style: { color: C.MONEY } },
             { str: " SABER EXPERT defeated. ", style: { color: C.MONEY, fontWeight: "bold" } },
             { str: "The Saber Quest is complete.", style: { color: C.SUCCESS } },
         ]);
+        /* LA QUETE EST FINIE : etape ET boutons repartent a zero. Rien n'est
+           garde en memoire pour ce joueur, donc rien a nettoyer plus tard. */
+        clearSecretArrow(fighter);
+        clearStructArrow(fighter, "door");
+        clearStructArrow(fighter, "curtain");
+        resetQuest(fighter);
         /* Retour dans la salle de Shanks, comme Garp renvoie au spawn. */
         try {
             api.setPosition(fighter, WALL_BEHIND[0], WALL_BEHIND[1], WALL_BEHIND[2]);
@@ -1152,16 +1530,24 @@ export function saberPreventDespawn(mobId) {
 export function saberJoin(playerId) {
     if (!playerId) return false;
     startHousekeeping();
-    /* Un joueur qui revient au milieu de la chasse doit retrouver sa fleche. */
-    if (stepOf(playerId) === S.HUNT && SABER_ISLAND.pos) armSecretArrow(playerId);
+    /* QUITTER ANNULE LA QUETE : l'etat est en memoire, il n'y a donc jamais
+       rien a relire. On repart d'une quete vierge a chaque connexion.
+       Les deux anciennes cles db (versions precedentes) sont effacees ici. */
+    resetQuest(playerId);
+    try { deleteStat(playerId, DB_STEP); } catch (e) {}
+    try { deleteStat(playerId, DB_BUTTONS); } catch (e) {}
     return true;
 }
 
 export function saberLeave(playerId) {
     if (!playerId) return false;
     clearSecretArrow(playerId);
+    clearStructArrow(playerId, "door");
+    clearStructArrow(playerId, "curtain");
     /* Le duel appartient a un joueur : s'il part, on range l'arene. */
     if (saber && saber.fighter === playerId) endSaberFight(null);
+    /* Quitter remet la quete a zero (etat en memoire seulement). */
+    resetQuest(playerId);
     return true;
 }
 
