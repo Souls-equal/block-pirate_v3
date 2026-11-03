@@ -109,9 +109,8 @@ export function currentIslands() {
 
    La position est lue A L'APPEL, jamais au chargement : saber.js importe
    utils/data, donc une lecture en haut de fichier tomberait sur un module
-   pas encore initialise (cycle d'imports). Elle vaut null tant que l'auteur
-   du monde ne l'a pas posee (setSecretIsland) : l'entree est alors ignoree,
-   plutot qu'un warp casse. */
+   pas encore initialise (cycle d'imports). Sans position, l'ile n'est pas
+   proposee du tout (aucun warp casse). */
 export function adminIslands() {
     const out = {};
     const isles = currentIslands();

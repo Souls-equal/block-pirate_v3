@@ -897,11 +897,13 @@ Tous passent par `buyItem()` : **la confirmation 3 s s'applique automatiquement*
 `Haki Buyer` (ou `Haki Fragment Buyer`) achète le butin de Garp à un **prix tiré au hasard entre 100
 et 300 Coins** par fragment, avec la même confirmation en deux clics que partout ailleurs.
 
-- le butin de Garp est un `Black Carpet` renommé **« Haki fragment »** (voir `dropHaki`,
-  `src/utils/boss.js`) ;
-- le PNJ ne vend **que** les items dont le nom affiché contient « Haki frag », **slot par slot**
-  (inventaire **et** Moonstone Chest, via `customItem`) : un joueur qui garde un `Black Carpet` pour
-  acheter le haki **ne le perd pas** en cliquant ici ;
+- le butin de Garp est un `Black Carpet` renommé **« Haki fragment »** (`dropHaki`,
+  `src/utils/boss.js`). C'est **le même item** que celui demandé par le `Haki Seller` : c'est voulu.
+  Le boss reste donc rentable pour un joueur qui a déjà appris le haki — il refarme Garp et revend
+  les fragments — au lieu de n'être qu'une étape obligée ;
+- **tous les `Black Carpet` sont vendus** (inventaire **et** Moonstone Chest, via `customItem`), donc
+  la confirmation prévient explicitement que ceux gardés pour le `Haki Seller` partent aussi : rien
+  n'est vendu sans le second clic, et le total est annoncé avant ;
 - le prix est tiré **une fois par offre** et mémorisé 3 s : la clé de confirmation est fixe, donc le
   second clic retrouve exactement le prix annoncé au premier (sans ce cache, le prix changerait à
   chaque clic et la vente ne se confirmerait jamais) ;
@@ -1330,7 +1332,10 @@ d'origine sans jamais enfermer quelqu'un derrière.
   est branché sur `onPlayerDropItem`, à côté des items de capacité. Ils ne peuvent donc pas être
   donnés à un autre joueur.
 - **Gold Grit** et **Magmaward Fuel** sont de **vrais items du jeu** : ils sont donnés et droppés par
-  leur nom, sans renommage ni attributs (rien dans `customItem.js`).
+  leur nom, sans attributs. `customItem.js` ne les renomme pas, il leur pose à chaque join le nom et
+  la description que le joueur doit lire : `Gold Grit` est un **tas de pièces et de trésor** volé par
+  le Mob Leader, et `Magmaward Fuel` n'est pas un carburant mais une **relique** ancienne encore
+  chaude du volcan.
 - perte d'item (mort, filtre d'inventaire) : **aucun blocage**. Le point d'eau rend la Cup pleine, le
   Rich Man rend la relique, et le retour de la relique ne peut pas en créer une deuxième (la garde est
   l'absence de l'item **et** l'étape). Une fois la relique brûlée dans le mur, le passage reste
@@ -1338,12 +1343,20 @@ d'origine sans jamais enfermer quelqu'un derrière.
 
 ### Le Mob Leader (niveau 200, mob `Glass Bro`)
 
-Il se lance **depuis un Code Block**, comme les mobs de quête, mais avec ses propres capacités :
+En jeu, il se lance en parlant au PNJ **`Mob Leader Summoner`** (ou `Mob Leader Starter`) : premier
+clic = rappel de ce qui va sortir, second clic dans les 3 s = le boss apparaît **à côté du PNJ** et
+vise le joueur. Aucun avant l'objectif du `Rich Man` (le boss appartient à la quête), et un seul
+Mob Leader à la fois.
+
+Un Code Block peut aussi le lancer directement :
 
 ```js
 spawnMobLeader(x, y, z)            // à l'endroit voulu
 spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
 ```
+
+Le **Gold Grit** ne tombe que tant que la quête le demande (étapes 5 et 6) : un joueur qui relance le
+boss après avoir été payé ne fabrique pas de l'or à l'infini, il ne récolte que le plaisir du combat.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
 (`20 + 200^1.6 × 8` ≈ 38 500 PV, `3 + 200^1.3 × 0.8` ≈ 786 dégâts par coup). Les deux valeurs se
@@ -1367,17 +1380,12 @@ protection PvP respectées) et non par un `applyHealthChange` brut.
 
 ### Secret Island (`2693,-911,-127`)
 
-La position est dans `SABER_ISLAND` (`src/gameplay/saber.js`) et se corrige sans recoller le World
-Code :
-
-```js
-setSecretIsland(x, y, z)   // depuis un Code Block
-```
+La position est une constante du monde, comme les boutons ou le mur : `SABER_ISLAND`,
+`src/gameplay/saber.js`. Il n'y a **aucun setter** — pour la déplacer, on change la constante.
 
 `Rich Man` pose la flèche de quête (id `saber-isle`) et l'île apparaît dans `Warp to Island` du
 panneau admin (`adminIslands()`) — **et seulement là** : elle ne figure ni dans les flèches d'île des
-joueurs, ni dans Settings, puisqu'elle est censée être secrète. Si la position valait `null`, ni
-flèche ni warp ne seraient proposés (rien de cassé).
+joueurs, ni dans Settings, puisqu'elle est censée être secrète.
 
 ---
 

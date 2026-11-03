@@ -219,6 +219,21 @@ export function itemJoin(playerId) {
     })
     api.removeItemCraftingRecipes(playerId, null)
     api.setItemStat(playerId, "M1911", "displayName", "Flintlock")
+    /* SABER QUEST : les deux butins de la quete. Ce sont de VRAIS items :
+       on ne renomme donc pas un bloc existant, on pose seulement le nom et
+       la description que le joueur doit lire.
+         - "Gold Grit" est un TAS DE PIECES / DE TRESOR vole par le Mob
+           Leader : la description doit se lire comme de l'or, pas comme
+           une ressource de construction.
+         - "Magmaward Fuel" n'est pas un carburant : c'est une RELIQUE
+           ancienne qui ouvre ce qu'aucune lame ne coupe. Le nom reste tel
+           quel (c'est l'item du jeu), la description dit ce qu'il est.
+       Les textes sont poses a chaque join, comme les autres items custom :
+       un item deja en banque les retrouve tout seul. */
+    api.setItemStat(playerId, "Gold Grit", "displayName", "Gold Grit")
+    api.setItemStat(playerId, "Gold Grit", "description", "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.")
+    api.setItemStat(playerId, "Magmaward Fuel", "displayName", "Magmaward Fuel")
+    api.setItemStat(playerId, "Magmaward Fuel", "description", "Not fuel at all: an ancient relic still warm from the volcano. It opens what no blade can cut.")
     api.setItemStat(playerId, "M1911", "gunStats", {
         fireRate:80,
         damage: 30,
