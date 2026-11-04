@@ -1209,6 +1209,40 @@ Mythical   Glacial Silverfish  Iceshelf Skate      Heatwarp Flounder       Mangl
 `FRUIT_BLOCKS` (`src/fruit/abilities.js`) est maintenant calculé à partir d'elle,
 donc impossible d'avoir deux tables désynchronisées.
 
+### Fruits sauvages : un bloc apparaît, on le clique
+
+Un **bloc de fruit** apparaît tout seul dans le monde. Le joueur le clique et reçoit un fruit
+**tiré au hasard dans la rareté de ce bloc** — le même tirage que la machine à fruits, mais gratuit.
+
+| Bloc posé | Rareté | Poids (celui du roll) |
+| --- | --- | --- |
+| `Potato Block` | Common | 41 |
+| `Pear Block` | Uncommon | 28 |
+| `Plum Block` | Rare | 21 |
+| `Banana Block` | Legendary | 8 |
+| `Apple Block` | Mythical | 2 |
+
+- **Un seul fruit en vie à la fois.** Un nouveau toutes les **20 minutes** (`WILD_EVERY = 24000`
+  ticks), et un fruit que personne ne ramasse **pourrit au bout de 15 minutes** (vérifié chaque
+  minute, message discret).
+- **Annonce à tout le monde au spawn** : `A Mythical fruit block appeared at Skylands. Click it to
+  claim a random Mythical fruit. It rots in 15 minutes.` La couleur est celle de la rareté, donc un
+  Mythique se voit dans le chat.
+- **Les points de spawn sont une liste écrite en dur**, `WILD_SPOTS`, en tête de
+  `src/fruit/index.js` : un point par île, à la hauteur du sol, avec le nom de l'île pour le
+  message. Pas de fonction de configuration : pour en ajouter ou en déplacer un, on change la liste.
+- Un point dont la case — ou la case juste au-dessus — **n'est pas de l'air est ignoré** : un point
+  mal placé ne pose jamais un fruit dans un mur, il ne pose simplement rien, et le tirage passe au
+  point suivant. Si aucun point n'est libre, aucun fruit n'apparaît.
+- La minuterie démarre au **premier join** et ne tourne qu'une fois : pas de fruit dans un monde vide.
+- **Le fruit exact n'est tiré qu'au ramassage** (dans la rareté du bloc), donc le bloc ne dit jamais
+  d'avance ce qu'il contient.
+
+> **Piège corrigé au passage.** `api.setBlock` attend `(x, y, z, nom)`. L'ancien code appelait
+> `api.setBlock(0, e, o, r)` au ramassage et `api.setBlock(nom, x, y, z)` au spawn : le bloc n'était
+> jamais posé (l'appel levait une erreur, loggée en `[fruit][err]`) et jamais retiré (bloc fantôme
+> définitif). Les deux appels sont maintenant dans le bon ordre.
+
 ### La migration, au join
 
 `migrateFruitItems()` (`src/gameplay/customItem.js`) passe l'inventaire **et** le
