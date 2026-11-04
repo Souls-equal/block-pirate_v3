@@ -1229,11 +1229,24 @@ Un **bloc de fruit** apparaît tout seul dans le monde. Le joueur le clique et r
   claim a random Mythical fruit. It rots in 15 minutes.` La couleur est celle de la rareté, donc un
   Mythique se voit dans le chat.
 - **Les points de spawn sont une liste écrite en dur**, `WILD_SPOTS`, en tête de
-  `src/fruit/index.js` : un point par île, à la hauteur du sol, avec le nom de l'île pour le
-  message. Pas de fonction de configuration : pour en ajouter ou en déplacer un, on change la liste.
-- Un point dont la case — ou la case juste au-dessus — **n'est pas de l'air est ignoré** : un point
-  mal placé ne pose jamais un fruit dans un mur, il ne pose simplement rien, et le tirage passe au
-  point suivant. Si aucun point n'est libre, aucun fruit n'apparaît.
+  `src/fruit/index.js` : **trois points par île** (18 en tout), avec le nom de l'île pour le message.
+  Trois par île exprès : avec un seul point, il suffisait de s'asseoir dessus pour tout rafler.
+  Pas de fonction de configuration : pour en ajouter ou en déplacer un, on change la liste.
+
+| Île | Points |
+| --- | --- |
+| Jungle | `1273,-915,338` · `1342,-916,226` · `1490,-918,100` |
+| Pirate Village | `926,-915,836` · `740,-917,694` · `720,-918,832` |
+| Desert | `607,-919,1613` · `487,-916,1818` · `622,-918,1888` |
+| Snow Village | `2406,-918,691` · `2536,-911,537` · `2445,-919,413` |
+| Marine Fortress | `2049,-917,-653` · `2081,-919,-457` · `2279,-918,-642` |
+| Skylands | `2694,-800,1274` · `2958,-673,1662` · `3063,-606,1378` |
+
+  **Starter Pirate, Middle Town et Starter Marine n'ont aucun point** : ce sont les îles de départ,
+  les fruits n'y apparaissent pas.
+- Un point occupé (quelqu'un a construit dessus) : le bloc essaie **la case juste au-dessus**, puis
+  abandonne ce point et le tirage passe au suivant. Jamais de fruit dans un mur, jamais de fruit qui
+  flotte. Si aucun point n'est libre, aucun fruit n'apparaît.
 - La minuterie démarre au **premier join** et ne tourne qu'une fois : pas de fruit dans un monde vide.
 - **Le fruit exact n'est tiré qu'au ramassage** (dans la rareté du bloc), donc le bloc ne dit jamais
   d'avance ce qu'il contient.
