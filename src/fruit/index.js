@@ -175,21 +175,38 @@ const WILD_BLOCKS = [
   { block: "Apple Block", rarity: "Mythical" },
 ];
 
-/* POINTS DE SPAWN : un point par ile, a la hauteur du sol (le meme repere que
-   les warps d'ile du panneau admin). Un point dont la case, ou la case juste
-   au-dessus, n'est pas de l'air est IGNORE : un point mal place ne pose
-   jamais un fruit dans un mur, il ne pose simplement rien. Pour en ajouter ou
-   en deplacer un, c'est ici et nulle part ailleurs. */
+/* POINTS DE SPAWN : TROIS par ile, pour qu'on ne campe pas un seul point.
+   Starter Pirate, Middle Town et Starter Marine n'en ont aucun : ce sont les
+   iles de depart, les fruits n'y apparaissent pas.
+
+   Le bloc est pose sur le point donne. Si cette case est occupee (quelqu'un a
+   construit dessus), on essaie la case juste au-dessus, puis on abandonne ce
+   point : jamais de fruit dans un mur, et jamais de fruit qui flotte.
+   Pour en ajouter ou en deplacer un, c'est ici et nulle part ailleurs. */
 const WILD_SPOTS = [
-  { pos: [-12, -910, 24], where: "Starter Pirate" },
-  { pos: [635, -900, -206], where: "Middle Town" },
-  { pos: [885, -906, -276], where: "Starter Marine" },
-  { pos: [1319, -906, 317], where: "Jungle" },
-  { pos: [811, -906, 770], where: "Pirate Village" },
-  { pos: [650, -913, 1789], where: "Desert" },
-  { pos: [2502, -915, 664], where: "Snow Village" },
-  { pos: [2101, -910, -666], where: "Marine Fortress" },
-  { pos: [2498, -909, 1247], where: "Skylands" },
+  { pos: [1273, -915, 338], where: "Jungle" },
+  { pos: [1342, -916, 226], where: "Jungle" },
+  { pos: [1490, -918, 100], where: "Jungle" },
+
+  { pos: [926, -915, 836], where: "Pirate Village" },
+  { pos: [740, -917, 694], where: "Pirate Village" },
+  { pos: [720, -918, 832], where: "Pirate Village" },
+
+  { pos: [607, -919, 1613], where: "Desert" },
+  { pos: [487, -916, 1818], where: "Desert" },
+  { pos: [622, -918, 1888], where: "Desert" },
+
+  { pos: [2406, -918, 691], where: "Snow Village" },
+  { pos: [2536, -911, 537], where: "Snow Village" },
+  { pos: [2445, -919, 413], where: "Snow Village" },
+
+  { pos: [2049, -917, -653], where: "Marine Fortress" },
+  { pos: [2081, -919, -457], where: "Marine Fortress" },
+  { pos: [2279, -918, -642], where: "Marine Fortress" },
+
+  { pos: [2694, -800, 1274], where: "Skylands" },
+  { pos: [2958, -673, 1662], where: "Skylands" },
+  { pos: [3063, -606, 1378], where: "Skylands" },
 ];
 
 /* ATTENTION : les minuteries de utils/timer comptent en TICKS (1 tick = 50 ms). */
@@ -224,13 +241,15 @@ function spawnWildFruit() {
 
   const free = [];
   for (const spot of WILD_SPOTS) {
-    const pos = spot.pos;
-    let ok = !1;
+    let y = null;
     try {
-      ok = api.getBlock(pos[0], pos[1], pos[2]) === "Air"
-        && api.getBlock(pos[0], pos[1] + 1, pos[2]) === "Air";
-    } catch (e) { ok = !1; }
-    if (ok) free.push(spot);
+      for (let up = 0; up < 2; up++) {
+        const cy = spot.pos[1] + up;
+        if (api.getBlock(spot.pos[0], cy, spot.pos[2]) === "Air"
+          && api.getBlock(spot.pos[0], cy + 1, spot.pos[2]) === "Air") { y = cy; break; }
+      }
+    } catch (e) { y = null; }
+    if (y !== null) free.push({ where: spot.where, pos: [spot.pos[0], y, spot.pos[2]] });
   }
   if (!free.length) return !1;
   const spot = free[Math.floor(Math.random() * free.length)];
