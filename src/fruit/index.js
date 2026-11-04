@@ -1,5 +1,5 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
-import { C as THEME, say } from "../core/theme";
+import { C as THEME, say, shout } from "../core/theme";
 import { confirmAction } from "../utils/data";
 let o = function () {},
   r = function () {};
@@ -141,34 +141,174 @@ export function spawnFruit(t, e, o, r) {
   }
   const c = i.baseItem.type;
   try {
-    api.setBlock(c, e, o, r);
+    /* api.setBlock attend (x, y, z, nom) : l'ancien appel (nom, x, y, z)
+       posait un bloc a l'origine du monde et laissait la case vide. */
+    api.setBlock(e, o, r, c);
   } catch (n) {
     f("spawnFruit.setBlock", n, t + " @ " + e + "," + o + "," + r);
   }
   const a = `${e},${o},${r}`;
   (y.set(a, { fruitName: t, blockType: c, x: e, y: o, z: r, spawnedAt: Date.now() }), y.size);
 }
-export function pickupFruit(t, e, o, r) {
-  const i = `${e},${o},${r}`,
-    c = y.get(i);
-  if (!c) return !1;
-  try {
-    api.setBlock(0, e, o, r);
-  } catch (t) {
-    f("pickupFruit.setBlock", t);
+/* ══ FRUITS SAUVAGES ═══════════════════════════════════════════════════════
+
+   Un bloc de fruit apparait tout seul dans le monde. Le joueur le clique et
+   recoit un fruit AU HASARD de la rareté de ce bloc — exactement le meme
+   tirage que la machine a fruits, mais gratuit et sans animation.
+
+   | bloc            | rareté    | poids (celui du roll) |
+   | Potato Block    | Common    | 41 |
+   | Pear Block      | Uncommon  | 28 |
+   | Plum Block      | Rare      | 21 |
+   | Banana Block    | Legendary |  8 |
+   | Apple Block     | Mythical  |  2 |
+
+   UN SEUL fruit en vie a la fois : un nouveau toutes les 20 minutes, et un
+   fruit que personne ne ramasse pourrit au bout de 15 minutes.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const WILD_BLOCKS = [
+  { block: "Potato Block", rarity: "Common" },
+  { block: "Pear Block", rarity: "Uncommon" },
+  { block: "Plum Block", rarity: "Rare" },
+  { block: "Banana Block", rarity: "Legendary" },
+  { block: "Apple Block", rarity: "Mythical" },
+];
+
+/* POINTS DE SPAWN : un point par ile, a la hauteur du sol (le meme repere que
+   les warps d'ile du panneau admin). Un point dont la case, ou la case juste
+   au-dessus, n'est pas de l'air est IGNORE : un point mal place ne pose
+   jamais un fruit dans un mur, il ne pose simplement rien. Pour en ajouter ou
+   en deplacer un, c'est ici et nulle part ailleurs. */
+const WILD_SPOTS = [
+  { pos: [-12, -910, 24], where: "Starter Pirate" },
+  { pos: [635, -900, -206], where: "Middle Town" },
+  { pos: [885, -906, -276], where: "Starter Marine" },
+  { pos: [1319, -906, 317], where: "Jungle" },
+  { pos: [811, -906, 770], where: "Pirate Village" },
+  { pos: [650, -913, 1789], where: "Desert" },
+  { pos: [2502, -915, 664], where: "Snow Village" },
+  { pos: [2101, -910, -666], where: "Marine Fortress" },
+  { pos: [2498, -909, 1247], where: "Skylands" },
+];
+
+/* ATTENTION : les minuteries de utils/timer comptent en TICKS (1 tick = 50 ms). */
+const WILD_EVERY = 24000;        // 20 min entre deux spawns
+const WILD_CHECK = 1200;         // verification de la pourriture : 1 min
+const WILD_LIFE_MS = 900000;     // un fruit vit 15 min (Date.now(), en ms)
+let wildTimer = null;
+
+function wildRarity() {
+  let total = 0;
+  for (const r of c) total += r.chance;
+  let roll = Math.random() * total;
+  for (const r of c) {
+    roll -= r.chance;
+    if (roll < 0) return r.name;
   }
-  y.delete(i);
-  const a = n[c.fruitName];
-  if (a && a.baseItem) {
-    const e = a.baseItem.type;
+  return c[0].name;
+}
+
+function wildFruitOf(rarity) {
+  const list = i[rarity];
+  if (!list || !list.length) return null;
+  return list[Math.floor(Math.random() * list.length)].rpName;
+}
+
+function spawnWildFruit() {
+  if (y.size > 0) return !1;
+  const rarity = wildRarity();
+  let def = null;
+  for (const b of WILD_BLOCKS) if (b.rarity === rarity) def = b;
+  if (!def) return !1;
+
+  const free = [];
+  for (const spot of WILD_SPOTS) {
+    const pos = spot.pos;
+    let ok = !1;
     try {
-      api.giveItem(t, e, 1, fruitItemAttributes(c.fruitName));
-    } catch (t) {
-      f("pickupFruit.giveItem", t);
+      ok = api.getBlock(pos[0], pos[1], pos[2]) === "Air"
+        && api.getBlock(pos[0], pos[1] + 1, pos[2]) === "Air";
+    } catch (e) { ok = !1; }
+    if (ok) free.push(spot);
+  }
+  if (!free.length) return !1;
+  const spot = free[Math.floor(Math.random() * free.length)];
+  const pos = spot.pos;
+
+  try {
+    api.setBlock(pos[0], pos[1], pos[2], def.block);
+  } catch (e) {
+    f("spawnWildFruit.setBlock", e);
+    return !1;
+  }
+  y.set(pos[0] + "," + pos[1] + "," + pos[2], {
+    rarity: rarity, blockType: def.block, x: pos[0], y: pos[1], z: pos[2], spawnedAt: Date.now(),
+  });
+
+  const color = a(rarity);
+  try {
+    shout([
+      { icon: "fa-solid fa-star", style: { color: color } },
+      { str: " A ", style: { color: "#cbd5e1" } },
+      { str: rarity, style: { color: color, fontWeight: "700" } },
+      { str: " fruit block appeared at ", style: { color: "#cbd5e1" } },
+      { str: spot.where, style: { color: "#f8fafc", fontWeight: "700" } },
+      { str: ". Click it to claim a random " + rarity + " fruit. It rots in 15 minutes.", style: { color: "#94a3b8" } },
+    ]);
+  } catch (e) {}
+  return !0;
+}
+
+function rotWildFruits() {
+  const now = Date.now();
+  for (const [key, f0] of y) {
+    if (now - f0.spawnedAt < WILD_LIFE_MS) continue;
+    try { api.setBlock(f0.x, f0.y, f0.z, "Air"); } catch (e) {}
+    y.delete(key);
+    try {
+      shout([
+        { icon: "fa-solid fa-hourglass", style: { color: "#94a3b8" } },
+        { str: " The fruit block nobody claimed rotted away.", style: { color: "#94a3b8" } },
+      ]);
+    } catch (e) {}
+  }
+}
+
+function startWildSpawn() {
+  if (wildTimer) return;
+  spawnWildFruit();
+  wildTimer = t(spawnWildFruit, WILD_EVERY);
+  t(rotWildFruits, WILD_CHECK);
+}
+
+export function pickupFruit(t, e, o, r) {
+  const i2 = `${e},${o},${r}`,
+    c2 = y.get(i2);
+  if (!c2) return !1;
+  try {
+    /* api.setBlock attend (x, y, z, nom) : c'est bien la case cliquee. */
+    api.setBlock(e, o, r, "Air");
+  } catch (t2) {
+    f("pickupFruit.setBlock", t2);
+  }
+  y.delete(i2);
+  /* Le fruit recu est TIRE au moment du ramassage, dans la rareté du bloc. */
+  const info = c2.fruitName ? getFruitInfo(c2.fruitName) : null,
+    rarity = c2.rarity || (info && info.rarity) || "Common",
+    fruitName = c2.rarity ? wildFruitOf(rarity) : c2.fruitName;
+  if (!fruitName) return !1;
+  const a2 = n[fruitName];
+  if (a2 && a2.baseItem) {
+    const e2 = a2.baseItem.type;
+    try {
+      api.giveItem(t, e2, 1, fruitItemAttributes(fruitName));
+    } catch (t3) {
+      f("pickupFruit.giveItem", t3);
     }
   }
   const l = m(t),
-    s = getFruitInfo(c.fruitName),
+    s = getFruitInfo(fruitName),
     u = s ? s.color : "#FFFFFF";
   return (
     p(
@@ -179,12 +319,12 @@ export function pickupFruit(t, e, o, r) {
         { str: "] ", style: { color: "#94a3b8" } },
         { str: l, style: { color: "#f8fafc", fontWeight: "600" } },
         { str: " picked up ", style: { color: "#cbd5e1" } },
-        { str: c.fruitName, style: { color: u || "#ffffff", fontWeight: "700" } },
+        { str: fruitName, style: { color: u || "#ffffff", fontWeight: "700" } },
         { str: "!", style: { color: "#cbd5e1" } },
       ],
       "pickupFruit",
     ),
-    c.fruitName,
+    fruitName,
     !0
   );
 }
@@ -510,6 +650,9 @@ export function getFruit(t) {
 export function handleFruitJoin(t) {
   if (t) delete GONE[t];
   restorePlayerFruit(t);
+  /* Les fruits sauvages n'existent que s'il y a quelqu'un pour les ramasser :
+     la minuterie demarre au premier join et ne demarre qu'une fois. */
+  startWildSpawn();
 }
 export function restorePlayerFruit(t) {
   try {
