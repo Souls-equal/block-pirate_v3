@@ -1426,16 +1426,29 @@ d'elle — donc on sait où aller, et on n'a pas une flèche dans le dos pour le
 | Objet | Item | Donné par | Consommé à |
 | --- | --- | --- | --- |
 | **Torch** | `Torch` | Code Block (derrière la porte) | le rideau du désert |
-| **Cup** | `Bucket` vide → **`Water Bucket`** (nom affiché `Cup of Water`) | Code Block (derrière le rideau) | l'Old Man |
+| **Cup** | `Bucket` vide → **`Water Bucket`** (items d'origine, aucun renommage) | Code Block (derrière le rideau) | l'Old Man |
 | **Gold Grit** | `Gold Grit` (vrai item) | le Mob Leader | le Rich Man |
 | **Magmaward Fuel** | `Magmaward Fuel` (vrai item) | le Rich Man | le mur scellé |
 
-- **La Cup est un vrai seau du jeu** : vide c'est `Bucket`, pleine c'est `Water Bucket` (nom affiché
-  `Cup of Water`). Le remplissage ne fait **pas** `removeItem` puis `giveItem` : `fillCup()` cherche le
-  slot qui contient le seau (`scanAllItems`) et réécrit **ce slot-là** avec `setItemSlot`, attributs
-  compris. L'item ne quitte jamais sa case, donc rien ne peut se dupliquer et un inventaire plein ne
-  peut pas avaler la Cup. Si la pile contenait plusieurs seaux, un seul est rempli et le reste est
-  rendu — après la réécriture du slot, jamais avant.
+- **La Cup est un vrai seau du jeu** : vide c'est `Bucket`, pleine c'est `Water Bucket`. **Seul
+  l'item d'origine décide** : aucun nom affiché n'entre dans une décision, et on n'en pose plus sur les
+  items de quête (ils se donnent nus). Un seau renommé par un Code Block ou par une ancienne version
+  se remplit donc comme un autre, et une Cup pleine est écrite **sans aucun attribut** — l'item reste
+  lisible tel quel par l'Old Man, par la déduction d'étape et par le blocage du lâcher.
+- **Vide ≠ pleine.** Le code compte les deux items séparément (`countOf(Bucket)` / `countOf(Water Bucket)`).
+  Avant, « la Cup est déjà pleine » testait la somme des deux : un joueur qui tenait un seau **vide**
+  s'entendait répondre *Your Cup is already full of water* et ne pouvait plus jamais le remplir. Le
+  point d'eau remplit maintenant **n'importe quel seau vide**, même si une Cup pleine traîne déjà dans
+  l'inventaire, et l'Old Man ne boit qu'une Cup **réellement pleine** (`Water Bucket` présent) : un seau
+  vide ne le désaltère pas, et ça ne bloque personne puisque le point d'eau remplit tout seau vide.
+- **Le remplissage ne fait pas** `removeItem` puis `giveItem` : `fillCup()` cherche le slot qui contient
+  le seau (`scanAllItems`) et réécrit **ce slot-là** avec `setItemSlot`, sans attributs. L'item ne
+  quitte jamais sa case, donc rien ne peut se dupliquer et un inventaire plein ne peut pas avaler la
+  Cup. Si la pile contenait plusieurs seaux, un seul est rempli et le reste est rendu — après la
+  réécriture du slot, jamais avant.
+- **Un clic muet n'existe plus** : au point d'eau, un joueur qui tient un seau avant d'avoir brûlé le
+  rideau reçoit une phrase (`The water is clear, but you have no reason to fill that yet.`) au lieu de
+  rien du tout — et son étape n'avance pas.
 - **Aucun item de la quête ne peut être lâché** : `saberLockedItem()` répond pour les cinq noms
   (`Torch`, `Bucket`, `Water Bucket`, `Gold Grit`, `Magmaward Fuel`), et il
   est branché sur `onPlayerDropItem`, à côté des items de capacité. Ils ne peuvent donc pas être

@@ -52,17 +52,15 @@ import { scanAllItems, writeItem } from "./customItem";
 /* ── 1. CONFIGURATION ──────────────────────────────────────────────────── */
 
 const ITEM_TORCH = "Torch";
-/* La Cup est un VRAI seau du jeu : vide c'est `Bucket`, plein c'est
-   `Water Bucket` (nom affiche "Cup of Water"). Le remplissage ne retire
-   jamais l'item pour le redonner : le slot qui tient le seau est reecrit au
-   meme endroit (voir fillCup). */
+/* La Cup est un VRAI seau du jeu, et elle se reconnait UNIQUEMENT a son item
+   d'origine : `Bucket` quand elle est vide, `Water Bucket` quand elle est
+   pleine. Aucun nom affiche n'entre dans une decision : un seau renomme par
+   un Code Block ou par une ancienne version reste un seau, et on n'en pose
+   plus (les items de quete se donnent nus). Le remplissage ne retire jamais
+   l'item pour le redonner : le slot qui tient le seau est reecrit au meme
+   endroit (voir fillCup). */
 const ITEM_CUP = "Bucket";
 const ITEM_CUP_FULL = "Water Bucket";
-const CUP_FULL = "Cup of Water";
-const CUP_FULL_ATTRS = {
-    customDisplayName: CUP_FULL,
-    customDescription: "A cup full of fresh water. Someone must be thirsty.",
-};
 /* Gold Grit et Magmaward Fuel sont de VRAIS items du jeu (ajoutes
    recemment) : on les donne par leur nom, sans renommage ni attributs. */
 const ITEM_GOLD = "Gold Grit";
@@ -213,11 +211,6 @@ function countOf(playerId, itemName) {
     let n = 0;
     for (let i = 0; i < slots.length; i++) n += slots[i].amount || 1;
     return n;
-}
-
-/* La Cup existe sous deux noms d'item (vide / pleine) : on compte les deux. */
-function cupAmount(playerId) {
-    return countOf(playerId, ITEM_CUP) + countOf(playerId, ITEM_CUP_FULL);
 }
 
 function heldItemName(playerId) {
@@ -548,51 +541,67 @@ function burnCurtain(playerId) {
 /* Rend une Cup pleine la ou il y a de la place (reprise apres une perte :
    mort, filtre d'inventaire). Ce n'est PAS le chemin normal du remplissage. */
 function giveFullCup(playerId) {
-    try {
-        api.giveItem(playerId, ITEM_CUP_FULL, 1, {
-            customDisplayName: CUP_FULL_ATTRS.customDisplayName,
-            customDescription: CUP_FULL_ATTRS.customDescription,
-        });
-        return true;
-    } catch (e) { return false; }
+    try { api.giveItem(playerId, ITEM_CUP_FULL, 1); return true; }
+    catch (e) { return false; }
 }
 
 function fillCup(playerId) {
     const step = stepOf(playerId);
-    if (step >= S.WATER) {
-        if (cupAmount(playerId) > 0) {
+    /* Vide et pleine sont DEUX ITEMS D'ORIGINE differents, pas deux noms du
+       meme item : `Bucket` et `Water Bucket`. C'est la seule chose qu'on
+       regarde, donc un seau renomme (Code Block, ancienne version) se remplit
+       comme un autre. Consequence : on ne compte jamais un seau VIDE comme une
+       Cup pleine, sinon un joueur qui a les deux ne peut plus rien remplir
+       ("Your Cup is already full" alors qu'il tient un seau vide). */
+    const empty = countOf(playerId, ITEM_CUP);
+    const full = countOf(playerId, ITEM_CUP_FULL);
+
+    /* Quete pas encore lancee : l'eau reste de l'eau. On ne remplit rien et on
+       ne fait pas avancer l'etape, mais on repond quand le joueur tient un
+       seau — un clic muet ressemble a un bug. */
+    if (step < S.CURTAIN) {
+        if (empty > 0) {
+            tell(playerId, line("fa-solid fa-circle-info", C.INFO,
+                "The water is clear, but you have no reason to fill that yet."));
+            return true;
+        }
+        return false;
+    }
+
+    if (empty === 0) {
+        if (full > 0) {
+            /* Deja remplie : l'etape suit l'item, pour ne jamais laisser un
+               joueur avec une Cup pleine et un Old Man qui a encore soif. */
+            if (step < S.WATER) setStep(playerId, S.WATER);
             tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
             return true;
         }
-        /* Cup perdue en route (mort, filtre d'inventaire) : on la rend plutot
-           que d'annoncer une etape que le joueur ne peut plus jouer. */
-        if (giveFullCup(playerId)) {
-            tell(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
+        if (step >= S.WATER) {
+            /* Cup perdue en route (mort, filtre d'inventaire) : on la rend
+               plutot que d'annoncer une etape que le joueur ne peut plus
+               jouer. */
+            if (giveFullCup(playerId)) {
+                tell(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
+                return true;
+            }
+            tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
             return true;
         }
-        tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
-        return true;
-    }
-    if (step < S.CURTAIN) return false;
-
-    const slots = slotsOf(playerId, ITEM_CUP);
-    if (!slots.length) {
         tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You need a Cup to carry water."));
         return true;
     }
 
-    /* REMPLISSAGE SUR PLACE : le slot qui tient le seau vide devient le seau
-       d'eau au meme endroit, avec son nom affiche. Aucun removeItem suivi
-       d'un giveItem : l'item ne quitte jamais sa case, donc rien ne peut se
-       dupliquer, et un inventaire plein ne peut pas avaler la Cup.
+    /* REMPLISSAGE SUR PLACE : le slot qui tient le seau vide est reecrit en
+       seau d'eau, au meme endroit et SANS nom affiche — l'item d'origine reste
+       lisible tel quel par toutes les autres verifications (Old Man, etape
+       deduite, blocage du lacher). Aucun removeItem suivi d'un giveItem :
+       l'item ne quitte jamais sa case, donc rien ne peut se dupliquer, et un
+       inventaire plein ne peut pas avaler la Cup.
        Un slot peut contenir plusieurs seaux : on n'en remplit qu'un et on
        rend la pile restante (jamais dupliquee : le slot est d'abord reecrit). */
-    const holder = slots[0];
+    const holder = slotsOf(playerId, ITEM_CUP)[0];
     const rest = Math.max(0, (holder.amount | 0) - 1);
-    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1, {
-        customDisplayName: CUP_FULL_ATTRS.customDisplayName,
-        customDescription: CUP_FULL_ATTRS.customDescription,
-    });
+    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1);
     if (!ok) {
         tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
         return true;
@@ -601,13 +610,13 @@ function fillCup(playerId) {
         try { api.giveItem(playerId, ITEM_CUP, rest); } catch (e) {}
     }
 
-    setStep(playerId, S.WATER);
+    if (step < S.WATER) setStep(playerId, S.WATER);
     soundAt(playerId, "coin", 0.5, 1.5, 20);
     tell(playerId, [
         { icon: "Water", style: { color: C.MARINE } },
-        { str: " You fill the Cup: ", style: { color: C.INFO } },
-        { str: CUP_FULL, style: { color: C.MARINE, fontWeight: "bold" } },
-        { str: ".", style: { color: C.INFO } },
+        { str: " You fill the Cup with water: ", style: { color: C.INFO } },
+        { str: ITEM_CUP_FULL, style: { color: C.MARINE, fontWeight: "bold" } },
+        { str: " ready for the Old Man.", style: { color: C.INFO } },
     ]);
     return true;
 }
@@ -661,6 +670,15 @@ export function saberOldMan(playerId) {
         return true;
     }
     if (step < S.WATER) {
+        tell(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
+        return true;
+    }
+
+    /* Il ne boit qu'une Cup REELLEMENT pleine : le seul juge est l'item
+       d'origine `Water Bucket`, jamais l'etape ni un nom affiche. Un seau
+       VIDE ne desaltere personne, et ca ne bloque pas : le point d'eau
+       remplit n'importe quel seau vide (voir fillCup). */
+    if (!hasItem(playerId, ITEM_CUP_FULL)) {
         tell(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
         return true;
     }
