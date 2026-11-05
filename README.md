@@ -1351,19 +1351,24 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 trois PNJ, le Mob Leader et le Saber Expert. Un seul fichier, parce que la limite des 30 fichiers du
 World Code ne laisse pas de place à un second.
 
-### Reprendre une quête en cours, sans rien écrire en base
+### Reprendre une quête en cours : l'étape en base, les plaques non
 
-**Aucune valeur de quête n'est écrite dans la base du joueur.** La progression vit en mémoire, dans
-`saber.js` (`quests[playerId]`), avec l'étape et les boutons déjà pressés.
+**Une seule clé de base, `s`**, et elle ne contient que le **numéro d'étape** (0 à 8). Rien d'autre :
+ni item, ni horodatage, ni joueur secondaire.
 
-**Une déconnexion n'efface rien.** Le module World Code continue de tourner, donc l'entrée du joueur
-l'attend : au retour il reprend **exactement** où il s'est arrêté (même étape, mêmes boutons déjà
-pressés), et sa flèche de quête est reposée si la chasse est en cours. Il n'y a qu'un cas où
-l'entrée est oubliée : un joueur qui n'a **rien** commencé (étape 0, aucun bouton), pour ne pas garder
-une ligne vide par joueur passé.
+- **L'étape est écrite tout de suite.** `setStep()` fait la mémoire *et* la base dans le même appel :
+  elle ne peut pas être en retard sur le jeu, même si le monde s'arrête juste après.
+- **Les cinq plaques ne sont jamais écrites.** Elles vivent en mémoire seulement, et repartent de zéro
+  à chaque connexion : un joueur qui quitte avec **3/5** retrouve **0/5** et doit les recliquer.
+  Taper `s = 0` ne sert à rien et ne serait pas plus sûr — la base ne voit que des étapes.
+- **Une déconnexion n'efface rien** : au retour, l'étape est relue dans `s`, la flèche de quête est
+  reposée si la chasse est en cours, et les plaques sont à refaire.
+- **Fin de quête : la clé est supprimée** (`resetQuest` → `deleteStat(playerId, "s")`), quand le Saber
+  Expert tombe. La quête est rejouable telle quelle, et il ne reste aucune ligne en base.
 
-**Après un redémarrage du monde**, la mémoire est vide : l'étape est alors **déduite des items que le
-joueur porte encore** (`stepFromItems`), puisqu'aucun des items de quête ne peut être lâché :
+**Filet de sécurité.** Si `s` est vide (joueur d'avant cette version, ou étape perdue), l'étape est
+déduite des **items portés** (`stepFromItems`) — aucun des items de quête ne peut être lâché, donc
+l'inventaire ne ment pas :
 
 | Item porté | Étape déduite | Ce que ça débloque |
 | --- | --- | --- |
@@ -1373,13 +1378,8 @@ joueur porte encore** (`stepFromItems`), puisqu'aucun des items de quête ne peu
 | `Gold Grit` | le Mob Leader est tombé | le Rich Man paie |
 | `Magmaward Fuel` | le Rich Man a payé | le mur scellé |
 
-Cette étape déduite n'est **pas mémorisée** : elle sert de point de départ, elle ne fige jamais la
-quête. Conséquence honnête : ce qui a été consommé et ne laisse pas d'item (avoir fait boire l'Old
-Man, avoir brûlé le rideau) est à refaire après un redémarrage — c'est le prix du « zéro db ».
-
-Seule la **fin de quête** remet l'état à zéro (étape *et* boutons), quand le Saber Expert tombe : la
-quête est rejouable telle quelle. Les deux anciennes clés db (`sq`, `sqB`) sont supprimées au join —
-ce sont des suppressions, jamais des écritures.
+Cette étape déduite n'est **pas** écrite : elle sert de point de départ, elle ne fige jamais la quête.
+Les deux anciennes clés (`sq`, `sqB`) sont supprimées au join — elles ne sont jamais relues.
 
 | Étape | Zone | Ce qui se passe |
 | --- | --- | --- |

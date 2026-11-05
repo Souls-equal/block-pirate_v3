@@ -7,7 +7,7 @@
    ici : les structures du monde, les trois PNJ, le Mob Leader et le Saber
    Expert.
 
-   DEROULEMENT (l'etape est un seul nombre en base, cle "sq")
+   DEROULEMENT (l'etape est un seul nombre en base, cle "s")
 
      0  rien
      1  JUNGLE   les cinq boutons caches sont tous pressés : la porte
@@ -42,7 +42,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 import { say, C } from "../core/theme";
-import { deleteStat } from "../utils/data";
+import { deleteStat, getStat, setStat } from "../utils/data";
 import { setInterval as every, nowMs } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
@@ -103,12 +103,17 @@ const S = {
     GOLD: 6,
     RELIC: 7,
     WALL: 8,
-    /* Pas d'etape "termine" : finir la quete la remet a zero (voir
-       saberFallen). L'etat ne survit ni a la fin, ni a la deconnexion. */
+    /* Pas d'etape "termine" : finir la quete la remet a zero et SUPPRIME la
+       cle `s` (voir saberFallen). L'etape survit a la deconnexion, pas la fin
+       de la quete. */
 };
 
-const DB_STEP = "sq";
-const DB_BUTTONS = "sqB";
+/* UNE seule cle, courte : le numero d'etape. Les plaques cliquees ne sont
+   JAMAIS ecrites (voir saveButtons) : un joueur qui quitte a 3/5 recommence a
+   0/5. Les deux cles des versions precedentes sont supprimees au join. */
+const DB_STEP = "s";
+const DB_STEP_OLD = "sq";
+const DB_BUTTONS_OLD = "sqB";
 
 /* L'ile secrete de la quete : sa position est une constante du monde, comme
    les boutons ou le mur. Elle sert a deux choses seulement : la fleche de
@@ -233,17 +238,30 @@ export function saberLockedItem(itemName) {
     return LOCKED_ITEMS.indexOf(itemName) !== -1;
 }
 
-/* ── 3. ETAT DE LA QUETE (en memoire, pas en db) ───────────────────────── */
+/* ── 3. ETAT DE LA QUETE ───────────────────────────────────────────────── */
 
-/* RIEN EN BASE. La quete ne sauvegarde pas une seule valeur : son etat vit
-   dans ce module et nulle part ailleurs. Elle survit donc a une deconnexion,
-   tant que le monde tourne, et se remet a zero seulement quand le joueur
-   termine (le Saber Expert tombe).
+/* L'ETAPE EST EN BASE, les PLAQUES NON.
+     - cle `s` : le numero d'etape seul (0 a 8). Ecrite a chaque etape, relue
+       au join et a la premiere demande. Elle survit a la deconnexion, au
+       redemarrage du monde et a tout le reste.
+     - les cinq plaques de la jungle ne sont jamais ecrites : elles vivent en
+       memoire et repartent de zero a chaque connexion. Un joueur qui quitte a
+       3/5 retrouve donc 0/5.
+     - fin de quete : la cle est SUPPRIMEE (voir resetQuest), la quete est
+       rejouable telle quelle.
 
-   Apres un redemarrage du monde, la memoire est vide : l'etape est alors
-   DEDUITE DES ITEMS que le joueur porte encore (voir stepFromItems). C'est le
-   seul "sauvegarde" du jeu, et c'est son inventaire, pas notre base. */
+   Filet de securite : si `s` est vide (joueur d'avant cette version), l'etape
+   est deduite des items portes (stepFromItems) — aucun item de quete ne peut
+   etre lache, donc l'inventaire ne ment pas. */
 const quests = {}; // playerId -> { step, buttons }
+
+/* L'etape en base, 0 si la cle n'existe pas encore. */
+function readStepStat(playerId) {
+    let v = 0;
+    try { v = getStat(playerId, DB_STEP, 0); } catch (e) { v = 0; }
+    v = v | 0;
+    return v > S.NONE ? v : S.NONE;
+}
 
 function questOf(playerId) {
     if (!playerId) return null;
@@ -270,16 +288,26 @@ function stepFromItems(playerId) {
 function stepOf(playerId) {
     const q = questOf(playerId);
     if (q) return q.step;
-    /* Pas de memoire (premier passage, ou monde redemarre) : les items
-       parlent. On ne memorise PAS le resultat : une etape deduite ne doit
-       jamais figer la quete, elle sert seulement de point de depart. */
+    /* Pas encore en memoire (premier appel apres un redemarrage du monde) :
+       la base fait foi. On la remet en memoire avec zero plaque. */
+    const saved = readStepStat(playerId);
+    if (saved > S.NONE) {
+        quests[playerId] = { step: saved, buttons: 0 };
+        return saved;
+    }
+    /* Rien en base (joueur d'avant cette version) : les items parlent. On ne
+       memorise PAS le resultat, une etape deduite ne doit jamais figer la
+       quete — elle sert seulement de point de depart. */
     return stepFromItems(playerId);
 }
 
+/* Chaque etape s'ecrit dans la foulee : la base ne peut pas etre en retard sur
+   le jeu, meme si le monde s'arrete juste apres. */
 function setStep(playerId, step) {
     if (!playerId) return;
     const q = questOf(playerId) || (quests[playerId] = { step: 0, buttons: 0 });
     q.step = step;
+    try { setStat(playerId, DB_STEP, step); } catch (e) {}
 }
 
 function buttonsOf(playerId) {
@@ -287,16 +315,19 @@ function buttonsOf(playerId) {
     return q ? q.buttons : 0;
 }
 
+/* Les plaques restent EN MEMOIRE : jamais de setStat ici. */
 function saveButtons(playerId, mask) {
     if (!playerId) return;
     const q = questOf(playerId) || (quests[playerId] = { step: 0, buttons: 0 });
     q.buttons = mask || 0;
 }
 
-/* Remise a zero COMPLETE : l'etape ET les boutons deja presses. */
+/* Remise a zero COMPLETE : la memoire, les plaques, ET la cle en base. C'est
+   ce qui rend la quete rejouable apres une victoire. */
 function resetQuest(playerId) {
     if (!playerId) return false;
     delete quests[playerId];
+    try { deleteStat(playerId, DB_STEP); } catch (e) {}
     return true;
 }
 
@@ -1901,14 +1932,16 @@ export function saberPreventDespawn(mobId) {
 export function saberJoin(playerId) {
     if (!playerId) return false;
     startHousekeeping();
-    /* ON NE REMET RIEN A ZERO : l'etat est reste en memoire pendant la
-       deconnexion, le joueur reprend exactement ou il s'est arrete (etapes,
-       boutons deja presses). S'il revient apres un redemarrage du monde, ses
-       items prennent le relais (stepFromItems).
-       Les deux anciennes cles db des versions precedentes sont effacees ici :
-       ce sont des suppressions, on n'ecrit jamais d'etat de quete. */
-    try { deleteStat(playerId, DB_STEP); } catch (e) {}
-    try { deleteStat(playerId, DB_BUTTONS); } catch (e) {}
+    /* Les deux cles des versions precedentes sont effacees : `sq` (etape) et
+       `sqB` (plaques) ne servent plus a rien, tout tient maintenant dans `s`. */
+    try { deleteStat(playerId, DB_STEP_OLD); } catch (e) {}
+    try { deleteStat(playerId, DB_BUTTONS_OLD); } catch (e) {}
+
+    /* L'ETAPE vient de la base ; les PLAQUES repartent de zero. Un joueur qui
+       a quitte a 3/5 retrouve donc 0/5 au retour, comme demande. */
+    const saved = readStepStat(playerId);
+    if (saved > S.NONE) quests[playerId] = { step: saved, buttons: 0 };
+    else if (questOf(playerId)) questOf(playerId).buttons = 0;
 
     /* La fleche de quete suit l'etape : elle pointe Secret Island tant que la
        chasse est en cours, et disparait des que le joueur a l'or (il doit
@@ -1925,11 +1958,15 @@ export function saberLeave(playerId) {
     clearStructArrow(playerId, "curtain");
     /* Le duel appartient a un joueur : s'il part, on range l'arene. */
     if (saber && saber.fighter === playerId) endSaberFight(null);
-    /* La quete N'EST PAS remise a zero : elle attend son retour. On oublie
-       seulement l'entree d'un joueur qui n'a rien commence, pour ne pas
-       garder une ligne vide par joueur passe. */
+    /* L'etape est deja en base : elle attend son retour. On jette seulement
+       les plaques cliquees — elles ne sont jamais sauvegardees, donc 3/5
+       redevient 0/5 — et l'entree d'un joueur qui n'a rien commence, pour ne
+       pas garder une ligne vide par joueur passe. */
     const q = questOf(playerId);
-    if (q && q.step <= S.NONE && !q.buttons) delete quests[playerId];
+    if (q) {
+        q.buttons = 0;
+        if (q.step <= S.NONE) delete quests[playerId];
+    }
     return true;
 }
 
