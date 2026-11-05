@@ -52,15 +52,21 @@ import { scanAllItems, writeItem } from "./customItem";
 /* ── 1. CONFIGURATION ──────────────────────────────────────────────────── */
 
 const ITEM_TORCH = "Torch";
-/* La Cup est un VRAI seau du jeu, et elle se reconnait UNIQUEMENT a son item
-   d'origine : `Bucket` quand elle est vide, `Water Bucket` quand elle est
-   pleine. Aucun nom affiche n'entre dans une decision : un seau renomme par
-   un Code Block ou par une ancienne version reste un seau, et on n'en pose
-   plus (les items de quete se donnent nus). Le remplissage ne retire jamais
+/* La Cup est un VRAI seau du jeu : `Bucket` quand elle est vide, `Water
+   Bucket` quand elle est pleine. Le nom affiche (`Cup of Water`) et la
+   description ne sont que DECORATIFS : aucune decision ne les lit, sinon un
+   seau renomme par un Code Block ou par une ancienne version deviendrait
+   invisible pour la quete. La regle est donc : on decide sur l'item
+   d'origine, on habille l'item d'origine. Le remplissage ne retire jamais
    l'item pour le redonner : le slot qui tient le seau est reecrit au meme
    endroit (voir fillCup). */
 const ITEM_CUP = "Bucket";
 const ITEM_CUP_FULL = "Water Bucket";
+const CUP_FULL = "Cup of Water";
+const CUP_FULL_ATTRS = {
+    customDisplayName: CUP_FULL,
+    customDescription: "A cup full of fresh water. Someone must be thirsty.",
+};
 /* Gold Grit et Magmaward Fuel sont de VRAIS items du jeu (ajoutes
    recemment) : on les donne par leur nom, sans renommage ni attributs. */
 const ITEM_GOLD = "Gold Grit";
@@ -457,8 +463,20 @@ export function saberClick(playerId, rightClick, x, y, z, blockName, targetId) {
     /* 2. Le rideau du desert (il faut la Torch). */
     if (inClickBox(x, y, z, [612, -904, 1760], [612, -902, 1762])) return burnCurtain(playerId);
 
-    /* 3. L'eau du point de remplissage. */
-    if (dist3([x, y, z], WATER_POINT) <= 4) return fillCup(playerId);
+    /* 3. L'eau du point de remplissage. Deux rayons : l'eau elle-meme, et un
+       plus large qui ne sert qu'a repondre "trop loin" — sans lui, un joueur
+       qui clic a cote ne voyait rien du tout et croyait que son clic etait
+       perdu. */
+    const toWater = dist3([x, y, z], WATER_POINT);
+    /* L'eau elle-meme est acceptee plus loin que le reste : viser la surface
+       ne donne pas la case exacte du point de remplissage, et un joueur sur la
+       rive clique forcement un peu a cote. */
+    const waterBlock = blockName === "Water" || blockName === "Flowing Water";
+    if (toWater <= 5 || (waterBlock && toWater <= 12)) return fillCup(playerId);
+    if (toWater <= 10) {
+        tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You are too far from the water."));
+        return true;
+    }
 
     /* 4. Le mur scelle de la salle de Shanks. */
     if (inClickBox(x, y, z, WALL_MIN, WALL_MAX)) return passWall(playerId);
@@ -541,8 +559,13 @@ function burnCurtain(playerId) {
 /* Rend une Cup pleine la ou il y a de la place (reprise apres une perte :
    mort, filtre d'inventaire). Ce n'est PAS le chemin normal du remplissage. */
 function giveFullCup(playerId) {
-    try { api.giveItem(playerId, ITEM_CUP_FULL, 1); return true; }
-    catch (e) { return false; }
+    try {
+        api.giveItem(playerId, ITEM_CUP_FULL, 1, {
+            customDisplayName: CUP_FULL_ATTRS.customDisplayName,
+            customDescription: CUP_FULL_ATTRS.customDescription,
+        });
+        return true;
+    } catch (e) { return false; }
 }
 
 function fillCup(playerId) {
@@ -556,23 +579,11 @@ function fillCup(playerId) {
     const empty = countOf(playerId, ITEM_CUP);
     const full = countOf(playerId, ITEM_CUP_FULL);
 
-    /* Quete pas encore lancee : l'eau reste de l'eau. On ne remplit rien et on
-       ne fait pas avancer l'etape, mais on repond quand le joueur tient un
-       seau — un clic muet ressemble a un bug. */
-    if (step < S.CURTAIN) {
-        if (empty > 0) {
-            tell(playerId, line("fa-solid fa-circle-info", C.INFO,
-                "The water is clear, but you have no reason to fill that yet."));
-            return true;
-        }
-        return false;
-    }
-
     if (empty === 0) {
         if (full > 0) {
             /* Deja remplie : l'etape suit l'item, pour ne jamais laisser un
                joueur avec une Cup pleine et un Old Man qui a encore soif. */
-            if (step < S.WATER) setStep(playerId, S.WATER);
+            if (step >= S.CURTAIN && step < S.WATER) setStep(playerId, S.WATER);
             tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
             return true;
         }
@@ -587,21 +598,38 @@ function fillCup(playerId) {
             tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
             return true;
         }
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You need a Cup to carry water."));
+        /* Ni seau vide, ni seau plein : le clic est arrive jusqu'ici, c'est
+           donc bien un probleme d'item et pas de detection. On le dit, au lieu
+           de laisser le joueur croire que son clic s'est perdu. */
+        tell(playerId, line("fa-solid fa-circle-info", C.INFO,
+            "You have nothing to collect this water with."));
+        return true;
+    }
+
+    /* Quete pas encore lancee : l'eau reste de l'eau. On ne remplit rien et on
+       ne fait pas avancer l'etape, mais on repond quand le joueur tient un
+       seau — un clic muet ressemble a un bug. */
+    if (step < S.CURTAIN) {
+        tell(playerId, line("fa-solid fa-circle-info", C.INFO,
+            "The water is clear, but you have no reason to fill that yet."));
         return true;
     }
 
     /* REMPLISSAGE SUR PLACE : le slot qui tient le seau vide est reecrit en
-       seau d'eau, au meme endroit et SANS nom affiche — l'item d'origine reste
-       lisible tel quel par toutes les autres verifications (Old Man, etape
-       deduite, blocage du lacher). Aucun removeItem suivi d'un giveItem :
-       l'item ne quitte jamais sa case, donc rien ne peut se dupliquer, et un
-       inventaire plein ne peut pas avaler la Cup.
+       seau d'eau, au meme endroit. On ecrit l'ITEM D'ORIGINE `Water Bucket`
+       (c'est lui qui decide de tout) et on lui pose par-dessus son nom affiche
+       et sa description — du decor, jamais relu par une decision.
+       Aucun removeItem suivi d'un giveItem : l'item ne quitte jamais sa case,
+       donc rien ne peut se dupliquer, et un inventaire plein ne peut pas
+       avaler la Cup.
        Un slot peut contenir plusieurs seaux : on n'en remplit qu'un et on
        rend la pile restante (jamais dupliquee : le slot est d'abord reecrit). */
     const holder = slotsOf(playerId, ITEM_CUP)[0];
     const rest = Math.max(0, (holder.amount | 0) - 1);
-    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1);
+    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1, {
+        customDisplayName: CUP_FULL_ATTRS.customDisplayName,
+        customDescription: CUP_FULL_ATTRS.customDescription,
+    });
     if (!ok) {
         tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
         return true;
@@ -615,8 +643,8 @@ function fillCup(playerId) {
     tell(playerId, [
         { icon: "Water", style: { color: C.MARINE } },
         { str: " You fill the Cup with water: ", style: { color: C.INFO } },
-        { str: ITEM_CUP_FULL, style: { color: C.MARINE, fontWeight: "bold" } },
-        { str: " ready for the Old Man.", style: { color: C.INFO } },
+        { str: CUP_FULL, style: { color: C.MARINE, fontWeight: "bold" } },
+        { str: ".", style: { color: C.INFO } },
     ]);
     return true;
 }
