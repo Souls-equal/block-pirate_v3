@@ -236,12 +236,14 @@ export function saberLockedItem(itemName) {
 
 /* ── 3. ETAT DE LA QUETE (en memoire, pas en db) ───────────────────────── */
 
-/* La quete ne se sauvegarde PAS : l'etat vit dans ce module et disparait
-   quand le joueur quitte, quand il termine (le Saber Expert tombe), et au
-   redemarrage du monde. Consequences assumees :
-     - un joueur qui revient doit refaire les boutons et retrouver une Torch ;
-     - il n'y a aucune migration a maintenir, aucune cle db qui traine.
-   Les deux anciennes cles db sont nettoyees au join (voir saberJoin). */
+/* RIEN EN BASE. La quete ne sauvegarde pas une seule valeur : son etat vit
+   dans ce module et nulle part ailleurs. Elle survit donc a une deconnexion,
+   tant que le monde tourne, et se remet a zero seulement quand le joueur
+   termine (le Saber Expert tombe).
+
+   Apres un redemarrage du monde, la memoire est vide : l'etape est alors
+   DEDUITE DES ITEMS que le joueur porte encore (voir stepFromItems). C'est le
+   seul "sauvegarde" du jeu, et c'est son inventaire, pas notre base. */
 const quests = {}; // playerId -> { step, buttons }
 
 function questOf(playerId) {
@@ -249,9 +251,30 @@ function questOf(playerId) {
     return quests[playerId] || null;
 }
 
+/* L'etape qu'un inventaire prouve a lui seul. Aucun de ces items ne peut etre
+   lache (ils sont dans LOCKED_ITEMS) : les porter signifie forcement etre
+   arrive la.
+     Torch        -> la porte de la jungle a ete ouverte (don derriere elle)
+     Bucket       -> la Cup du rideau (don derriere le rideau)
+     Water Bucket -> la Cup a ete remplie au point d'eau
+     Gold Grit    -> le Mob Leader est tombe
+     Magmaward Fuel -> le Rich Man a paye */
+function stepFromItems(playerId) {
+    if (hasItem(playerId, ITEM_RELIC)) return S.RELIC;
+    if (hasItem(playerId, ITEM_GOLD)) return S.GOLD;
+    if (hasItem(playerId, ITEM_CUP_FULL)) return S.WATER;
+    if (hasItem(playerId, ITEM_TORCH)) return S.DOOR;
+    if (hasItem(playerId, ITEM_CUP)) return S.CURTAIN;
+    return S.NONE;
+}
+
 function stepOf(playerId) {
     const q = questOf(playerId);
-    return q ? q.step : 0;
+    if (q) return q.step;
+    /* Pas de memoire (premier passage, ou monde redemarre) : les items
+       parlent. On ne memorise PAS le resultat : une etape deduite ne doit
+       jamais figer la quete, elle sert seulement de point de depart. */
+    return stepFromItems(playerId);
 }
 
 function setStep(playerId, step) {
@@ -1832,12 +1855,20 @@ export function saberPreventDespawn(mobId) {
 export function saberJoin(playerId) {
     if (!playerId) return false;
     startHousekeeping();
-    /* QUITTER ANNULE LA QUETE : l'etat est en memoire, il n'y a donc jamais
-       rien a relire. On repart d'une quete vierge a chaque connexion.
-       Les deux anciennes cles db (versions precedentes) sont effacees ici. */
-    resetQuest(playerId);
+    /* ON NE REMET RIEN A ZERO : l'etat est reste en memoire pendant la
+       deconnexion, le joueur reprend exactement ou il s'est arrete (etapes,
+       boutons deja presses). S'il revient apres un redemarrage du monde, ses
+       items prennent le relais (stepFromItems).
+       Les deux anciennes cles db des versions precedentes sont effacees ici :
+       ce sont des suppressions, on n'ecrit jamais d'etat de quete. */
     try { deleteStat(playerId, DB_STEP); } catch (e) {}
     try { deleteStat(playerId, DB_BUTTONS); } catch (e) {}
+
+    /* La fleche de quete suit l'etape : elle pointe Secret Island tant que la
+       chasse est en cours, et disparait des que le joueur a l'or (il doit
+       revenir au Rich Man) ou la relique. */
+    if (stepOf(playerId) === S.HUNT) armSecretArrow(playerId);
+    else clearSecretArrow(playerId);
     return true;
 }
 
@@ -1848,8 +1879,11 @@ export function saberLeave(playerId) {
     clearStructArrow(playerId, "curtain");
     /* Le duel appartient a un joueur : s'il part, on range l'arene. */
     if (saber && saber.fighter === playerId) endSaberFight(null);
-    /* Quitter remet la quete a zero (etat en memoire seulement). */
-    resetQuest(playerId);
+    /* La quete N'EST PAS remise a zero : elle attend son retour. On oublie
+       seulement l'entree d'un joueur qui n'a rien commence, pour ne pas
+       garder une ligne vide par joueur passe. */
+    const q = questOf(playerId);
+    if (q && q.step <= S.NONE && !q.buttons) delete quests[playerId];
     return true;
 }
 
