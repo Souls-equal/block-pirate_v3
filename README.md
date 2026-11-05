@@ -1441,52 +1441,68 @@ spawnMobLeader(x, y, z)            // à l'endroit voulu
 spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
 ```
 
+> **Pourquoi il se battait comme un mob ordinaire.** `thinkLeader()` n'avançait que si
+> `leader.aiTarget` était vivant, et cette cible n'était remplie **que** si on passait un `playerId`.
+> Lancé par le Code Block de Secret Island (sans joueur), il n'avait donc **aucune cible** : zéro
+> capacité, juste des coups de poing. Il **choisit maintenant sa cible lui-même** — le joueur le plus
+> proche dans ses 40 blocs (`LEADER.AGGRO`), reprise dès que la cible meurt ou sort de portée — donc
+> il attaque même si on l'invoque à côté de personne et qu'un joueur arrive ensuite.
+
 Un second appel est refusé tant que le premier est vivant. Le **Gold Grit** ne tombe que tant que la
 quête le demande (étapes 5 et 6) : relancer le boss après avoir été payé ne fabrique pas de l'or à
 l'infini.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
-(`20 + 200^1.6 × 8` ≈ 38 500 PV, `3 + 200^1.3 × 0.8` ≈ 786 dégâts par coup). Les deux valeurs se
-retouchent en tête de `saber.js` (`LEADER.LEVEL`) si le combat est trop long ou trop violent.
+(`20 + 200^1.6 × 8` = **38 456 PV**, `3 + 200^1.3 × 0.8` = **787 dégâts par coup**). Les deux valeurs
+se retouchent en tête de `saber.js` (`LEADER.LEVEL`).
 
-Quatre capacités, dont une qui punit vraiment le corps à corps :
+**Ses capacités sont à l'échelle de ce niveau** (`LEADER.HIT`, en multiples d'un coup de corps à
+corps) : une capacité à 90 quand le poing en fait 787 ne se sent pas.
 
-- **ruée** — il fonce et percute ;
-- **volée d'or** — une onde lancée à distance ;
-- **coup de poing au sol** — zone proche, ralentissement ;
-- **le cercle d'or** (`leaderRing`) — un anneau de particules se dessine autour de lui pendant 1,4 s,
-  puis éclate. Qui est encore **dans le rayon** (6,5 blocs) encaisse **un coup de corps à corps de
-  plus** : exactement `leaderDmg()`, les dégâts normaux du mob. Le cercle est visible pendant toute
-  la préparation, donc il s'esquive — reculer de quelques blocs suffit.
+| Capacité | Déclencheur | Ce qu'elle fait |
+| --- | --- | --- |
+| **Gold Ring** | joueur à moins de 9 blocs | un anneau de particules se dessine autour de lui pendant 1,4 s, puis éclate : qui est **dans le rayon** (6,5 blocs) encaisse **un coup de corps à corps complet** (× 1,0) |
+| **Gold Slam** | moins de 7 blocs | anneau qui se resserre au sol pendant 0,6 s, puis projection + ralentissement (× 0,7) |
+| **Gold Shot** | 5 → 26 blocs | une onde d'or lancée en ligne (× 0,45) |
+| **Ruée** | 4 → 20 blocs | il fonce et percute (× 0,55) |
 
-Un second appel est refusé tant que le premier est vivant, et le monde ne peut pas le despawner en
-plein combat.
+Les quatre se préparent **au sol**, jamais dans le chat. Un second appel est refusé tant que le
+premier est vivant, et le monde ne peut pas le despawner en plein combat.
 
 ### Le Saber Expert
 
 Shanks lance le duel **dans l'arène du boss Haki** (`[-87,1014,-80]` → `[165,1014,206]`), pas dans
-une salle inventée : le joueur y est téléporté, le boss posé à 8 blocs, comme Garp. Refus si
-quelqu'un d'autre est déjà dans l'arène.
+une salle inventée : le joueur y est téléporté, le boss posé à 10 blocs. Refus si quelqu'un d'autre
+est déjà dans l'arène.
 
-Il est dur par ses **attaques**, pas par ses chiffres : **4 200 PV** (et non 6 000) et **70** de
-corps à corps, sur le mob `Lord Vulcan`, échelle 1,8. Sept attaques, **une seule à la fois**, et
-jamais deux fois la même d'affilée (`saber.last` : sans cette rotation, la saisie et le coup au sol,
-de portée courte, sortaient en boucle et les autres ne se voyaient jamais).
+C'est un **boss de niveau 200** : mêmes formules que le Mob Leader, donc **38 456 PV** et **787** de
+corps à corps (mob `Lord Vulcan`, échelle 1,9). Sa difficulté ne vient pas de ses chiffres mais de
+ses **neuf attaques**, jouées une seule à la fois.
 
-| Attaque | Portée | Ce qu'elle fait |
-| --- | --- | --- |
-| **Blade Dash** | 3 → 24 | il charge tout droit ; le coup suit le **segment parcouru** (on ne le traverse pas entre deux images), traînée de lames |
-| **Air Slash** | > 4 | **deux ondes indépendantes** qui ne partent pas du même point |
-| **Saber Slam** | < 9 | onde de choc au sol, projection + ralentissement |
-| **Saber Grab** | < 9 | un **fil rouge** part de sa main pendant 0,7 s : rester à moins de 8 blocs = aspiré, frappé, affaibli. Sortir de la portée annule la saisie |
-| **Blade Storm** | < 9,5 | tourbillon de 2,6 s : deux anneaux de lames qui tournent, dégâts toutes les 0,4 s. On ne reste pas collé à lui |
-| **Saber Beam** | 6 → 40 | il vise la position du joueur **à cet instant**, dessine la ligne et la marque au sol pendant 0,9 s, puis frappe cette zone. Bouger suffit |
-| **Blade Tempest** | < 16 | six ondes en étoile — **phase 2 uniquement** |
+**Aucune attaque n'est annoncée dans le chat.** Chacune se prépare **dans le terrain** : la zone qui
+va être frappée est dessinée avec des particules au sol, puis l'impact tombe exactement dedans. Le
+joueur lit le sol, pas les logs.
+
+| Attaque | Portée | Préparation visible | Impact |
+| --- | --- | --- | --- |
+| **Saber Dash** | 5 → 34 | un **couloir** de particules apparaît de lui vers le sol du joueur, avec une flèche qui progresse | il fonce dedans à 34 blocs/s, coupe tout le **segment parcouru** (on ne le traverse pas entre deux images) |
+| **Saber Slam** | < 10 | anneau qui se resserre au sol | projection + ralentissement dans 9 blocs |
+| **Shockwave** | < 26 | un anneau part de lui et **grandit** | tout ce qui est dans la bande de l'anneau est frappé une fois — sortir du cercle suffit |
+| **Saber Beam** | 5 → 44 | une **marque au sol** à l'endroit où le joueur se trouve, deux anneaux qui se rejoignent | une colonne tombe sur la marque — bouger suffit |
+| **Blade Rain** | 4 → 34 | **cinq marques** apparaissent autour du joueur | elles tombent l'une après l'autre, 340 ms d'écart |
+| **Blade Storm** | < 10,5 | deux anneaux de lames tournent autour de lui pendant 2,6 s | dégâts par vagues toutes les 0,4 s — on ne reste pas collé |
+| **Saber Chain** | < 13 | un **fil rouge** part de sa main vers le joueur, en direct | à la fin du délai, si le joueur est encore à 12 blocs : aspiré, frappé, affaibli. Sortir annule |
+| **Air Slash** | 4 → 32 | — | deux ondes qui ne partent pas du même point |
+| **Blade Tempest** | < 18 | anneau au sol | six ondes en étoile — **phase 2 uniquement** |
 
 À 50 % de vie, **phase 2** : nametag rouge, vitesse augmentée, délais raccourcis et `BLADE TEMPEST`
-débloquée. Toutes les valeurs (PV, dégâts, délais, rayons) sont en tête de `saber.js`, dans `SABER`.
-Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone et de protection PvP
-respectées) et non par un `applyHealthChange` brut.
+débloquée — là encore, uniquement du visuel, aucun message.
+
+La rotation joue **l'attaque qui n'a pas servi depuis le plus longtemps** (`saber.used`) en évitant
+de répéter la même deux fois de suite : sans ça, les deux premières de la liste sortaient en boucle
+et les autres ne se voyaient jamais. Toutes les valeurs (niveau, dégâts, délais, rayons) sont en tête
+de `saber.js`, dans `SABER`. Les dégâts passent par `combat.damage()` (donc gardes d'équipe, de zone
+et de protection PvP respectées) et non par un `applyHealthChange` brut.
 
 ### Secret Island (`2693,-911,-127`)
 
