@@ -1351,16 +1351,35 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 trois PNJ, le Mob Leader et le Saber Expert. Un seul fichier, parce que la limite des 30 fichiers du
 World Code ne laisse pas de place à un second.
 
-### L'état de la quête ne se sauvegarde pas
+### Reprendre une quête en cours, sans rien écrire en base
 
-La progression vit **en mémoire**, dans `saber.js` (`quests[playerId]`), et se **remet à zéro** :
+**Aucune valeur de quête n'est écrite dans la base du joueur.** La progression vit en mémoire, dans
+`saber.js` (`quests[playerId]`), avec l'étape et les boutons déjà pressés.
 
-- **quand le joueur quitte** (déconnexion) — il n'y a donc rien à relire au retour, et rien à migrer ;
-- **quand il termine la quête**, c'est-à-dire quand le Saber Expert tombe : l'étape *et* les boutons
-  repartent de zéro, la quête est rejouable telle quelle.
+**Une déconnexion n'efface rien.** Le module World Code continue de tourner, donc l'entrée du joueur
+l'attend : au retour il reprend **exactement** où il s'est arrêté (même étape, mêmes boutons déjà
+pressés), et sa flèche de quête est reposée si la chasse est en cours. Il n'y a qu'un cas où
+l'entrée est oubliée : un joueur qui n'a **rien** commencé (étape 0, aucun bouton), pour ne pas garder
+une ligne vide par joueur passé.
 
-Conséquence assumée : un redémarrage du monde efface aussi la progression. Les deux anciennes clés db
-(`sq`, `sqB`) sont supprimées au join pour ne pas laisser de vieux reste chez les joueurs existants.
+**Après un redémarrage du monde**, la mémoire est vide : l'étape est alors **déduite des items que le
+joueur porte encore** (`stepFromItems`), puisqu'aucun des items de quête ne peut être lâché :
+
+| Item porté | Étape déduite | Ce que ça débloque |
+| --- | --- | --- |
+| `Torch` | la porte de la jungle est ouverte | brûler le rideau |
+| `Bucket` | la Cup du rideau a été récupérée | remplir la Cup au point d'eau |
+| `Water Bucket` | la Cup est remplie | l'Old Man boit |
+| `Gold Grit` | le Mob Leader est tombé | le Rich Man paie |
+| `Magmaward Fuel` | le Rich Man a payé | le mur scellé |
+
+Cette étape déduite n'est **pas mémorisée** : elle sert de point de départ, elle ne fige jamais la
+quête. Conséquence honnête : ce qui a été consommé et ne laisse pas d'item (avoir fait boire l'Old
+Man, avoir brûlé le rideau) est à refaire après un redémarrage — c'est le prix du « zéro db ».
+
+Seule la **fin de quête** remet l'état à zéro (étape *et* boutons), quand le Saber Expert tombe : la
+quête est rejouable telle quelle. Les deux anciennes clés db (`sq`, `sqB`) sont supprimées au join —
+ce sont des suppressions, jamais des écritures.
 
 | Étape | Zone | Ce qui se passe |
 | --- | --- | --- |
