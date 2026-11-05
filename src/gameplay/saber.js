@@ -768,7 +768,13 @@ const LEADER = {
     SCALE: 1.6,
     SPEED: 5,
     CD: { rush: 7000, volley: 5000, shake: 6000, ring: 9000 },
-    DMG: { rush: 90, volley: 70, shake: 120 },
+    /* Portee a laquelle il prend quelqu'un en chasse tout seul (son
+       hostilityRadius est du meme ordre). */
+    AGGRO: 40,
+    /* Ses capacites sont a l'echelle de son niveau (multiples d'un coup de
+       corps a corps), pas des petits chiffres fixes : une capacite qui fait
+       90 quand le poing en fait 787 ne se sent pas. */
+    HIT: { rush: 0.55, volley: 0.45, shake: 0.7 },
     /* LE CERCLE D'OR : un anneau de particules se dessine autour du mob (il
        reste visible pendant toute la preparation), puis il eclate. Prendre
        l'eclat quand on est dedans coute UN coup de corps a corps du mob en
@@ -782,6 +788,7 @@ const LEADER = {
    arbitraire. Les deux valeurs se retouchent ici si besoin. */
 function leaderHp() { return Math.round(20 + Math.pow(LEADER.LEVEL, 1.6) * 8); }
 function leaderDmg() { return Math.round(3 + Math.pow(LEADER.LEVEL, 1.3) * 0.8); }
+function leaderHit(key) { return Math.round(leaderDmg() * (LEADER.HIT[key] || 0.5)); }
 
 let leader = null; // { id, handle, cds, rushUntil, rushHit, waves }
 
@@ -828,8 +835,12 @@ export function spawnMobLeader(x, y, z, playerId) {
         api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
             nameTag(LEADER.NAME, LEADER.TITLE, "#FFD166"), true);
     } catch (e) {}
-    if (playerId) {
-        try { api.setMobAiState(id, "chasing", { targetId: playerId }); } catch (e) {}
+    /* Il se choisit une cible tout seul des le spawn : sans joueur en
+       parametre (Code Block de Secret Island), il restait sans cible et
+       n'attaquait donc jamais avec ses capacites. */
+    const firstTarget = playerId || nearestPlayerTo(spot, LEADER.AGGRO);
+    if (firstTarget) {
+        try { api.setMobAiState(id, "chasing", { targetId: firstTarget }); } catch (e) {}
     }
     soundAt(spot, "ominousBellHit", 1, 0.8, 40);
 
@@ -840,7 +851,8 @@ export function spawnMobLeader(x, y, z, playerId) {
         rushHit: {},
         waves: [],
         ring: null,
-        aiTarget: playerId || null,
+        shake: null,
+        aiTarget: firstTarget || null,
     };
     if (!leaderTimer) leaderTimer = every(thinkLeader, 4);
     return id;
@@ -861,6 +873,7 @@ function thinkLeader() {
 
     advanceWaves(leader.waves, leader.id);
     advanceLeaderRing(leader.id, p);
+    tickLeaderShake(p);
 
     if (nowMs() < leader.rushUntil) {
         const ids = getAlivePlayerIds();
@@ -870,14 +883,23 @@ function thinkLeader() {
             const tp = safePosition(t);
             if (!tp || dist3(tp, p) > 3.2) continue;
             leader.rushHit[t] = 1;
-            damage(t, LEADER.DMG.rush, leader.id, "Mob Leader");
+            damage(t, leaderHit("rush"), leader.id, "Mob Leader");
             const dir = norm3([tp[0] - p[0], 0.4, tp[2] - p[2]]);
             impulse(t, dir[0] * 9, 4, dir[2] * 9);
         }
     }
 
-    const target = leader.aiTarget && alive(leader.aiTarget) ? leader.aiTarget : null;
+    /* CIBLE : on garde la cible courante si elle est vivante et encore a
+       portee, sinon on prend le joueur le plus proche. C'est ce qui fait la
+       difference entre "un mob qui marche" et "un boss qui attaque". */
+    let target = leader.aiTarget && alive(leader.aiTarget) ? leader.aiTarget : null;
+    if (target) {
+        const cp = safePosition(target);
+        if (!cp || dist3(cp, p) > LEADER.AGGRO) target = null;
+    }
+    if (!target) target = nearestPlayerTo(p, LEADER.AGGRO);
     if (!target) return;
+    leader.aiTarget = target;
     const tp = safePosition(target);
     if (!tp) return;
     const d = dist3(p, tp);
@@ -899,13 +921,30 @@ function leaderRush(p, tp) {
     soundAt(p, "bearRoar1", 1, 1.3, 35);
 }
 
+/* La frappe au sol : meme principe que le boss, un anneau se resserre sur le
+   sol pendant 0,6 s, puis tout ce qui est dedans est projete et ralenti. */
 function leaderShake(p) {
     leader.cds.shake = nowMs() + LEADER.CD.shake;
-    hitArea(p, 5.5, leader.id, "Mob Leader", LEADER.DMG.shake, {
+    leader.shake = { until: nowMs() + 600, at: [p[0], p[1], p[2]], radius: 6 };
+    soundAt(p, "ominousBellHit", 1, 0.7, 35);
+}
+
+function tickLeaderShake(p) {
+    const sh = leader ? leader.shake : null;
+    if (!sh) return;
+    const now = nowMs();
+    const left = Math.max(0, sh.until - now) / 600;
+    ring([sh.at[0], sh.at[1] + 0.12, sh.at[2]], sh.radius * (0.4 + 0.6 * left), 16, {
+        tex: TEX.crit, r: 0.11, size: [0.24, 0.42], life: [0.16, 0.34],
+        colors: [rgba(255, 210, 80), rgba(120, 60, 0, 0)],
+    }, now / 130);
+    if (now < sh.until) return;
+    leader.shake = null;
+    hitArea([sh.at[0], sh.at[1] + 0.4, sh.at[2]], sh.radius, leader.id, "Gold Slam", leaderHit("shake"), {
         knock: 10, lift: 5, slow: [1200, 2],
     });
-    boom([p[0], p[1], p[2]], 3, { tex: TEX.crit, colors: [rgba(255, 200, 60), rgba(90, 60, 0, 0)] });
-    soundAt(p, "ominousBellHit", 1, 0.7, 35);
+    boom([sh.at[0], sh.at[1], sh.at[2]], 3.5, { tex: TEX.crit, count: 60, colors: [rgba(255, 200, 60), rgba(90, 60, 0, 0)] });
+    soundAt(sh.at, "glass1", 1, 0.7, 40);
 }
 
 /* Le cercle : preparation visible, puis eclat. Les degats sont exactement
@@ -958,10 +997,27 @@ function advanceLeaderRing(id, p) {
     leader.ring = null;
 }
 
+/* Le joueur le plus proche dans un rayon. Indispensable : un Mob Leader lance
+   par un Code Block sans joueur (le cas de Secret Island) n'avait AUCUNE
+   cible, donc il ne declenchait jamais la moindre attaque et se battait comme
+   un mob ordinaire. */
+function nearestPlayerTo(p, radius) {
+    const ids = getAlivePlayerIds();
+    let best = null, bestD = radius * radius;
+    for (let i = 0; i < ids.length; i++) {
+        const tp = safePosition(ids[i]);
+        if (!tp) continue;
+        const dx = tp[0] - p[0], dy = tp[1] - p[1], dz = tp[2] - p[2];
+        const d2 = dx * dx + dy * dy * 4 + dz * dz;
+        if (d2 < bestD) { bestD = d2; best = ids[i]; }
+    }
+    return best;
+}
+
 function leaderVolley(p, tp) {
     leader.cds.volley = nowMs() + LEADER.CD.volley;
     const dir = norm3([tp[0] - p[0], 0.15, tp[2] - p[2]]);
-    spawnWave(leader.waves, [p[0], p[1] + 1.1, p[2]], dir, 26, 1.2, LEADER.DMG.volley, "Gold Shot");
+    spawnWave(leader.waves, [p[0], p[1] + 1.1, p[2]], dir, 26, 1.2, leaderHit("volley"), "Gold Shot");
     soundAt(p, "cannonFire3", 0.8, 1.4, 35);
 }
 
@@ -971,35 +1027,52 @@ function leaderVolley(p, tp) {
    monde, on ne lui en invente pas une seconde. */
 const ARENA = { a: [-87, 1014, -80], b: [165, 1014, 206] };
 
-/* Le Saber Expert n'est plus "beaucoup de PV et de gros chiffres" : il a
-   MOINS de PV (4200 au lieu de 6000) et frappe moins fort au corps a corps
-   (70), mais il joue SEPT attaques qui demandent une reaction :
-     charge (dash)   - trainee de lames, on esquive sur le cote ;
-     entaille double - deux ondes qui ne partent pas du meme point ;
-     coup au sol     - zone proche, ralentit ;
-     saisie (grab)   - il te tire a lui, telegraphie par un fil rouge ;
-     tempete         - six ondes en cercle, phase 2 ;
-     tourbillon      - cercle de lames autour de lui, ticks de degats ;
-     rayon           - vise la position du joueur, telegraphie au sol.
-   Chaque valeur se retouche ici. */
+/* ── niveau 200 : memes formules que gameplay/spawning.js ───────────────── */
+function mobHp(level) { return Math.round(20 + Math.pow(level, 1.6) * 8); }
+function mobDmg(level) { return Math.round(3 + Math.pow(level, 1.3) * 0.8); }
+
+/* LE SABER EXPERT EST UN BOSS, PAS UN DUELISTE.
+   Il a les statistiques d'un mob de NIVEAU 200 (memes formules que le Mob
+   Leader : ~38 500 PV, ~786 de corps a corps), et neuf attaques qui, toutes,
+   DESSINENT leur zone avant de frapper.
+
+   Aucune de ses attaques ne previent dans le chat : la preparation est une
+   animation au sol (couloir, cercle, anneau, marque), puis l'impact tombe
+   exactement dans la zone dessinee. Le joueur lit le terrain, pas les logs. */
 const SABER = {
     MOB: "Lord Vulcan",
     NAME: "SABER EXPERT",
-    TITLE: "Guardian of the Ancient Blade",
-    HP: 4200,
-    SCALE: 1.8,
-    SPEED: 6.4,
-    MELEE: 70,
-    RUSH_SPEED: 20,
-    DMG: { rush: 120, slash: 110, slam: 150, grab: 170, tempest: 90, storm: 40, beam: 200 },
-    CD: { rush: 6000, slash: 4200, slam: 5000, grab: 6500, tempest: 8000, storm: 10000, beam: 7000 },
-    DASH_MS: 750,
-    STORM: { MS: 2600, TICK: 400, RADIUS: 4.5 },
-    BEAM: { WARN: 900, RADIUS: 2.6 },
-    GRAB: { WARN: 700 },
+    TITLE: "Level 200 - Guardian of the Ancient Blade",
+    LEVEL: 200,
+    SCALE: 1.9,
+    SPEED: 6.2,
+    DASH_SPEED: 34,
+    BG: "#E8B4A0",
+    /* Degats = multiples d'un coup de corps a corps de niveau 200. */
+    HIT: {
+        dash: 1.0, slam: 0.9, quake: 0.7, beam: 1.3, rain: 0.55,
+        storm: 0.12, grab: 1.1, tempest: 0.45, slash: 0.8,
+    },
+    CD: {
+        dash: 7000, slam: 6500, quake: 9000, beam: 5500, rain: 12000,
+        storm: 12000, grab: 8000, tempest: 9000, slash: 4500,
+    },
+    WARN: { dash: 900, slam: 750, beam: 900, grab: 700 },
+    DASH: { MS: 800, LEN_MAX: 34, WIDTH: 3.2 },
+    STORM: { MS: 2600, TICK: 400, RADIUS: 5.5 },
+    QUAKE: { SPEED: 13, MAX: 26, BAND: 1.8 },
+    BEAM: { RADIUS: 2.8 },
+    RAIN: { COUNT: 5, RADIUS: 2.6, STEP: 340 },
 };
 
-let saber = null; // { id, fighter, hp0, enraged, cds, waves, rushUntil, rushHit, aiTarget }
+function saberHp() { return mobHp(SABER.LEVEL); }
+function saberDmg() { return mobDmg(SABER.LEVEL); }
+function hitFor(key) { return Math.round(saberDmg() * (SABER.HIT[key] || 0.5)); }
+
+export function saberHpForTest() { return saberHp(); }
+export function saberDmgForTest() { return saberDmg(); }
+
+let saber = null; // voir startSaberFight pour la forme exacte
 let saberTimer = null;
 
 function nameTag(title, subtitle, color) {
@@ -1047,6 +1120,67 @@ function despawnIfAlive(id) {
     try { if (alive(id)) api.despawnMob(id); } catch (e) {}
 }
 
+/* ── 9 bis. DESSINER UNE ZONE (la telegraphie du boss) ─────────────────── */
+
+const WARN_A = rgba(232, 180, 160);
+const WARN_B = rgba(140, 30, 20, 0);
+const HOT_A = rgba(255, 120, 80);
+const HOT_B = rgba(90, 0, 0, 0);
+
+/* Un anneau au sol. `count` suit le rayon pour que les points ne s'espacent
+   pas quand la zone grandit. */
+function groundRing(c, radius, colorA, colorB, spin) {
+    const n = Math.max(10, Math.round(radius * 5));
+    ring([c[0], c[1] + 0.12, c[2]], radius, n, {
+        tex: TEX.crit,
+        r: 0.1,
+        size: [0.26, 0.46],
+        life: [0.18, 0.38],
+        colors: [colorA || WARN_A, colorB || WARN_B],
+    }, spin || 0);
+}
+
+/* Un couloir : les deux bords + des barres transversales. C'est la zone
+   exacte que la charge va balayer. */
+function groundCorridor(a, b, width, colorA, colorB) {
+    const dx = b[0] - a[0], dz = b[2] - a[2];
+    const len = Math.sqrt(dx * dx + dz * dz) || 1;
+    const px = -dz / len, pz = dx / len;
+    const y = a[1] + 0.12;
+    const steps = Math.max(4, Math.min(40, Math.round(len / 1.6)));
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = a[0] + dx * t, z = a[2] + dz * t;
+        point([x + px * width, y, z + pz * width], { tex: TEX.crit, count: 1, r: 0.1, size: [0.22, 0.4], life: [0.16, 0.32], colors: [colorA || WARN_A, colorB || WARN_B] });
+        point([x - px * width, y, z - pz * width], { tex: TEX.crit, count: 1, r: 0.1, size: [0.22, 0.4], life: [0.16, 0.32], colors: [colorA || WARN_A, colorB || WARN_B] });
+        if (i % 3 === 0) point([x, y, z], { tex: TEX.glint, count: 1, r: 0.07, size: [0.16, 0.3], life: [0.12, 0.26], colors: [colorA || WARN_A, colorB || WARN_B] });
+    }
+}
+
+/* Un disque marque au sol : deux anneaux + une croix. */
+function groundMark(c, radius, colorA, colorB, spin) {
+    groundRing(c, radius, colorA, colorB, spin || 0);
+    groundRing(c, radius * 0.55, colorA, colorB, -(spin || 0));
+    point([c[0], c[1] + 0.12, c[2]], { tex: TEX.crit, count: 4, r: 0.14, size: [0.3, 0.5], life: [0.2, 0.4], colors: [colorA || WARN_A, colorB || WARN_B] });
+}
+
+/* Une colonne verticale, pour l'impact du rayon. */
+function pillar(c, height, colorA, colorB) {
+    const n = Math.max(6, Math.round(height * 2));
+    for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const rad = Math.sin(t * Math.PI) * 0.5;
+        point([c[0] + Math.cos(i * 2.4) * rad, c[1] + height * t, c[2] + Math.sin(i * 2.4) * rad], {
+            tex: TEX.glint, count: 2, r: 0.12, size: [0.3, 0.55], life: [0.16, 0.34],
+            colors: [colorA || HOT_A, colorB || HOT_B],
+        });
+    }
+}
+
+function saberColor() { return saber && saber.enraged ? "#FF4D4D" : SABER.BG; }
+
+/* ── 9 ter. LA BOUCLE ──────────────────────────────────────────────────── */
+
 function startSaberFight(playerId) {
     if (saber && alive(saber.id)) {
         tell(playerId, line("fa-solid fa-swords", C.DANGER,
@@ -1062,14 +1196,13 @@ function startSaberFight(playerId) {
             return false;
         }
     }
-    /* Personne sur place : on nettoie les mobs errants de l'arene. */
     if (inArena.length === 0) clearArenaMobs();
 
     const landing = arenaSpot();
     try { api.setPosition(playerId, landing[0], landing[1], landing[2]); } catch (e) {}
     const p = safePosition(playerId) || landing;
     const angle = Math.random() * Math.PI * 2;
-    const spot = clearSpot([p[0] + Math.cos(angle) * 8, p[1], p[2] + Math.sin(angle) * 8]);
+    const spot = clearSpot([p[0] + Math.cos(angle) * 10, p[1], p[2] + Math.sin(angle) * 10]);
 
     let id = null;
     try {
@@ -1083,10 +1216,11 @@ function startSaberFight(playerId) {
         return false;
     }
 
+    const hp = saberHp();
     try {
-        api.setMobSetting(id, "maxHealth", SABER.HP);
-        api.setHealth(id, SABER.HP, undefined, true);
-        api.setMobSetting(id, "attackDamage", SABER.MELEE);
+        api.setMobSetting(id, "maxHealth", hp);
+        api.setHealth(id, hp, undefined, true);
+        api.setMobSetting(id, "attackDamage", saberDmg());
         api.setMobSetting(id, "hostilityRadius", 48);
         api.setMobSetting(id, "chaseRadius", 48);
         api.setMobSetting(id, "territoryRadius", 48);
@@ -1096,35 +1230,41 @@ function startSaberFight(playerId) {
         api.setMobSetting(id, "knockbackReceivedMultiplier", 0);
         api.setLifeformScale(id, SABER.SCALE);
         api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
-            nameTag(SABER.NAME, SABER.TITLE, "#E8B4A0"), true);
+            nameTag(SABER.NAME, SABER.TITLE, SABER.BG), true);
         api.setMobAiState(id, "chasing", { targetId: playerId });
     } catch (e) {}
 
     saber = {
         id: id,
         fighter: playerId,
-        hp0: SABER.HP,
+        hp0: hp,
         enraged: false,
+        last: null,
         cds: {
-            rush: nowMs() + 2500, slash: nowMs() + 1500, slam: 0, grab: 0,
-            tempest: 0, storm: 0, beam: 0,
+            dash: nowMs() + 2500, slam: nowMs() + 4000, quake: nowMs() + 6000,
+            beam: nowMs() + 3000, rain: nowMs() + 9000, storm: nowMs() + 7000,
+            grab: nowMs() + 5000, tempest: 0, slash: nowMs() + 1500,
         },
         waves: [],
-        rushUntil: 0,
-        rushHit: {},
+        cast: null,
+        used: {},
         storm: null,
-        beam: null,
+        quake: null,
+        rain: null,
         grab: null,
-        last: null,
+        dashUntil: 0,
+        dashFrom: null,
+        dashHit: {},
         aiTarget: playerId,
     };
     if (saberTimer) saberTimer.stop();
     saberTimer = every(thinkSaber, 4);
 
     soundAt(spot, "ominousBellHit", 1, 0.6, 45);
+    groundRing(spot, 4, HOT_A, HOT_B);
     tell(playerId, [
-        { icon: "fa-solid fa-swords", style: { color: "#E8B4A0" } },
-        { str: " SABER EXPERT", style: { color: "#E8B4A0", fontWeight: "bold" } },
+        { icon: "fa-solid fa-swords", style: { color: SABER.BG } },
+        { str: " SABER EXPERT", style: { color: SABER.BG, fontWeight: "bold" } },
         { str: ": \"Then draw your steel.\"", style: { color: C.INFO } },
     ]);
     return true;
@@ -1150,14 +1290,14 @@ function thinkSaber() {
     if (!p) { despawnIfAlive(saber.id); stopSaber(); return; }
 
     advanceWaves(saber.waves, saber.id);
-    /* Les quatre attaques "a preparation" se suivent ici : elles dessinent
-       leur zone d'abord, puis frappent. Une attaque a la fois. */
     tickSaberDash(p);
+    tickSaberCast(p);
     tickSaberStorm(p);
-    tickSaberBeam(p);
+    tickSaberQuake(p);
+    tickSaberRain(p);
     tickSaberGrab(p);
 
-    let target = saber.fighter && alive(saber.fighter) ? saber.fighter : null;
+    const target = saber.fighter && alive(saber.fighter) ? saber.fighter : null;
     if (!target) { endSaberFight("Your duel ended: the arena is empty."); return; }
     const tp = safePosition(target);
     if (!tp) { endSaberFight("Your duel ended: the arena is empty."); return; }
@@ -1166,38 +1306,34 @@ function thinkSaber() {
 
     const d = dist3(p, tp);
     const now = nowMs();
-
-    /* Aucune attaque ne se superpose a une autre. */
     if (saberBusy(now)) return;
 
-    /* ROTATION : on liste ce qui est disponible a cette distance, puis on
-       ecarte la derniere attaque jouee. Sans ca, la saisie et le coup au sol
-       (portee courte, delai court) sortaient en boucle et les autres
-       attaques ne se voyaient jamais. */
+    /* ROTATION : tout ce qui est disponible a cette distance, moins la
+       derniere attaque jouee. Les portees sont larges parce que chaque
+       attaque se prepare : le boss a le temps de la lancer. */
     const ready = [];
-    if (now >= saber.cds.grab && d < 9) ready.push("grab");
-    if (now >= saber.cds.slam && d < 9) ready.push("slam");
-    if (now >= saber.cds.beam && d > 6 && d < 40) ready.push("beam");
-    if (saber.enraged && now >= saber.cds.tempest && d < 16) ready.push("tempest");
+    if (now >= saber.cds.dash && d > 5 && d < SABER.DASH.LEN_MAX) ready.push("dash");
+    if (now >= saber.cds.slam && d < 10) ready.push("slam");
+    if (now >= saber.cds.quake && d < SABER.QUAKE.MAX) ready.push("quake");
+    if (now >= saber.cds.beam && d > 5 && d < 44) ready.push("beam");
+    if (now >= saber.cds.rain && d > 4 && d < 34) ready.push("rain");
     if (now >= saber.cds.storm && d < SABER.STORM.RADIUS + 5) ready.push("storm");
-    if (now >= saber.cds.slash && d > 4) ready.push("slash");
-    if (now >= saber.cds.rush && d > 3 && d < 24) ready.push("rush");
+    if (now >= saber.cds.grab && d < 13) ready.push("grab");
+    if (saber.enraged && now >= saber.cds.tempest && d < 18) ready.push("tempest");
+    if (now >= saber.cds.slash && d > 4 && d < 32) ready.push("slash");
 
-    let pick = null;
+    /* On joue celle qui n'a pas servi depuis le plus longtemps : c'est ce qui
+       garantit que TOUTES les attaques passent, et pas seulement les deux
+       premieres de la liste. `saber.last` evite juste de repeter la meme
+       deux fois de suite. */
+    let pick = null, pickAge = -1;
     for (let i = 0; i < ready.length; i++) {
-        if (ready[i] !== saber.last) { pick = ready[i]; break; }
+        const age = now - (saber.used[ready[i]] || 0);
+        if (ready[i] === saber.last) continue;
+        if (age > pickAge) { pickAge = age; pick = ready[i]; }
     }
     if (!pick && ready.length) pick = ready[0];
-    if (pick) {
-        if (pick === "grab") saberGrab(p, tp);
-        else if (pick === "slam") saberSlam(p);
-        else if (pick === "beam") saberBeam(p, tp);
-        else if (pick === "tempest") saberTempest(p);
-        else if (pick === "storm") saberStorm(p);
-        else if (pick === "slash") saberSlash(p, tp);
-        else saberRush(p, tp);
-        return;
-    }
+    if (pick) { castSaber(pick, p, tp); return; }
 
     if (saber.aiTarget !== target) {
         try { api.setMobAiState(saber.id, "chasing", { targetId: target }); } catch (e) {}
@@ -1206,14 +1342,30 @@ function thinkSaber() {
 }
 
 function saberBusy(now) {
-    if (now < saber.rushUntil) return true;
-    if (saber.storm && now < saber.storm.until) return true;
-    if (saber.beam) return true;
+    if (saber.cast) return true;
+    if (saber.storm) return true;
+    if (saber.quake) return true;
+    if (saber.rain) return true;
     if (saber.grab) return true;
+    if (now < saber.dashUntil) return true;
     return false;
 }
 
-/* Phase 2 : le boss accelere et raccourcit tous ses delais. */
+function castSaber(kind, p, tp) {
+    saber.last = kind;
+    saber.used[kind] = nowMs();
+    if (kind === "dash") saberDash(p, tp);
+    else if (kind === "slam") saberSlam(p);
+    else if (kind === "quake") saberQuake(p);
+    else if (kind === "beam") saberBeam(p, tp);
+    else if (kind === "rain") saberRain(p, tp);
+    else if (kind === "storm") saberStorm(p);
+    else if (kind === "grab") saberGrab(p);
+    else if (kind === "tempest") saberTempest(p);
+    else saberSlash(p, tp);
+}
+
+/* Phase 2 : plus rapide, plus rouge. Uniquement du visuel. */
 function enrage() {
     saber.enraged = true;
     for (const k in saber.cds) saber.cds[k] = Math.min(saber.cds[k], nowMs() + 1200);
@@ -1224,94 +1376,247 @@ function enrage() {
             nameTag(SABER.NAME + " [ENRAGED]", SABER.TITLE, "#FF4D4D"), true);
     } catch (e) {}
     const p = safePosition(saber.id);
-    if (p) {
-        boom(p, 4, { tex: TEX.effect, colors: [rgba(255, 60, 40), rgba(60, 0, 0, 0)] });
-        soundAt(p, "bearRoar1", 1, 0.9, 50);
-    }
-    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-fire", C.DANGER, "The Saber Expert is enraged!"));
+    if (!p) return;
+    boom(p, 5, { tex: TEX.effect, count: 120, colors: [rgba(255, 60, 40), rgba(60, 0, 0, 0)] });
+    groundRing(p, 9, HOT_A, HOT_B);
+    groundRing(p, 6, HOT_A, HOT_B, 1);
+    soundAt(p, "bearRoar1", 1, 0.85, 60);
 }
 
-/* LA CHARGE (dash) : il part tout droit, laisse une trainee de lames et
-   coupe tous ceux qu'il traverse. On l'esquive sur le cote - pas en reculant,
-   il va plus vite que le joueur. */
-function saberRush(p, tp) {
-    saber.last = "rush";
-    saber.cds.rush = nowMs() + SABER.CD.rush * (saber.enraged ? 0.75 : 1);
-    saber.rushUntil = nowMs() + SABER.DASH_MS;
-    saber.rushHit = {};
-    saber.dashFrom = [p[0], p[1], p[2]];
-    const dir = norm3([tp[0] - p[0], 0, tp[2] - p[2]]);
-    setVel(saber.id, dir[0] * SABER.RUSH_SPEED, 3, dir[2] * SABER.RUSH_SPEED);
-    try { api.setEntityHeading(saber.id, Math.atan2(dir[0], dir[2])); } catch (e) {}
-    soundAt(p, "bearRoar1", 1, 1.35, 45);
+/* ══ LES ATTAQUES ═════════════════════════════════════════════════════════
+   Chacune : une preparation dessinee, puis l'impact dans la zone dessinee. */
+
+/* 1. CHARGE GEANTE. Un couloir de particules apparait de lui jusqu'au sol
+   ou se trouve le joueur, avec une fleche qui avance. A la fin de la
+   preparation il fonce DANS ce couloir, coupe tout ce qu'il traverse et
+   termine par une onde de choc. On esquive sur le cote, jamais en reculant. */
+function saberDash(p, tp) {
+    saber.cds.dash = nowMs() + SABER.CD.dash * (saber.enraged ? 0.8 : 1);
+    const dx = tp[0] - p[0], dz = tp[2] - p[2];
+    const len = Math.min(SABER.DASH.LEN_MAX, Math.sqrt(dx * dx + dz * dz) + 4);
+    const d = norm3([dx, 0, dz]);
+    saber.cast = {
+        kind: "dash",
+        until: nowMs() + SABER.WARN.dash,
+        from: [p[0], p[1], p[2]],
+        dir: [d[0], 0, d[2]],
+        len: len,
+        to: [p[0] + d[0] * len, p[1], p[2] + d[2] * len],
+    };
+    soundAt(p, "bearRoar1", 1, 1.25, 45);
+}
+
+function drawDashCast(c, now) {
+    const t = 1 - Math.max(0, c.until - now) / SABER.WARN.dash;
+    groundCorridor(c.from, c.to, SABER.DASH.WIDTH, WARN_A, WARN_B);
+    /* la fleche qui progresse : elle montre ou il sera dans un instant */
+    const lead = [c.from[0] + (c.to[0] - c.from[0]) * Math.min(1, t * 1.15),
+        c.from[1], c.from[2] + (c.to[2] - c.from[2]) * Math.min(1, t * 1.15)];
+    groundMark(lead, 1.4, HOT_A, HOT_B, now / 120);
+}
+
+function startDash(c) {
+    saber.dashUntil = nowMs() + SABER.DASH.MS;
+    saber.dashHit = {};
+    saber.dashFrom = [c.from[0], c.from[1], c.from[2]];
+    setVel(saber.id, c.dir[0] * SABER.DASH_SPEED, 2.5, c.dir[2] * SABER.DASH_SPEED);
+    try { api.setEntityHeading(saber.id, Math.atan2(c.dir[0], c.dir[2])); } catch (e) {}
+    soundAt(c.from, "bearRoar1", 1, 1.4, 55);
 }
 
 function tickSaberDash(p) {
     const prev = saber.dashFrom;
     saber.dashFrom = [p[0], p[1], p[2]];
     const now = nowMs();
-    if (now >= saber.rushUntil) return;
-
-    /* trainee : deux lames fantomes derriere lui */
-    point([p[0], p[1] + 1, p[2]], {
-        tex: TEX.glint, count: 4, r: 0.14,
-        size: [0.3, 0.55], life: [0.15, 0.32],
-        colors: [rgba(232, 180, 160), rgba(140, 40, 30, 0)],
-    });
+    if (now >= saber.dashUntil) return;
     if (!prev) return;
 
-    /* Le coup suit le SEGMENT parcouru entre deux passages : on ne peut pas
-       le traverser entre deux images. */
+    point([p[0], p[1] + 1, p[2]], { tex: TEX.glint, count: 5, r: 0.14, size: [0.32, 0.6], life: [0.14, 0.3], colors: [WARN_A, WARN_B] });
+
     const ids = getAlivePlayerIds();
     for (let i = 0; i < ids.length; i++) {
         const t = ids[i];
-        if (saber.rushHit[t]) continue;
+        if (saber.dashHit[t]) continue;
         const tp = safePosition(t);
         if (!tp) continue;
         const near = segDist([tp[0], tp[1] + 0.9, tp[2]], prev, p);
-        if (near.d2 > 2.8 * 2.8) continue;
-        saber.rushHit[t] = 1;
-        if (damage(t, SABER.DMG.rush, saber.id, "Blade Dash")) {
+        if (near.d2 > SABER.DASH.WIDTH * SABER.DASH.WIDTH) continue;
+        saber.dashHit[t] = 1;
+        if (damage(t, hitFor("dash"), saber.id, "Saber Dash")) {
             const dir = norm3([tp[0] - p[0], 0.5, tp[2] - p[2]]);
-            impulse(t, dir[0] * 12, 6, dir[2] * 12);
+            impulse(t, dir[0] * 13, 6, dir[2] * 13);
         }
     }
 }
 
-function saberSlash(p, tp) {
-    saber.last = "slash";
-    saber.cds.slash = nowMs() + SABER.CD.slash * (saber.enraged ? 0.75 : 1);
-    const dir = norm3([tp[0] - p[0], 0.05, tp[2] - p[2]]);
-    const side = [-dir[2], 0, dir[0]];
-    /* DEUX ondes independantes : elles ne partent pas du meme point, donc on
-       ne peut pas esquiver en reculant simplement. */
-    spawnWave(saber.waves, [p[0] + side[0] * 2.2, p[1] + 1, p[2] + side[2] * 2.2], dir, 34, 1.5, SABER.DMG.slash, "Air Slash");
-    spawnWave(saber.waves, [p[0] - side[0] * 2.2, p[1] + 1, p[2] - side[2] * 2.2], dir, 34, 1.5, SABER.DMG.slash, "Air Slash");
-    soundAt(p, "magicAccent1", 0.9, 1.2, 45);
-}
-
+/* 2. FRAPPE AU SOL. Un anneau se resserre sur le sol autour de lui : quand il
+   atteint le rayon d'impact, tout ce qui est dedans est projete. */
 function saberSlam(p) {
-    saber.last = "slam";
-    saber.cds.slam = nowMs() + SABER.CD.slam * (saber.enraged ? 0.75 : 1);
-    const ground = [p[0], p[1], p[2]];
-    hitArea(ground, 6, saber.id, "Saber Slam", SABER.DMG.slam, {
-        knock: 14, lift: 7, slow: [1500, 2],
-    });
-    boom(ground, 4, { tex: TEX.crit, colors: [rgba(255, 220, 120), rgba(90, 60, 0, 0)] });
-    soundAt(ground, "glass1", 1, 0.6, 45);
+    saber.cds.slam = nowMs() + SABER.CD.slam * (saber.enraged ? 0.8 : 1);
+    saber.cast = { kind: "slam", until: nowMs() + SABER.WARN.slam, at: [p[0], p[1], p[2]], radius: 9 };
+    soundAt(p, "ominousBellHit", 1, 0.9, 45);
 }
 
-/* LA SAISIE : un fil rouge part de sa main vers le joueur pendant 0,7 s.
-   Il tire ensuite : s'il est encore a portee, le joueur est aspire, frappe
-   et affaibli. Sortir des 8 blocs pendant le delai annule la saisie. */
-const GRAB_RANGE = 8;
+function drawSlamCast(c, now) {
+    const t = 1 - Math.max(0, c.until - now) / SABER.WARN.slam;
+    const r = c.radius * (1.6 - 0.6 * t);
+    groundRing(c.at, r, WARN_A, WARN_B, now / 160);
+    groundRing(c.at, c.radius, WARN_A, WARN_B, -now / 200);
+    if (t > 0.6) groundRing(c.at, c.radius * 0.4, HOT_A, HOT_B, now / 90);
+}
 
-function saberGrab(p, tp) {
-    saber.last = "grab";
-    saber.cds.grab = nowMs() + SABER.CD.grab * (saber.enraged ? 0.75 : 1);
-    saber.grab = { until: nowMs() + SABER.GRAB.WARN, target: saber.fighter };
-    soundAt(p, "magicAccent1", 1, 0.8, 45);
-    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-hand-fist", C.DANGER, "The Saber Expert reaches for you: break away!"));
+function resolveSlam(c) {
+    hitArea([c.at[0], c.at[1] + 0.5, c.at[2]], c.radius, saber.id, "Saber Slam", hitFor("slam"), {
+        knock: 15, lift: 7, slow: [1500, 2],
+    });
+    boom([c.at[0], c.at[1] + 0.5, c.at[2]], 5, { tex: TEX.crit, count: 90, colors: [rgba(255, 220, 120), rgba(90, 60, 0, 0)] });
+    groundRing(c.at, c.radius, HOT_A, HOT_B);
+    soundAt(c.at, "glass1", 1, 0.55, 55);
+}
+
+/* 3. ONDE DE CHOC. Un anneau part de lui et grandit : il faut sauter
+   par-dessus ou sortir du cercle, rester dedans est puni une fois. */
+function saberQuake(p) {
+    saber.cds.quake = nowMs() + SABER.CD.quake * (saber.enraged ? 0.8 : 1);
+    saber.quake = { at: [p[0], p[1], p[2]], r: 1.2, hit: {} };
+    soundAt(p, "ominousBellHit", 1, 0.7, 55);
+}
+
+function tickSaberQuake(p) {
+    const q = saber.quake;
+    if (!q) return;
+    const now = nowMs();
+    const stepR = SABER.QUAKE.SPEED * 0.2; // 200 ms
+    q.r += stepR;
+    if (q.r > SABER.QUAKE.MAX) { saber.quake = null; return; }
+
+    groundRing(q.at, q.r, HOT_A, HOT_B, now / 100);
+
+    const ids = getAlivePlayerIds();
+    for (let i = 0; i < ids.length; i++) {
+        const t = ids[i];
+        if (q.hit[t]) continue;
+        const tp = safePosition(t);
+        if (!tp) continue;
+        if (Math.abs(dist3(tp, q.at) - q.r) > SABER.QUAKE.BAND) continue;
+        q.hit[t] = 1;
+        if (damage(t, hitFor("quake"), saber.id, "Shockwave")) {
+            const dir = norm3([tp[0] - q.at[0], 0.4, tp[2] - q.at[2]]);
+            impulse(t, dir[0] * 7, 8, dir[2] * 7);
+        }
+    }
+}
+
+/* 4. RAYON. Une marque apparait la ou le joueur se trouve, avec un cercle qui
+   se resserre : quand les deux anneaux se rejoignent, une colonne tombe.
+   Bouger suffit. */
+function saberBeam(p, tp) {
+    saber.cds.beam = nowMs() + SABER.CD.beam * (saber.enraged ? 0.8 : 1);
+    saber.cast = {
+        kind: "beam",
+        until: nowMs() + SABER.WARN.beam,
+        at: [tp[0], tp[1], tp[2]],
+        from: [p[0], p[1], p[2]],
+        radius: SABER.BEAM.RADIUS,
+    };
+    soundAt(p, "magicAccent1", 0.85, 0.6, 55);
+}
+
+function drawBeamCast(c, now) {
+    const t = 1 - Math.max(0, c.until - now) / SABER.WARN.beam;
+    groundMark(c.at, c.radius, WARN_A, WARN_B, now / 140);
+    groundRing(c.at, c.radius * (3.2 - 2.2 * t), WARN_A, WARN_B, -now / 120);
+    groundCorridor(c.from, c.at, 0.5, rgba(255, 200, 180, 0.6), WARN_B);
+    if (t > 0.75) pillar(c.at, 6, HOT_A, HOT_B);
+}
+
+function resolveBeam(c) {
+    hitArea([c.at[0], c.at[1] + 0.5, c.at[2]], c.radius, saber.id, "Saber Beam", hitFor("beam"), {
+        knock: 6, lift: 5,
+    });
+    pillar(c.at, 10, HOT_A, HOT_B);
+    boom([c.at[0], c.at[1] + 0.8, c.at[2]], 3.4, { tex: TEX.crit, count: 90, colors: [rgba(255, 220, 200), rgba(150, 20, 20, 0)] });
+    soundAt(c.at, "cannonFire3", 0.9, 1.05, 55);
+}
+
+/* 5. PLUIE DE LAMES. Cinq marques apparaissent autour de la position du
+   joueur, puis chacune tombe a son tour. On peut sortir du cercle marque. */
+function saberRain(p, tp) {
+    saber.cds.rain = nowMs() + SABER.CD.rain * (saber.enraged ? 0.8 : 1);
+    const marks = [{ at: [tp[0], tp[1], tp[2]], due: nowMs() + 700, done: false }];
+    const n = SABER.RAIN.COUNT - 1;
+    const a0 = Math.random() * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+        const a = a0 + (i / n) * Math.PI * 2;
+        const rad = 4 + Math.random() * 5;
+        const spot = clearSpot([tp[0] + Math.cos(a) * rad, tp[1], tp[2] + Math.sin(a) * rad]);
+        marks.push({ at: spot, due: nowMs() + 700 + (i + 1) * SABER.RAIN.STEP, done: false });
+    }
+    saber.rain = { marks: marks };
+    soundAt(p, "magicAccent1", 0.8, 1.3, 55);
+}
+
+function tickSaberRain(p) {
+    const r = saber.rain;
+    if (!r) return;
+    const now = nowMs();
+    let left = 0;
+    for (let i = 0; i < r.marks.length; i++) {
+        const m = r.marks[i];
+        if (m.done) continue;
+        if (now >= m.due) {
+            m.done = true;
+            hitArea([m.at[0], m.at[1] + 0.5, m.at[2]], SABER.RAIN.RADIUS, saber.id, "Blade Rain", hitFor("rain"), {
+                knock: 5, lift: 6,
+            });
+            pillar(m.at, 9, HOT_A, HOT_B);
+            groundRing(m.at, SABER.RAIN.RADIUS, HOT_A, HOT_B);
+            soundAt(m.at, "glass1", 0.9, 0.8, 50);
+            continue;
+        }
+        left++;
+        /* marque legere : cinq marques dessinees en meme temps, on ne peut pas
+           se permettre deux anneaux + une croix par marque a chaque passage */
+        groundRing(m.at, SABER.RAIN.RADIUS, WARN_A, WARN_B, now / 130);
+        point([m.at[0], m.at[1] + 0.12, m.at[2]], { tex: TEX.crit, count: 3, r: 0.13, size: [0.26, 0.46], life: [0.16, 0.34], colors: [WARN_A, WARN_B] });
+    }
+    if (left === 0) saber.rain = null;
+}
+
+/* 6. TOURBILLON. Deux anneaux de lames tournent autour de lui et blessent par
+   vagues. On ne reste pas colle. */
+function saberStorm(p) {
+    saber.cds.storm = nowMs() + SABER.CD.storm * (saber.enraged ? 0.8 : 1);
+    saber.storm = { until: nowMs() + SABER.STORM.MS, next: nowMs() };
+    soundAt(p, "bigDrumSwish1", 1, 0.9, 50);
+}
+
+function tickSaberStorm(p) {
+    const st = saber.storm;
+    if (!st) return;
+    const now = nowMs();
+    if (now >= st.until) { saber.storm = null; return; }
+
+    groundRing(p, SABER.STORM.RADIUS, WARN_A, WARN_B, now / 120);
+    ring([p[0], p[1] + 1.2, p[2]], SABER.STORM.RADIUS * 0.65, 14, {
+        tex: TEX.glint, r: 0.1, size: [0.26, 0.46], life: [0.16, 0.32],
+        colors: [rgba(255, 255, 255), rgba(200, 120, 90, 0)],
+    }, -now / 90);
+
+    if (now < st.next) return;
+    st.next = now + SABER.STORM.TICK;
+    hitArea([p[0], p[1] + 0.6, p[2]], SABER.STORM.RADIUS, saber.id, "Blade Storm", hitFor("storm"), {});
+}
+
+/* 7. CHAINE. Un fil rouge part de sa main vers le joueur, en direct : s'il
+   est encore a portee au bout du delai, il l'aspire et frappe. Sortir des
+   12 blocs pendant la preparation annule. */
+const GRAB_RANGE = 12;
+
+function saberGrab(p) {
+    saber.cds.grab = nowMs() + SABER.CD.grab * (saber.enraged ? 0.8 : 1);
+    saber.grab = { until: nowMs() + SABER.WARN.grab, target: saber.fighter, from: [p[0], p[1], p[2]] };
+    soundAt(p, "magicAccent1", 1, 0.8, 50);
 }
 
 function tickSaberGrab(p) {
@@ -1322,113 +1627,75 @@ function tickSaberGrab(p) {
     const tp = victim ? safePosition(victim) : null;
 
     if (tp) {
-        /* le fil : une ligne de particules entre lui et le joueur */
-        for (let i = 1; i <= 10; i++) {
-            const t = i / 11;
-            point([p[0] + (tp[0] - p[0]) * t, p[1] + 1.2 + (tp[1] + 1 - p[1] - 1.2) * t, p[2] + (tp[2] - p[2]) * t], {
-                tex: TEX.square, count: 1, r: 0.07,
-                size: [0.16, 0.26], life: [0.1, 0.2],
+        const a = [p[0], p[1] + 1.4, p[2]];
+        const b = [tp[0], tp[1] + 1.2, tp[2]];
+        for (let i = 1; i <= 12; i++) {
+            const t = i / 13;
+            point([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t], {
+                tex: TEX.square, count: 1, r: 0.08, size: [0.18, 0.3], life: [0.08, 0.18],
                 colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)],
             });
         }
+        groundRing([tp[0], tp[1], tp[2]], 2, HOT_A, HOT_B, now / 100);
     }
     if (now < g.until) return;
 
     saber.grab = null;
     if (!victim || !tp) return;
-    if (dist3(tp, p) > GRAB_RANGE) {
-        tell(victim, line("fa-solid fa-person-running", C.SUCCESS, "You break out of the Saber Expert's reach."));
-        return;
-    }
+    if (dist3(tp, p) > GRAB_RANGE) return;   // il s'est echappe : rien ne se passe
     const dir = norm3([p[0] - tp[0], 0.35, p[2] - tp[2]]);
     try { setVel(victim, dir[0] * 18, 5, dir[2] * 18); } catch (e) {}
-    if (damage(victim, SABER.DMG.grab, saber.id, "Saber Grab")) {
+    if (damage(victim, hitFor("grab"), saber.id, "Saber Chain")) {
         eff(victim, "Weakness", 3000, { inbuiltLevel: 2 });
     }
-    boom([tp[0], tp[1] + 1, tp[2]], 2, { tex: TEX.crit, colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)] });
-    tell(victim, line("fa-solid fa-hand-fist", C.DANGER, "The Saber Expert grabs you and hurls you back!"));
+    boom([tp[0], tp[1] + 1, tp[2]], 2.5, { tex: TEX.crit, count: 50, colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)] });
 }
 
-/* LE TOURBILLON : un cercle de lames autour de lui pendant 2,6 s, qui blesse
-   par vagues (toutes les 0,4 s). On ne reste pas colle a lui. */
-function saberStorm(p) {
-    saber.last = "storm";
-    saber.cds.storm = nowMs() + SABER.CD.storm * (saber.enraged ? 0.8 : 1);
-    saber.storm = { until: nowMs() + SABER.STORM.MS, next: nowMs() };
-    soundAt(p, "bigDrumSwish1", 1, 0.9, 45);
-    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-tornado", C.DANGER, "The Saber Expert starts spinning: get away from him!"));
+/* 8. ENTaille double : deux ondes qui ne partent pas du meme point. */
+function saberSlash(p, tp) {
+    saber.cds.slash = nowMs() + SABER.CD.slash * (saber.enraged ? 0.75 : 1);
+    const dir = norm3([tp[0] - p[0], 0.05, tp[2] - p[2]]);
+    const side = [-dir[2], 0, dir[0]];
+    spawnWave(saber.waves, [p[0] + side[0] * 2.4, p[1] + 1, p[2] + side[2] * 2.4], dir, 32, 1.6, hitFor("slash"), "Air Slash");
+    spawnWave(saber.waves, [p[0] - side[0] * 2.4, p[1] + 1, p[2] - side[2] * 2.4], dir, 32, 1.6, hitFor("slash"), "Air Slash");
+    soundAt(p, "magicAccent1", 0.9, 1.2, 45);
 }
 
-function tickSaberStorm(p) {
-    const st = saber.storm;
-    if (!st) return;
-    const now = nowMs();
-    if (now >= st.until) { saber.storm = null; return; }
-
-    /* deux anneaux, l'un tourne a l'envers de l'autre */
-    ring([p[0], p[1] + 0.6, p[2]], SABER.STORM.RADIUS, 18, {
-        tex: TEX.glint, r: 0.1, size: [0.26, 0.46], life: [0.18, 0.34],
-        colors: [rgba(232, 180, 160), rgba(120, 30, 30, 0)],
-    }, now / 170);
-    ring([p[0], p[1] + 1.6, p[2]], SABER.STORM.RADIUS * 0.6, 12, {
-        tex: TEX.glint, r: 0.09, size: [0.22, 0.4], life: [0.16, 0.3],
-        colors: [rgba(255, 255, 255), rgba(200, 120, 90, 0)],
-    }, -now / 130);
-
-    if (now < st.next) return;
-    st.next = now + SABER.STORM.TICK;
-    hitArea([p[0], p[1] + 0.6, p[2]], SABER.STORM.RADIUS, saber.id, "Blade Storm", SABER.DMG.storm, {});
-}
-
-/* LE RAYON : il vise la position ou le joueur se trouve A CET INSTANT, dessine
-   la ligne au sol, puis frappe. Bouger suffit : c'est une attaque de zone,
-   pas un aimbot. */
-function saberBeam(p, tp) {
-    saber.last = "beam";
-    saber.cds.beam = nowMs() + SABER.CD.beam * (saber.enraged ? 0.8 : 1);
-    saber.beam = { to: [tp[0], tp[1], tp[2]], until: nowMs() + SABER.BEAM.WARN };
-    soundAt(p, "magicAccent1", 0.85, 0.65, 50);
-    if (saber.fighter) tell(saber.fighter, line("fa-solid fa-crosshairs", C.DANGER, "The Saber Expert aims at you: move!"));
-}
-
-function tickSaberBeam(p) {
-    const b = saber.beam;
-    if (!b) return;
-    const now = nowMs();
-
-    /* la ligne de visee + la marque au sol */
-    for (let i = 1; i <= 14; i++) {
-        const t = i / 14;
-        point([p[0] + (b.to[0] - p[0]) * t, p[1] + 1.2 + (b.to[1] + 0.5 - p[1] - 1.2) * t, p[2] + (b.to[2] - p[2]) * t], {
-            tex: TEX.glint, count: 1, r: 0.07,
-            size: [0.18, 0.3], life: [0.1, 0.2],
-            colors: [rgba(255, 200, 180), rgba(180, 40, 40, 0)],
-        });
-    }
-    ring([b.to[0], b.to[1] + 0.1, b.to[2]], SABER.BEAM.RADIUS, 12, {
-        tex: TEX.crit, r: 0.09, size: [0.2, 0.34], life: [0.15, 0.3],
-        colors: [rgba(255, 90, 70), rgba(90, 0, 0, 0)],
-    }, now / 200);
-
-    if (now < b.until) return;
-
-    hitArea([b.to[0], b.to[1] + 0.5, b.to[2]], SABER.BEAM.RADIUS, saber.id, "Saber Beam", SABER.DMG.beam, {
-        knock: 6, lift: 4,
-    });
-    boom([b.to[0], b.to[1] + 0.8, b.to[2]], 3, { tex: TEX.crit, count: 80, colors: [rgba(255, 220, 200), rgba(150, 20, 20, 0)] });
-    soundAt(b.to, "cannonFire3", 0.9, 1.1, 50);
-    saber.beam = null;
-}
-
+/* 9. TEMPETE DE LAMES : six ondes en etoile, phase 2 seulement. */
 function saberTempest(p) {
-    saber.last = "tempest";
     saber.cds.tempest = nowMs() + SABER.CD.tempest;
     for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
         spawnWave(saber.waves, [p[0], p[1] + 0.6, p[2]], [Math.cos(a), 0, Math.sin(a)],
-            20, 1.2, SABER.DMG.tempest, "Blade Tempest");
+            22, 1.3, hitFor("tempest"), "Blade Tempest");
     }
-    soundAt(p, "ominousBellHit", 1, 0.5, 50);
+    groundRing(p, 4, HOT_A, HOT_B);
+    soundAt(p, "ominousBellHit", 1, 0.5, 55);
+}
+
+/* Le chef d'orchestre de la preparation : dessine, puis frappe. */
+function tickSaberCast(p) {
+    const c = saber.cast;
+    if (!c) return;
+    const now = nowMs();
+    if (c.kind === "dash") {
+        /* Le couloir suit le boss : il reste colle a lui pendant qu'il avance,
+           et la charge part donc de la ou il est vraiment. */
+        c.from = [p[0], p[1], p[2]];
+        c.to = [p[0] + c.dir[0] * c.len, p[1], p[2] + c.dir[2] * c.len];
+        drawDashCast(c, now);
+    } else if (c.kind === "slam") {
+        c.at = [p[0], p[1], p[2]];
+        drawSlamCast(c, now);
+    } else if (c.kind === "beam") {
+        drawBeamCast(c, now);
+    }
+    if (now < c.until) return;
+
+    saber.cast = null;
+    if (c.kind === "dash") startDash(c);
+    else if (c.kind === "slam") resolveSlam(c);
+    else if (c.kind === "beam") resolveBeam(c);
 }
 
 /* ── 10. ONDES (communes au Mob Leader et au Saber Expert) ─────────────── */
