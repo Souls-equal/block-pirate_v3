@@ -21,9 +21,13 @@ import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/kil
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
-import { bossDamageGate as bpBossGate, cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
+import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
+import { bossDamageGate as bpBossGate } from "./utils/bossGate";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
-import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
+import { saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberPreventDespawn as spDespawn } from "./gameplay/saber/index";
+import { saberClick as spClick, saberOldMan as spOldMan, saberRichMan as spRichMan, saberShanks as spShanks } from "./gameplay/saber/world";
+import { spawnMobLeader as spLeader } from "./gameplay/saber/leader";
+import { saberLockedItem as spLocked } from "./gameplay/saber/state";
 import { installTheme as installTheme, shout } from "./core/theme";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 

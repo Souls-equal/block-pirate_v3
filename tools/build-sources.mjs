@@ -34,9 +34,11 @@ const SRC = path.join(ROOT, "src");
    ouvres sur GitHub pour copier chaque fichier dans le World Code. */
 const OUT = path.join(ROOT, "world-code");
 const WORLD_LIMIT = 512_000;
-/* Le World Code de Bloxd est limite en NOMBRE DE FICHIERS (30) en plus des
-   caracteres. On bloque le build plutot que de le decouvrir en collant. */
-const FILE_LIMIT = 30;
+/* Le World Code de Bloxd est limite en NOMBRE DE FICHIERS (64) en plus des
+   caracteres. On bloque le build plutot que de le decouvrir en collant.
+   Le plafond a double : on peut enfin decouper les gros fichiers par sujet
+   (saber/ est passe de 1 fichier de 2000 lignes a 8 fichiers lisibles). */
+const FILE_LIMIT = 64;
 /* Seul `blocks/` ne part pas dans le World Code : ce sont les Code Blocks
    (voir build-blocks.mjs). `build/` est compacté s'il existe chez toi
    (layer/path/sphere) : ces fichiers comptent aussi dans la limite. */

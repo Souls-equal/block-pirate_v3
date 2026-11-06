@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**30 fichiers, 366 685 caracteres** (72 % de la limite de 512 000 du World Code, -51 % par rapport aux sources lisibles).
+**39 fichiers, 371 269 caracteres** (73 % de la limite de 512 000 du World Code, -51 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -30,7 +30,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 
 | Fichier | Caracteres | Source lisible |
 | --- | --- | --- |
-| `core/admin.js` | 60 854 | 100 206 |
+| `core/admin.js` | 60 861 | 100 213 |
 | `core/ranks.js` | 2 457 | 5 245 |
 | `core/team.js` | 18 617 | 44 605 |
 | `core/theme.js` | 14 922 | 32 455 |
@@ -42,15 +42,24 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/codes.js` | 4 382 | 7 146 |
 | `gameplay/customItem.js` | 4 770 | 12 260 |
 | `gameplay/fightingStyles.js` | 19 919 | 41 594 |
-| `gameplay/NPCs.js` | 9 436 | 20 889 |
+| `gameplay/loot.js` | 1 937 | 6 318 |
+| `gameplay/NPCs.js` | 9 442 | 20 895 |
 | `gameplay/quest.js` | 10 557 | 23 366 |
-| `gameplay/saber.js` | 31 373 | 79 914 |
-| `gameplay/spawning.js` | 8 014 | 20 479 |
+| `gameplay/saber/arrows.js` | 682 | 1 638 |
+| `gameplay/saber/config.js` | 1 222 | 4 341 |
+| `gameplay/saber/expert.js` | 12 577 | 26 554 |
+| `gameplay/saber/index.js` | 1 045 | 4 989 |
+| `gameplay/saber/kit.js` | 4 271 | 8 835 |
+| `gameplay/saber/leader.js` | 5 680 | 13 523 |
+| `gameplay/saber/state.js` | 1 312 | 5 384 |
+| `gameplay/saber/world.js` | 8 581 | 21 432 |
+| `gameplay/spawning.js` | 6 225 | 14 613 |
 | `gameplay/stamina.js` | 4 493 | 10 048 |
 | `gameplay/stats.js` | 4 776 | 10 726 |
 | `gameplay/variations.js` | 7 125 | 21 692 |
-| `index.js` | 11 640 | 23 436 |
-| `utils/boss.js` | 6 786 | 15 100 |
+| `index.js` | 11 785 | 23 601 |
+| `utils/boss.js` | 5 070 | 9 507 |
+| `utils/bossGate.js` | 1 997 | 6 578 |
 | `utils/combat.js` | 14 802 | 45 357 |
 | `utils/data.js` | 5 888 | 13 505 |
 | `utils/fx.js` | 6 076 | 10 662 |
