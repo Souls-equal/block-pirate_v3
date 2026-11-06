@@ -9,7 +9,7 @@ import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
-import { saberOldMan, saberRichMan, saberShanks } from "./saber";
+import { saberOldMan, saberRichMan, saberShanks } from "./saber/world";
 import { clearItem, scanAllItems } from "./customItem";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM

@@ -14,8 +14,7 @@ et les capacités des fruits empaquetées sous `code-blocks/`.
 ## Démarrage rapide (copier-coller dans Bloxd.io)
 
 > **Où trouver les fichiers à coller ?** Dans **[`world-code/`](world-code/)** :
-> même arborescence que `src/`, en version compacte (53 % de la limite au lieu de
-> 94 %). `src/` reste la version lisible pour travailler, `dist/` est ignoré par git.
+> même arborescence que `src/`, en version compacte (73 % de la limite). `src/` reste la version lisible pour travailler, `dist/` est ignoré par git.
 > Détail : [World Code : la limite des 512 000 caractères](#world-code--la-limite-des-512-000-caractères).
 
 Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`index.js`, `core/*`, `gameplay/*`, `utils/*`, `fruit/fruitData.js`) restent tels quels. Tu as seulement à mettre à jour :
@@ -36,10 +35,10 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
 
 ## World Code : la limite des 512 000 caractères
 
-Bloxd limite le World Code à **512 000 caractères** **et à 30 fichiers**, et il compte
+Bloxd limite le World Code à **512 000 caractères** **et à 64 fichiers**, et il compte
 **le texte brut des fichiers collés**. Les sources de `src/` sont écrites pour être lues (commentaires,
-indentation, noms explicites) : ~481 000 caractères à elles seules, donc la limite est
-atteinte dès qu'on ajoute un fichier `src/build/*`.
+indentation, noms explicites) : ~760 000 caractères à elles seules, donc le texte brut
+dépasse largement la limite dès qu'on ajoute un fichier `src/build/*`.
 
 `npm run build:src` produit donc **`world-code/`** (versionné dans git, tu peux le
 parcourir directement sur GitHub) : la même arborescence, fichier
@@ -47,16 +46,17 @@ par fichier, mais compactée pour le collage — commentaires et espaces retiré
 (`minifyWhitespace`), code simplifié (`minifySyntax`), **noms locaux raccourcis**
 (`minifyIdentifiers`).
 
-> **Limite de 30 fichiers** : `build-sources.mjs` refuse de produire `world-code/` au-delà
-> de **30 fichiers** (`FILE_LIMIT`). C'est pour ça que le mute vit dans `core/team.js`
-> (avec `handleChat`) et que le pont des Code Blocks vit dans `index.js` : deux fichiers
-> de moins, et la limite est tenue. Avant d'ajouter un module, demande-toi s'il ne peut
-> pas rejoindre un fichier existant.
+> **Limite de 64 fichiers** : `build-sources.mjs` refuse de produire `world-code/` au-delà
+> de **64 fichiers** (`FILE_LIMIT`). La limite a longtemps été de 30, ce qui obligeait à
+> entasser des sujets sans rapport dans le même fichier (le mute dans `core/team.js`, le
+> pont des Code Blocks dans `index.js`, les 1 944 lignes de la Saber Quest dans un seul
+> `gameplay/saber.js`). À 64, un fichier = un sujet : on découpe quand un fichier mélange
+> deux responsabilités, pas pour faire du nombre (39 fichiers aujourd'hui).
 
 | | Caractères | Limite |
 | --- | --- | --- |
-| Sources lisibles (`src/`) | ~481 000 | 94 % |
-| **`world-code/` (à coller)** | **~273 000** | **53 %** |
+| Sources lisibles (`src/`) | ~760 000 | 148 % |
+| **`world-code/` (à coller)** | **~371 000** | **73 %** |
 
 Ce qui n'est **jamais** modifié, parce que le jeu s'appuie dessus :
 
@@ -1170,6 +1170,75 @@ pour un rang immunisé dans tous les cas, c'est le point le plus simple à teste
 
 ---
 
+## Refactorisation : un fichier par sujet
+
+Rien n'a changé pour le joueur : mêmes quêtes, mêmes boss, mêmes récompenses. Ce qui
+change, c'est **où** vit le code, et donc ce qu'on doit lire pour le modifier.
+
+### 1. `gameplay/saber.js` → `gameplay/saber/` (1 944 lignes → 8 fichiers)
+
+La Saber Quest tenait dans un seul fichier de 79 914 caractères : les constantes, les
+messages, la porte, les trois PNJ, le Mob Leader et les neuf attaques du Saber Expert.
+Un fichier = un sujet, maintenant :
+
+| Fichier | Contenu | Lignes |
+| --- | --- | --- |
+| `config` | items, points du monde, étapes `S`, clés de base | 20 déclarations |
+| `kit` | outils : distances, inventaire, messages, télégraphies | 29 |
+| `state` | l'étape (clé `s`), les cinq plaques en mémoire | 10 |
+| `arrows` | flèches Secret Island / structure ouverte | 5 |
+| `world` | porte, rideau, eau, mur, PNJ, housekeeping | 20 |
+| `leader` | Mob Leader (niveau 200) + Gold Grit | 16 |
+| `expert` | Saber Expert (niveau 200) + ses 9 attaques | 40 |
+| `index` | join, leave, morts, fermeture du monde | 8 |
+
+Les dépendances forment un **graphe sans cycle** entre ces huit fichiers :
+`config` ne dépend de personne, `kit` de `theme`/`fx`/`combat`, `state` de `data` +
+`config` + `kit`, `world` de `config`/`arrows`/`kit`/`state`/`expert`, et `index` de tout
+le reste. Deux conséquences voulues :
+
+* **la répartition des morts** ne vit plus dans un `if` géant : `saberKilledMob` demande
+  à `killLeader()` puis à `killSaber()` « est-ce toi ? ». Ajouter un troisième boss ne
+  touche donc pas au cycle de vie ;
+* `saberJoin` / `saberLeave` ne font plus que deux appels (`resumeQuest` / `parkQuest`,
+  `startHousekeeping` / `stopHousekeeping`) : la règle « l'étape est en base, les plaques
+  non » est écrite à **un seul endroit**.
+
+### 2. Deux extractions au passage
+
+* **`gameplay/loot.js`** — la table de butin, `rollMobLoot` et `markBossMob` sortent de
+  `spawning.js` (qui garde spawn, IA et crédit de kill). `spawning.js` importe
+  `rollMobLoot`, `boss.js` et les deux boss importent `markBossMob`.
+* **`utils/bossGate.js`** — les paliers anti one-shot (`armBossGate`, `disarmBossGate`,
+  `bossDamageGate`, `GATE`) sortent de `boss.js`. Le garde-fou ne connaît **aucun** boss :
+  `boss.js` et `gameplay/saber/*` l'arment, `utils/combat.js` et `onPlayerDamagingMob`
+  l'interrogent.
+
+### 3. Comment l'équivalence a été vérifiée
+
+Le découpage n'est pas une réécriture : un script compare **déclaration par déclaration**
+le texte du code (commentaires exclus) entre l'ancien `saber.js` et les nouveaux fichiers.
+
+* **145 déclarations sur 150 sont identiques au caractère près** ;
+* les 5 restantes sont les fonctions de cycle de vie réécrites (`saberKilledMob`,
+  `saberPreventDespawn`, `saberJoin`, `saberLeave`, `saberClose`) : elles délèguent
+  seulement aux nouvelles fonctions, à l'identique (mêmes ordres d'appel, mêmes
+  conditions, mêmes messages) ;
+* 5 déclarations ont disparu, toutes **mortes** : `saberColor()` n'était appelée nulle
+  part, et quatre `*ForTest()` (PV et dégâts des deux boss) n'étaient référencées ni par
+  `src/` ni par les Code Blocks ;
+* 8 déclarations sont nouvelles : `resumeQuest`, `parkQuest`, `killLeader`,
+  `leaderMobId`, `killSaber`, `saberMobId`, `saberFighter`, `stopHousekeeping` — ce sont
+  les portes d'entrée qui remplacent les anciens accès directs aux variables de module.
+
+Une simulation charge le paquet compilé avec une `api` factice : **44 vérifications**
+(étape écrite en base, plaques remises à zéro au retour, flèche armée seulement à la
+chasse, Gold Grit lâché une seule fois et seulement à l'étape chasse, `preventDespawn`
+sur les boss, plafond à 9 % et blocage de 1 500 ms des paliers) passent toutes, et les
+**55 fonctions exportées** des six modules sont appelées une fois sans `ReferenceError`.
+
+---
+
 ## Arborescence
 
 ```
@@ -1183,7 +1252,16 @@ pour un rang immunisé dans tous les cas, c'est le point le plus simple à teste
 │   │   └── ranks.js              # grades + permissions
 │   ├── gameplay/                 # quêtes, mobs, PNJ, stats, endurance, codes
 │   │   ├── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
-│   │   ├── saber.js              # ⭐ Saber Quest : boutons, porte, PNJ, 2 boss
+│   │   ├── saber/                # ⭐ Saber Quest, un fichier par sujet (8)
+│   │   │   ├── config.js         #    items, points du monde, étapes, clé "s"
+│   │   │   ├── kit.js            #    distances, inventaire, messages, télégraphies
+│   │   │   ├── state.js          #    l'étape : en base, plaques en mémoire
+│   │   │   ├── arrows.js         #    flèches de quête
+│   │   │   ├── world.js          #    porte, rideau, eau, mur, 3 PNJ
+│   │   │   ├── leader.js         #    Mob Leader + Gold Grit
+│   │   │   ├── expert.js         #    Saber Expert + arène
+│   │   │   └── index.js          #    join, leave, morts, fermeture
+│   │   ├── loot.js               # ⭐ butin des mobs (4 / 6 / 9 %)
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
@@ -1467,9 +1545,10 @@ Chaque quête porte son `targetMob` (**le nom du mob tel qu'il est posé dans le
 
 ## La Saber Quest (dernière grande quête de la mer 1)
 
-`src/gameplay/saber.js` porte **toute** la quête : les boutons, les deux structures ouvrables, les
-trois PNJ, le Mob Leader et le Saber Expert. Un seul fichier, parce que la limite des 30 fichiers du
-World Code ne laisse pas de place à un second.
+`src/gameplay/saber/` porte **toute** la quête : les boutons, les deux structures ouvrables, les
+trois PNJ, le Mob Leader et le Saber Expert. C'était un seul fichier jusqu'à la limite des 30 fichiers ;
+depuis qu'elle est passée à 64, la quête est découpée en huit fichiers (voir
+[Refactorisation : un fichier par sujet](#refactorisation--un-fichier-par-sujet)).
 
 ### Reprendre une quête en cours : l'étape en base, les plaques non
 
