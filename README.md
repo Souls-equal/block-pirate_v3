@@ -918,6 +918,58 @@ disent seulement **quand** ils tombent.
 
 ---
 
+## Les trois boss : pas de one-shot, des paliers à 1/2, 1/3, 1/4 et 1/5
+
+**Garp**, le **Saber Expert** et le **Mob Leader** ne peuvent plus être tués d'un seul coup, même par
+une attaque à 38 000 dégâts. `bossDamageGate()` (`src/utils/boss.js`) est la porte unique, armée à
+l'apparition de chaque boss (`armBossGate(id, pvMax)`).
+
+**1. Les paliers.** À **1/2, 1/3, 1/4 et 1/5** de sa vie, le boss encaisse : le coup qui
+franchirait le palier est **refusé**, et il **bloque tous les dégâts pendant 1,5 s**. Chaque palier ne
+tombe **qu'une fois** — quatre moments où il faut attendre avant de continuer.
+
+- Le blocage vaut pour **tout le monde**, pas seulement pour l'attaquant : c'est le boss qui est
+  verrouillé, pas le joueur.
+- Le message part à tous les joueurs à moins de 48 blocs :
+  `[MOB LEADER] endures 50% health left - no damage for a moment.` avec un cri et des particules sur
+  le boss.
+- Le coup est refusé **juste avant** de franchir la ligne (55 % de vie pour le palier 1/2), donc la
+  barre ne descend jamais sous le palier pendant le blocage.
+
+**2. Le plafond.** Un coup ne retire jamais plus de **9 % des PV maximum**. Sans lui, une attaque
+énorme sautait les quatre paliers d'un coup et le boss tombait quand même. La **dernière touche**
+n'est jamais écourtée : dès que ce qu'il reste tient dans le plafond, le coup passe tel quel — un
+boss reste donc **toujours tuable**, et le coup fatal n'est jamais bloqué.
+
+**Les deux chemins de dégâts sont couverts**, sinon le garde-fou aurait un trou :
+
+| Chemin | Où | Comment |
+| --- | --- | --- |
+| capacités (fruits, armes, invocations) | `utils/combat.js` → `damage()` | hook `setMobDamageHook`, posé par `index.js` |
+| corps à corps | `onPlayerDamagingMob` (`index.js`) | même fonction, `preventDamage` quand le coup est refusé |
+
+Le hook n'est appelé **que pour les mobs** : un joueur, un PNJ ou une invocation ne le voient jamais.
+Et il ne s'applique qu'aux boss armés : un mob ordinaire reçoit exactement ses dégâts comme avant.
+
+Le garde-fou est désarmé avec le boss (`cleanup()` pour Garp, `despawnIfAlive()` pour les deux autres)
+et il s'auto-nettoie si la vie du mob n'est plus lisible : aucune ligne ne traîne après un kill.
+
+---
+
+## Le Gold Grit du Mob Leader : une seule fois
+
+Le butin de quête ne passe **pas** par le tableau de drops ci-dessus : le `Gold Grit` tombe dans
+`saberKilledMob()`, sur son propre chemin, quand le Mob Leader meurt **à l'étape « chasse »**.
+
+Il ne tombe qu'**une seule fois** : relancer le Mob Leader par son Code Block et le tuer à l'étape
+« or » ne lâche plus rien. Le `Gold Grit` ne peut pas être lâché, donc un doublon resterait bloqué
+dans l'inventaire pour toujours. S'il a perdu l'or (mort, coffre vide), le **Rich Man** remet l'étape
+à « chasse » et le prochain kill le rend — la quête ne peut pas se bloquer.
+
+Le roll de butin (4 / 6 / 9 %) **s'ajoute** à ce don : il ne le remplace jamais.
+
+---
+
 ## Boss Garp : il apparaît à côté du joueur
 
 `startBoss()` (`src/utils/haki.js`, appelé par le Code Block du portail) tirait **deux positions

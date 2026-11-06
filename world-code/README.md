@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**30 fichiers, 364 476 caracteres** (71 % de la limite de 512 000 du World Code, -51 % par rapport aux sources lisibles).
+**30 fichiers, 366 685 caracteres** (72 % de la limite de 512 000 du World Code, -51 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -44,14 +44,14 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/fightingStyles.js` | 19 919 | 41 594 |
 | `gameplay/NPCs.js` | 9 436 | 20 889 |
 | `gameplay/quest.js` | 10 557 | 23 366 |
-| `gameplay/saber.js` | 31 295 | 79 167 |
+| `gameplay/saber.js` | 31 373 | 79 914 |
 | `gameplay/spawning.js` | 8 014 | 20 479 |
 | `gameplay/stamina.js` | 4 493 | 10 048 |
 | `gameplay/stats.js` | 4 776 | 10 726 |
 | `gameplay/variations.js` | 7 125 | 21 692 |
-| `index.js` | 11 491 | 22 718 |
-| `utils/boss.js` | 4 995 | 9 313 |
-| `utils/combat.js` | 14 611 | 44 061 |
+| `index.js` | 11 640 | 23 436 |
+| `utils/boss.js` | 6 786 | 15 100 |
+| `utils/combat.js` | 14 802 | 45 357 |
 | `utils/data.js` | 5 888 | 13 505 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 5 690 | 13 325 |

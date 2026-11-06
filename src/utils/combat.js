@@ -112,6 +112,23 @@ export function markUntil(targetId, ms) {
 }
 export function unmark(targetId) { delete marks[targetId]; }
 
+/* PALIERS DE DÉGÂTS DES BOSS
+
+   Un boss (Garp, Saber Expert, Mob Leader) ne doit pas pouvoir être tué d'un
+   seul coup. Ce fichier est le passage obligé de TOUS les dégâts de capacité
+   (fruits, armes, invocations), donc c'est ici qu'on pose la porte : le hook
+   renvoie
+     - `false`  : le coup est REFUSÉ (palier franchi, ou blocage en cours) ;
+     - un nombre : les dégâts sont ramenés à ce plafond ;
+     - la même valeur : le coup passe tel quel.
+   Il n'est posé que par index.js (voir utils/boss.js) et ne s'applique qu'aux
+   MOBS : un joueur, un PNJ ou une invocation ne passent jamais par lui. */
+let mobDamageHook = null;
+
+export function setMobDamageHook(fn) {
+    mobDamageHook = typeof fn === "function" ? fn : null;
+}
+
 /* SANTÉ */
 function pushHealth(id, amount, who, broadcast) {
     try {
@@ -397,6 +414,16 @@ export function damage(target, rawAmount, caster, itemName) {
         }
 
         try { recordDamager(target, effectiveCaster, item); } catch (e1) {}
+
+        /* Boss : refus du coup ou plafond (voir setMobDamageHook). Placé APRÈS
+           recordDamager : le tueur reste mémorisé même si le coup est refusé,
+           sinon un boss bloqué ferait perdre le crédit du kill. */
+        if (isMob && mobDamageHook) {
+            let gate = amt;
+            try { gate = mobDamageHook(target, amt); } catch (eGate) { gate = amt; }
+            if (gate === false) return false;
+            if (typeof gate === "number" && gate >= 1 && gate < amt) amt = Math.round(gate);
+        }
 
         let credited = false;
         try {
