@@ -1,6 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout } from "../core/theme";
-import { confirmAction } from "../utils/data";
+import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -1020,6 +1020,11 @@ function E(t, o, r) {
                     })
                   );
                 }
+                /* Le bon ne part que MAINTENANT : argent encaisse et fruit
+                   donne. Un tirage qui echoue ou qui est rembourse le laisse
+                   au joueur. S'il en a disparu entre-temps, on ne lui
+                   reclame rien : le prix annonce est le prix paye. */
+                if (i.ticket) spendFruitTicket(t, i.ticket);
                 const l = getFruitInfo(r);
                 e(() => {
                   if (!fruitOnline(t)) return;
@@ -1090,18 +1095,30 @@ export function rollFruit(t, e = 1) {
     }
     return 0;
   })();
-  const rollPrice = 500 + 35 * rollLevel;
+  /* BON DE REDUCTION : on choisit le meilleur bon du joueur UNE fois, avant
+     l'annonce, pour que le prix affiche soit exactement celui qui sera
+     debite. Il n'est consomme qu'a la remise du fruit (voir plus bas). */
+  const rollTicket = bestFruitTicket(t);
+  const rollPct = rollTicket ? rollTicket.pct : 0;
+  const rollPrice = fruitRollPrice(rollLevel, rollPct);
   let rollBalance = 0;
   for (const key of C) {
     const v = T(t, key);
     if (null !== v) { rollBalance = Math.max(0, v); break; }
   }
+  const rollNote = rollTicket
+    ? [
+        { str: " (" + rollTicket.pct + "% off with your ", style: { color: "#86efac" } },
+        { str: rollTicket.label, style: { color: "#86efac", fontWeight: "700" } },
+        { str: ")", style: { color: "#86efac" } },
+      ]
+    : [];
   if (rollBalance >= rollPrice && !confirmAction(t, "fruit", [
     { icon: "fa-solid fa-dice", style: { color: THEME.MONEY } },
     { str: " Spin the fruit machine for ", style: { color: "#cbd5e1" } },
     { str: String(rollPrice), style: { color: "#facc15", fontWeight: "700" } },
     { str: " (level " + rollLevel + ").", style: { color: "#cbd5e1" } },
-  ])) return null;
+  ].concat(rollNote))) return null;
 
   const r = (function (t) {
     const e = (function (t) {
@@ -1111,9 +1128,7 @@ export function rollFruit(t, e = 1) {
         }
         return 0;
       })(t),
-      o = (function (t) {
-        return 500 + 35 * t;
-      })(e),
+      o = fruitRollPrice(e, rollPct),
       r = (function (t) {
         for (const e of C) {
           const o = T(t, e);
@@ -1142,7 +1157,16 @@ export function rollFruit(t, e = 1) {
        quand le joueur quittait pendant l'animation — or on ne peut plus
        ecrire dans la base d'un joueur deconnecte, donc l'argent etait perdu
        ET une erreur partait dans les logs. */
-    return { level: e, price: o, key: r.key, balanceBefore: r.balance, balanceAfter: r.balance - o, paid: false };
+    return {
+      level: e,
+      price: o,
+      key: r.key,
+      balanceBefore: r.balance,
+      balanceAfter: r.balance - o,
+      paid: false,
+      /* Le bon utilise pour CE tirage : il part a la remise du fruit. */
+      ticket: rollTicket ? rollTicket.item : null,
+    };
   })(t);
   return r ? (E(t, o, r), o) : null;
 }

@@ -1,6 +1,7 @@
 //utils/boss.js
 import { setTimeout, setInterval, sleep, run } from "./timer";
 import { say } from "../core/theme";
+import { markBossMob } from "../gameplay/spawning";
 
 // config
 
@@ -268,6 +269,9 @@ export function spawnBoss(position, playerId) {
     guards: [],
     aiTarget: null,
   };
+  /* Boss de rang 3 pour le butin : cleanup() despawn Garp avant le credit du
+     kill, donc son nom ne sera plus lisible a ce moment-la. */
+  markBossMob(id, CFG.NAME);
 
   setupMob(id, CFG.HP, {
     name: CFG.NAME,

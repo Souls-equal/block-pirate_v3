@@ -181,6 +181,83 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
 }
 
 
+/* ══════════════════════════════════════════════════════════════════════════
+   BONS DE REDUCTION POUR LA MACHINE A FRUITS
+
+   Cinq items PAR DEFAUT de Bloxd (les Lottery Tickets), renommes en "Fruit
+   Voucher" par customItem.js. Un bon garde dans l'inventaire reduit le prix du
+   tirage : 10, 20, 30, 40 puis 50 % pour le plus rare. Le MEILLEUR bon du
+   joueur est utilise, et il n'est consomme qu'au moment ou le fruit est
+   reellement remis : un tirage echoue ou rembourse ne coute pas le bon.
+
+   Source unique : le nom d'item, le nom affiche, la description ET la
+   reduction vivent ici. customItem.js les affiche, utils/spawning.js les
+   utilise comme butin, fruit/index.js les applique au prix.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const FRUIT_TICKETS = [
+    {
+        item: "Common Lottery Ticket",
+        pct: 10,
+        label: "Common Fruit Voucher",
+        desc: "10% off the fruit machine. The Fruit Dealer takes it when you spin.",
+    },
+    {
+        item: "Uncommon Lottery Ticket",
+        pct: 20,
+        label: "Uncommon Fruit Voucher",
+        desc: "20% off the fruit machine. The Fruit Dealer takes it when you spin.",
+    },
+    {
+        item: "Rare Lottery Ticket",
+        pct: 30,
+        label: "Rare Fruit Voucher",
+        desc: "30% off the fruit machine. The Fruit Dealer takes it when you spin.",
+    },
+    {
+        item: "Epic Lottery Ticket",
+        pct: 40,
+        label: "Epic Fruit Voucher",
+        desc: "40% off the fruit machine. The Fruit Dealer takes it when you spin.",
+    },
+    {
+        item: "Legendary Lottery Ticket",
+        pct: 50,
+        label: "Legendary Fruit Voucher",
+        desc: "50% off the fruit machine. The Fruit Dealer takes it when you spin.",
+    },
+];
+
+/* Le meilleur bon du joueur : { item, pct, label } ou null. Aucun test de
+   nom affiche : on lit l'item d'origine, comme partout ailleurs. */
+export function bestFruitTicket(playerId) {
+    if (!playerId) return null;
+    let best = null;
+    for (let i = 0; i < FRUIT_TICKETS.length; i++) {
+        const t = FRUIT_TICKETS[i];
+        let n = 0;
+        try { n = api.getInventoryItemAmount(playerId, t.item) || 0; } catch (e) { n = 0; }
+        if (n > 0 && (!best || t.pct > best.pct)) best = t;
+    }
+    return best;
+}
+
+/* Consomme UN bon. Renvoie false si le joueur n'en a plus (il a pu le perdre
+   pendant l'animation) : l'achat reste valable, on ne le fait pas payer deux
+   fois. */
+export function spendFruitTicket(playerId, itemName) {
+    if (!playerId || !itemName) return false;
+    try { api.removeItemName(playerId, itemName, 1); return true; } catch (e) { return false; }
+}
+
+/* Prix d'un tirage, reduction appliquee (0 a 50 %). */
+export function fruitRollPrice(level, pct) {
+    const lvl = Math.max(0, Math.floor(level) || 0);
+    const off = Math.max(0, Math.min(50, Math.floor(pct) || 0));
+    return Math.max(1, Math.round((500 + 35 * lvl) * (100 - off) / 100));
+}
+
+
 /* utils/leveling.js */
 
 export const SP_PER_LEVEL = 3;
