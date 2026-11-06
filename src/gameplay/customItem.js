@@ -3,6 +3,7 @@
 import { FRUITS_BY_RARITY, fruitDescription, fruitItemAttributes, getRarityEnchantTier } from "../fruit/index";
 import { LEGACY_FRUIT_ITEMS, getFruitItemName, getFruitInfo } from "../fruit/fruitData";
 import { setTimeout as scheduleTick } from "../utils/timer";
+import { FRUIT_TICKETS } from "../utils/data";
 import { say } from "../core/theme";
 
 /* Le tier d'enchantement n'est peut-etre pas modifiable via setItemStat :
@@ -234,6 +235,16 @@ export function itemJoin(playerId) {
     api.setItemStat(playerId, "Gold Grit", "description", "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.")
     api.setItemStat(playerId, "Magmaward Fuel", "displayName", "Ancient Relic")
     api.setItemStat(playerId, "Magmaward Fuel", "description", "An ancient Relic bearing the marks of time. It opens what no blade can cut, right where it's marked")
+    /* BONS DE REDUCTION DE LA MACHINE A FRUITS : cinq items PAR DEFAUT de
+       Bloxd (Lottery Tickets), qu'on renomme et qu'on decrit. La liste vit
+       dans utils/data (FRUIT_TICKETS), avec la reduction de chacun, parce que
+       c'est le meme tableau qui sert au prix (fruit/index) et au butin des
+       mobs (utils/spawning). Un joueur ne voit jamais "Lottery Ticket". */
+    for (let i = 0; i < FRUIT_TICKETS.length; i++) {
+        const voucher = FRUIT_TICKETS[i];
+        try { api.setItemStat(playerId, voucher.item, "displayName", voucher.label); } catch (e) {}
+        try { api.setItemStat(playerId, voucher.item, "description", voucher.desc); } catch (e) {}
+    }
     api.setItemStat(playerId, "M1911", "gunStats", {
         fireRate:80,
         damage: 30,

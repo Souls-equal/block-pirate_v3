@@ -48,6 +48,7 @@ import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
 import { boom, point, at as soundAt, ring, segDist, TEX, rgba } from "../utils/fx";
 import { scanAllItems, writeItem } from "./customItem";
+import { markBossMob } from "./spawning";
 
 /* ── 1. CONFIGURATION ──────────────────────────────────────────────────── */
 
@@ -919,6 +920,9 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (playerId) tell(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
         return null;
     }
+    /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
+       kill, donc son nom ne sera plus lisible a ce moment-la. */
+    markBossMob(id, LEADER.NAME);
 
     const hp = leaderHp();
     try {
@@ -1315,6 +1319,9 @@ function startSaberFight(playerId) {
         tell(playerId, line("fa-solid fa-xmark", C.DANGER, "The Saber Expert did not show up."));
         return false;
     }
+    /* Meme raison que le Mob Leader : l'arene est rangee avant le credit du
+       kill, donc le nom du boss n'est plus lisible a ce moment-la. */
+    markBossMob(id, SABER.NAME);
 
     const hp = saberHp();
     try {

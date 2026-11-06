@@ -848,6 +848,74 @@ qui continuait de tourner). Chaque sortie est maintenant isolée dans un `Gt("le
 **Le prix affiché pendant l'animation est donc une promesse, pas un débit** : il est prélevé au
 moment où le fruit tombe dans l'inventaire.
 
+### Les bons de réduction (Lottery Tickets)
+
+Cinq items **par défaut de Bloxd** — `Common`, `Uncommon`, `Rare`, `Epic` et `Legendary Lottery
+Ticket` — sont renommés en **Fruit Vouchers** par `customItem.js` (nom affiché + description posés à
+chaque join, comme les autres items custom). Un joueur ne voit jamais « Lottery Ticket ».
+
+Un bon **gardé dans l'inventaire** réduit le prix du tirage chez le **Fruit Dealer** :
+
+| Item d'origine | Nom affiché | Réduction |
+| --- | --- | --- |
+| `Common Lottery Ticket` | Common Fruit Voucher | **10 %** |
+| `Uncommon Lottery Ticket` | Uncommon Fruit Voucher | **20 %** |
+| `Rare Lottery Ticket` | Rare Fruit Voucher | **30 %** |
+| `Epic Lottery Ticket` | Epic Fruit Voucher | **40 %** |
+| `Legendary Lottery Ticket` | Legendary Fruit Voucher | **50 %** |
+
+- **Le meilleur bon du joueur est utilisé**, pas le premier trouvé : avec un commun et un légendaire
+  en poche, c'est le légendaire qui part, et **un seul** bon par tirage.
+- **Il n'est consommé qu'à la remise du fruit.** L'annonce (`Spin the fruit machine for 1080 (level
+  20). (10% off with your Common Fruit Voucher)`) donne exactement le prix qui sera débité ; un
+  tirage refusé (pas assez d'argent), échoué ou remboursé **laisse le bon au joueur**.
+- Le prix de base ne change pas : `500 + 35 × niveau`, puis la réduction, et jamais moins de 1.
+- **Source unique** : `FRUIT_TICKETS` (`src/utils/data.js`) porte le nom d'item, le nom affiché, la
+  description et le pourcentage. `customItem.js` les affiche, `fruit/index.js` les applique au prix,
+  `utils/spawning.js` les utilise comme butin. Aucune de ces trois listes n'est recopiée.
+
+---
+
+## Butin des mobs : 4 %, 6 %, 9 %
+
+Chaque mob tué a **une** chance de lâcher un objet, et cette chance dépend de son rang :
+
+| Rang | Chance de roll |
+| --- | --- |
+| mob normal (1) | **4 %** |
+| tier 2 (2) | **6 %** |
+| boss (3) | **9 %** |
+
+S'il y a un roll, **un** objet est tiré au poids parmi ceux que **ce** mob a le droit de lâcher
+(`rollMobLoot`, `src/utils/spawning.js`, appelé par `killdMob`). Un kill n'étant crédité qu'une fois
+(`utils/killAttribution`), un mob ne peut pas lâcher deux fois.
+
+| Récompense | Poids | Rangs | Réservé à |
+| --- | --- | --- | --- |
+| `Common Lottery Ticket` | 130 | 1, 2, 3 | — |
+| `Uncommon Lottery Ticket` | 62 | 1, 2, 3 | — |
+| `Rare Lottery Ticket` | 26 | 2, 3 | — |
+| `Epic Lottery Ticket` | 14 | 3 | **`MOB LEADER`** |
+| `Legendary Lottery Ticket` | 5 | 3 | **`SABER EXPERT`** |
+| `Black Carpet` (Haki fragment) | 10 | 3 | **`GARP`** |
+
+Autrement dit : un mob normal ne peut donner que les deux premiers bons, un tier 2 ajoute le rare,
+et les trois meilleures récompenses sont **réservées à un boss par son nom** — le 40 % au mini-boss
+(Mob Leader), le 50 % au Saber Expert, le fragment de haki à Garp. Le tableau est une simple liste
+écrite en dur (`LOOT_TICKET_RULE` + `LOOT_EXTRA`) : les bons viennent de `FRUIT_TICKETS`, les poids
+disent seulement **quand** ils tombent.
+
+- **Le butin tombe au sol** (`api.createItemDrop`) à l'endroit du cadavre, ou à celui du tueur si la
+  position n'est plus lisible ; si lâcher un item est impossible, il va directement au tueur plutôt
+  que de disparaître. Le joueur reçoit `Loot! Common Fruit Voucher dropped.` avec le **nom affiché**.
+- **Les trois boss sont enregistrés à l'apparition** (`markBossMob`) : Garp, le Saber Expert et le
+  Mob Leader sont `despawn` **avant** le crédit de leur kill, donc leur nom n'est plus lisible à ce
+  moment-là. Sans cet enregistrement ils retomberaient dans le rang des mobs ordinaires et ne
+  pourraient jamais lâcher leurs objets réservés. Un boss nommé est de toute façon forcé au rang 3.
+- **Aucun objet de quête n'est dans ce tableau** (`Torch`, `Cup`, `Gold Grit`, `Magmaward Fuel`) :
+  ce sont des dons garantis, et un doublon bloquerait la quête — un `Gold Grit` de trop ne se donne
+  à personne et ne peut pas être lâché.
+
 ---
 
 ## Boss Garp : il apparaît à côté du joueur
