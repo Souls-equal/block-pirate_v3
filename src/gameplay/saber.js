@@ -49,6 +49,7 @@ import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifef
 import { boom, point, at as soundAt, ring, segDist, TEX, rgba } from "../utils/fx";
 import { scanAllItems, writeItem } from "./customItem";
 import { markBossMob } from "./spawning";
+import { armBossGate, disarmBossGate } from "../utils/boss";
 
 /* ── 1. CONFIGURATION ──────────────────────────────────────────────────── */
 
@@ -923,8 +924,9 @@ export function spawnMobLeader(x, y, z, playerId) {
     /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
        kill, donc son nom ne sera plus lisible a ce moment-la. */
     markBossMob(id, LEADER.NAME);
-
     const hp = leaderHp();
+    /* Pas de one shot : paliers a 1/2, 1/3, 1/4 et 1/5 de sa vie. */
+    armBossGate(id, hp);
     try {
         api.setMobSetting(id, "maxHealth", hp);
         api.setHealth(id, hp, undefined, true);
@@ -1221,6 +1223,8 @@ function playersInArena() {
 
 function despawnIfAlive(id) {
     if (!id) return;
+    /* Le garde-fou de degats suit le mob : plus de mob, plus de palier. */
+    disarmBossGate(id);
     try { if (alive(id)) api.despawnMob(id); } catch (e) {}
 }
 
@@ -1322,8 +1326,9 @@ function startSaberFight(playerId) {
     /* Meme raison que le Mob Leader : l'arene est rangee avant le credit du
        kill, donc le nom du boss n'est plus lisible a ce moment-la. */
     markBossMob(id, SABER.NAME);
-
     const hp = saberHp();
+    /* Pas de one shot : meme garde-fou que sur le Mob Leader et Garp. */
+    armBossGate(id, hp);
     try {
         api.setMobSetting(id, "maxHealth", hp);
         api.setHealth(id, hp, undefined, true);
@@ -1898,7 +1903,13 @@ export function saberKilledMob(playerId, mobId) {
            Gold Grit a l'infini. Apres le paiement du Rich Man, il ne lache
            donc plus rien. */
         const st = playerId ? stepOf(playerId) : S.NONE;
-        const wantGold = st === S.HUNT || st === S.GOLD;
+        /* L'OR NE TOMBE QU'UNE FOIS, a l'etape chasse. Un second Mob Leader
+           lance par le Code Block et tue a l'etape "or" ne lache donc plus
+           rien : le Gold Grit ne peut pas etre lache, un doublon resterait
+           bloque dans l'inventaire pour toujours. S'il a perdu l'or, le Rich
+           Man remet l'etape a la chasse (voir saberRichMan) et le prochain
+           kill le rend. */
+        const wantGold = st === S.HUNT;
         if (p && wantGold) {
             try { api.createItemDrop(p[0], p[1] + 0.5, p[2], ITEM_GOLD, 1, false); } catch (e) {}
             soundAt(p, "coin", 1, 0.9, 40);

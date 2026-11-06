@@ -12,7 +12,7 @@ import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isF
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, reconcileSP as _ } from "./utils/data";
 import { itemJoin as z } from "./gameplay/customItem";
-import { clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
+import { setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -21,7 +21,7 @@ import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/kil
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
 import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
-import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
+import { bossDamageGate as bpBossGate, cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
 import { installTheme as installTheme, shout } from "./core/theme";
@@ -151,7 +151,12 @@ function meleeLocked(t, withItem) {
     return !0;
 }
 
-$(), x(), rt(H), yt(E), ct((t, r, a) => {
+$(), x(), rt(H), yt(E),
+/* PALIERS DE DEGATS DES BOSS : utils/combat.js passe TOUS les degats de
+   capacite par ce hook, donc Garp, le Saber Expert et le Mob Leader ne
+   peuvent pas etre tues d'un seul coup (voir bossDamageGate). */
+bpSetMobDamageHook((mobId, amount) => bpBossGate(mobId, amount));
+ct((t, r, a) => {
     /* Le kill peut être crédité après la déconnexion du tueur : toutes les
        fonctions appelées ici sont protégées (try/catch), on ne filtre rien. */
     Gt("bossKill", () => Ft(t, r));
@@ -304,6 +309,14 @@ $(), x(), rt(H), yt(E), ct((t, r, a) => {
 }, onPlayerDamagingMob = (t, r, a, i) => {
     if (Et(t, r, a, i) || isNPCEntity(r)) return "preventDamage";
     if (idInSafeZone(t) || idInSafeZone(r)) return "preventDamage";
+    /* MEMES PALIERS POUR LE CORPS A CORPS : les capacites passent par le hook
+       de utils/combat, les coups d'epee passent par ici. Les deux chemins
+       interrogent donc le meme garde-fou, et un boss bloque pareil. */
+    try {
+        if (bpBossGate(r, a) === false) return "preventDamage";
+    } catch (e) {
+        _t("onPlayerDamagingMob.bossGate", e);
+    }
     nt(r);
     try {
         ft(r, t, Vt(i));
