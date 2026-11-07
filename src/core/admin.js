@@ -10,7 +10,7 @@ import { eff, isAliveId, restoreClientOption, setAirJumpCount, setJumpAmount, se
 import { setInterval as everyTick } from "../utils/timer";
 import { blockKillCredit } from "../utils/killAttribution";
 import { currentVariation } from "../gameplay/variations";
-import { SABER_ISLAND } from "../gameplay/saber/config";
+import { SABER_ISLAND } from "../gameplay/saber";
 
 import { ITEM_COLOR, say, shout, shoutRaw } from "./theme";
 /* ==========================================================================
