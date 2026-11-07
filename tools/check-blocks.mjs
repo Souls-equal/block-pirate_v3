@@ -15,6 +15,7 @@ import {
   fnv1a,
   findCensoredPatterns,
   findRiskyProducts,
+  findRiskyCommas,
   uncensorBlockCode,
 } from "./pack-format.mjs";
 
@@ -123,6 +124,39 @@ for (const [body, expected] of LITERAL_CASES) {
     `anti-censure : littéral : le résultat change sur « ${body} »`,
   );
 }
+
+// --- La ligne exacte du bug, forme validée en jeu ----------------------------
+// Le joueur a relu le bloc APRÈS correction : `i=(s.hi-s.lo)* 1 * *****=`.
+// Les cinq astérisques remplacent `b , f` (espaces comprises) : c'est l'espace
+// APRÈS la virgule qui déclenche. Sa correction manuelle, qui compilait :
+//     i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
+// On exige donc exactement `* 1 * b ,f=` — le `1 *` ET les espaces, avec la
+// virgule collée au `f`.
+const CT_DOME_LINE = "i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)";
+const CT_DOME_FIXED = "i=(s.hi-s.lo)* 1 * b ,f=Math.atan2(c-a,s.hi-s.lo)";
+const ctFixed = uncensorBlockCode(CT_DOME_LINE);
+check(
+  ctFixed === CT_DOME_FIXED,
+  `anti-censure : la ligne du dôme doit devenir « ${CT_DOME_FIXED} », obtenu « ${ctFixed} »`,
+);
+check(
+  findRiskyCommas(ctFixed).length === 0,
+  `anti-censure : « ${ctFixed} » contient encore « , » + espace + lettre`,
+);
+// La forme déjà espacée (`b , f`, celle qui a été censurée) doit être ramenée
+// à la forme validée, et les virgules normales du code minifié ne bougent pas.
+check(
+  uncensorBlockCode("x=b , f=1;") === "x=b ,f=1;",
+  `anti-censure : « b , f » doit devenir « b ,f » (obtenu « ${uncensorBlockCode("x=b , f=1;")} »)`,
+);
+// Les virgules ordinaires du code minifié ne sont pas touchées (sinon le code
+// grossirait de plusieurs milliers de caractères pour rien) : seules les
+// familles à risque (`x,f`, `x,b/d/g`) reçoivent un espace.
+check(
+  uncensorBlockCode("h1(q,z,w)") === "h1(q,z,w)",
+  `anti-censure : les virgules ordinaires ne doivent pas bouger ` +
+    `(obtenu « ${uncensorBlockCode("h1(q,z,w)")} »)`,
+);
 
 // Les `*` qui ne sont PAS des multiplications, et ceux déjà neutralisés par un
 // chiffre, doivent rester tels quels : y insérer `1*` casserait le code.
