@@ -2,7 +2,7 @@ import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleCha
 import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
-import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync } from "./core/UI"; 
+import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync, setTutorialLineLookup as bpSetTutorialLine } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
 import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
@@ -10,9 +10,9 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { clearConfirm as bpClearConfirm, reconcileSP as _ } from "./utils/data";
+import { clearConfirm as bpClearConfirm, reconcileSP as _, setPurchaseHook as bpSetPurchaseHook } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
-import { setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
+import { setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -22,10 +22,11 @@ import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from 
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
 import { isHakiPod as hkPod, onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
-import { bossDamageGate as bpBossGate } from "./utils/bossGate";
+import { bossDamageGate as bpBossGate } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
 import { installTheme as installTheme, shout, txt } from "./core/theme";
+import { notePurchase as tutPurchase, skipTutorial as tutSkip, startTutorial as tutStart, startTutorialLoop as startTutorialLoop, tutorialJoin as tutorialJoin, tutorialLeave as tutorialLeave, tutorialObjective as tutorialObjective, tutorialShield as tutorialShield } from "./gameplay/tutorial";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
 /* PONT VERS LES CODE BLOCKS
@@ -55,6 +56,13 @@ enterSea = (playerId, seaNumber) => bpEnterSea(playerId, seaNumber);
        spawnMobLeader(x, y, z)            -> a l'endroit voulu
        spawnMobLeader(x, y, z, playerId)  -> et il vise ce joueur */
 spawnMobLeader = (x, y, z, playerId) => spLeader(x, y, z, playerId);
+/* Tutoriel : le passer, ou le rejouer. Le premier sert au joueur qui ne veut
+   pas des explications (double clic de confirmation, comme un achat), le
+   second a tester le parcours depuis un Code Block :
+       skipTutorial(playerId)                 -> plus jamais de tutoriel
+       startTutorial(playerId)                -> le relance a l'etape 1      */
+startTutorial = (playerId) => tutStart(playerId, true);
+skipTutorial = (playerId) => tutSkip(playerId);
 
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
@@ -78,6 +86,17 @@ try {
    periodique ; le reste est pilote par les handlers ci-dessous. */
 try {
     startVariationLoop();
+} catch (e) {}
+
+/* Tutoriel : trois branchements seulement.
+   - la garde PvP de l'etape 1 (utils/combat, comme la garde de zone) ;
+   - le hook d'achat (utils/data) pour l'etape "premiere arme" ;
+   - la ligne d'objectif dans la sidebar (core/UI). */
+try {
+    bpSetTutorialGuard(tutorialShield);
+    bpSetPurchaseHook(tutPurchase);
+    bpSetTutorialLine(tutorialObjective);
+    startTutorialLoop();
 } catch (e) {}
 
 const xt = {};
@@ -176,7 +195,10 @@ ct((t, r, a) => {
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
     /* Dernier : la variation decide de la position d'arrivee (spawn du lobby,
        position sauvegardee dans la mer, ou arrivee en attente). */
-    Gt("variation", () => variationJoin(t));
+    Gt("variation", () => variationJoin(t)),
+    /* Dernier, et volontairement APRES la variation : le tutoriel parle une
+       fois que le joueur est a sa place (spawn du lobby ou de la mer). */
+    Gt("tutorial", () => tutorialJoin(t));
 }, onPlayerLeave = t => {
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
@@ -188,7 +210,7 @@ ct((t, r, a) => {
     Gt("leave.fruitCallbacks", () => s(t)), Gt("leave.haki", () => V(t)),
     Gt("leave.items", () => it(t)), Gt("leave.admin", () => Wt(t)),
     Gt("leave.pvp", () => pvClear(t)), Gt("leave.settings", () => bpSettingsLeave(t)),
-    Gt("leave.saber", () => spLeave(t));
+    Gt("leave.saber", () => spLeave(t)), Gt("leave.tutorial", () => tutorialLeave(t));
     try {
         lt(t);
     } catch (t) {
@@ -278,6 +300,13 @@ ct((t, r, a) => {
         if (pvGuard(r, a)) return "preventDamage";
     } catch (t) {
         _t("onPlayerDamagingOtherPlayer.pvpGuard", t);
+    }
+    /* Tutoriel, etape 1 : un joueur qui n'a pas encore choisi sa team ne peut
+       pas etre frappe. Les mobs, eux, le blessent normalement. */
+    try {
+        if (tutorialShield(r, a)) return "preventDamage";
+    } catch (t) {
+        _t("onPlayerDamagingOtherPlayer.tutorial", t);
     }
     try {
         ft(a, r, Vt(e));

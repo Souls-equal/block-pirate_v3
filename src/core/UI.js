@@ -12,6 +12,14 @@ import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
 import { C, fit, measure, say, txt, bold, ic } from "./theme";
 
+/* Ligne du tutoriel dans la sidebar. UI n'importe PAS gameplay/tutorial (data
+   importe UI : ce serait un cycle de plus) : index.js pose la fonction, qui
+   renvoie une chaine courte ou null. */
+let tutorialLineLookup = null;
+export function setTutorialLineLookup(fn) {
+    tutorialLineLookup = typeof fn === "function" ? fn : null;
+}
+
 export const dCode = "7WGjmPHZrS"
 
 function makeBar(value, max, size = 18){
@@ -134,6 +142,15 @@ function drawSidebar(playerId){
         ic("fa-solid fa-star", C.SUCCESS),
         txt(" Stat Points " + sp + "\n\n", C.SUCCESS),
     ], true, 4);
+
+    /* Objectif du tutoriel : optionnel, mais garde en premier (priorite 0). */
+    const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
+    if (tut) {
+        block([
+            ic("fa-solid fa-list", C.SUCCESS),
+            txt(" " + short(tut, 40) + "\n\n", C.SUCCESS),
+        ], true, 0);
+    }
 
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);

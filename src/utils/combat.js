@@ -38,6 +38,15 @@ export function setTeamGuard(fn) { teamGuard = fn; }
    Posee par index.js avec idInSafeZone() de gameplay/variations. */
 let zoneGuard = null;
 export function setZoneGuard(fn) { zoneGuard = fn; }
+/* Garde du tutoriel : pendant la premiere etape (pas encore d'equipe), les
+   autres joueurs ne peuvent pas blesser le nouveau venu. Posee par index.js
+   avec tutorialShield() de gameplay/tutorial. */
+let tutorialGuard = null;
+export function setTutorialGuard(fn) { tutorialGuard = fn; }
+function blockedByTutorial(caster, target) {
+    if (!tutorialGuard) return false;
+    try { return tutorialGuard(caster, target) === true; } catch (e) { return false; }
+}
 function blockedByZone(caster, target) {
     if (!zoneGuard) return false;
     try {
@@ -349,6 +358,7 @@ export function damage(target, rawAmount, caster, itemName) {
         /* Zone neutre du lobby : ni le lanceur ni la cible ne peuvent etre
            touches (capacites, invocations, degats de zone...). */
         if (blockedByZone(caster, target)) return false;
+        if (blockedByTutorial(caster, target)) return false;
 
         // Toujours assurer mobData même si le cache alive est en retard.
         // Note: api.getEntityType(id) renvoie "Draugr Zombie", "Gorilla", etc. (jamais "MOB").

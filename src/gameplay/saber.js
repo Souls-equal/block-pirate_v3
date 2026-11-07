@@ -7,7 +7,7 @@
    Un nouveau fichier ne se justifie que s'il est GENERIQUE et partage par
    plusieurs domaines — c'est le cas des deux seules choses sorties d'ici :
 
-     utils/bossGate.js   les paliers anti one-shot, armes par les TROIS boss
+     utils/boss.js       les paliers anti one-shot, armes par les TROIS boss
                          (Garp, le Mob Leader, le Saber Expert)
      gameplay/loot.js    le butin des mobs, tous rangs et tous mobs confondus
 
@@ -52,8 +52,7 @@ import { aliveNow, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safeP
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
 import { heldItemName, scanAllItems, writeItem } from "./customItem";
 import { markBossMob } from "./loot";
-import { armBossGate, disarmBossGate } from "../utils/bossGate";
-import { setupBossMob } from "../utils/boss";
+import { armBossGate, disarmBossGate, setupBossMob } from "../utils/boss";
 
 /* ── 1. CONSTANTES ET POINTS DU MONDE ─────────────────────────────────────
 
