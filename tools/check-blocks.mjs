@@ -35,12 +35,13 @@ const check = (cond, msg) => {
 // Deux passes, deux symptômes :
 //  - 1re tentative (demande 68) : le filtre avait remplacé `*b,f=` par `******=`
 //    (« Unexpected token » ligne 6). On avait espacé la ponctuation.
-//  - 2e tentative : le joueur signale « encore de la censure au même endroit »,
-//    et corrige à la main en écrivant `...*b` -> `1*(...)*b` / `f=1*Math...`.
-//    Autrement dit : le filtre RECOLLE les lettres de part et d'autre d'un
-//    opérateur — espaces compris — et lit `s.lo)*b` comme le mot « slob ».
-//    La seule parade qui marche est de casser la suite de lettres par un
-//    chiffre : `*b` -> `*1*b` (multiplication par 1, résultat identique).
+//  - 2e tentative : le joueur signale « encore de la censure au même endroit ».
+//    Les espaces sont CONSERVÉS (ils ne gênaient pas), mais ils ne suffisaient
+//    pas : c'est en AJOUTANT un `1 *` devant l'identifiant que le bloc est
+//    passé. Forme validée en jeu, espaces compris :
+//        i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
+//    On génère donc `*b` -> `* 1 * b` (multiplication par 1 : résultat
+//    identique) en gardant tous les espaces, y compris ceux des règles `x,f`.
 //
 // On vérifie donc, pour chaque cas : plus aucun motif censurable, correction
 // idempotente, JavaScript valide, et surtout RÉSULTAT IDENTIQUE à l'exécution.
@@ -108,7 +109,7 @@ const LITERAL_CASES = [
   ["const re=/\\*b/;return re.source;", "const re=/\\*b/;return re.source;"],
   [
     "const s2=\"*b\";const n=s[0]*b;return s2+n.length;",
-    "const s2=\"*b\";const n=s[0]*1*b;return s2+n.length;",
+    "const s2=\"*b\";const n=s[0]* 1 * b;return s2+n.length;",
   ],
 ];
 for (const [body, expected] of LITERAL_CASES) {

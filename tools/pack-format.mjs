@@ -54,17 +54,18 @@ export function parseBlock(text) {
 // modifier les noms de variables.
 //
 // VU EN JEU, APRÈS UN PREMIER CORRECTIF QUI N'A PAS SUFFI :
-// les espaces ne suffisent pas, parce que le filtre RECOLLE les lettres de part
-// et d'autre d'un opérateur. `i=(s.hi-s.lo)*b,f=Math.atan2(...)` se lit alors
-// `...slob...` — un mot anglais — et il est censuré même écrit
-// `(s.hi-s.lo)*b , f=`. Ce qui marche (corrigé à la main par le joueur) :
-// `i=1*(s.hi-s.lo)*b,f=1*)*Math.atan2(...)` — une identité arithmétique qui
-// casse la suite de lettres sans changer le résultat.
+// espacer `b,f` en `b , f` ne suffisait pas — le joueur a retrouvé la censure au
+// même endroit. Ce qui est passé, c'est la MÊME ligne avec, en plus, un `1 *`
+// devant l'identifiant :
+//     i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
+// Autrement dit : espaces (conservés) + un chiffre qui casse la suite de
+// lettres. On ne prétend pas savoir exactement ce que le filtre reconnaît ; on
+// reproduit la recette validée en jeu.
 //
 // On applique donc, dans cet ordre :
-//   1. `CENSOR_RULES` : espaces autour des motifs connus (historique) ;
-//   2. `neutralizeProducts` : `*b` -> `*1*b` quand `b` est un identifiant d'UNE
-//      lettre — c'est le seul endroit où le filtre a encore mordu.
+//   1. `CENSOR_RULES` : espaces autour des motifs connus (historique, conservé) ;
+//   2. `neutralizeProducts` : `*b` -> `* 1 * b` quand `b` est un identifiant
+//      d'UNE lettre — le seul endroit où le filtre a encore mordu.
 // `findRiskyProducts` / `findCensoredPatterns` REFUSENT de produire un pack qui
 // en contient encore.
 
@@ -316,21 +317,39 @@ export function literalMask(code) {
   return mask;
 }
 
-/* `...*b` (b = identifiant d'UNE lettre) : le filtre recolle `b` avec ce qui
-   précède/suit et lit un mot. On insère `1*` : `*b` -> `*1*b`, ce qui ne change
-   rien au calcul (multiplication par 1) et casse la suite de lettres.
-   On ne touche PAS à `2*b` (`[\d*]` exclu) : un chiffre devant coupe déjà le mot,
-   et `a*b` est couvert (le filtre ne s'arrête pas aux frontières de mots).
-   Attention aux `*` qui ne sont pas des multiplications : `function*b(){}` et
-   `yield*x` — y insérer `1*` casserait le code, d'où les deux lookbehind. */
-const SINGLE_LETTER_PRODUCT =
-  /(?<![\d*])(?<!function)(?<!yield)\*(\s*)(?=[A-Za-z](?![\w$]))/g;
+/* --- `...*b` (b = identifiant d'UNE lettre) : on écrit `* 1 * b` -------------
+   Le joueur a débloqué le pack 2 en écrivant à la main :
+     i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
+   autrement dit : les ESPACES (qu'on garde) **plus** un `1 *` inséré devant
+   l'identifiant. Les deux ensemble, tels quels : c'est cette forme-là qui a été
+   validée en jeu, donc c'est celle qu'on génère — y compris les espaces autour
+   du `1`.
+   Sémantiquement, `x * 1 * b` vaut `x * b` : rien ne change au calcul.
+   On ne touche ni à `2*b` (le chiffre coupe déjà la suite de lettres), ni à
+   `a**b` / `a*=b`, ni aux `*` de `function*` et `yield*` qui ne sont pas des
+   multiplications. Rien de tout ça dans une chaîne, un gabarit, une regex ou
+   un commentaire : là, c'est du texte affiché au joueur. */
+const RISKY_PRODUCT = /\*\s*(?=[A-Za-z](?![\w$]))/g;
+
+/* Le `*` est-il une multiplication dangereuse ? On regarde ce qui le précède en
+   sautant les espaces (pour reconnaître un `* 1 *` déjà corrigé). */
+function productIsRisky(code, index) {
+  let i = index - 1;
+  while (i >= 0 && /\s/.test(code[i])) i--;
+  if (i < 0) return false;
+  const c = code[i];
+  if (c === "*" || (c >= "0" && c <= "9")) return false; // 2*b, a**b, * 1 *
+  const before = code.slice(Math.max(0, i - 7), i + 1);
+  if (/function$/.test(before) || /yield$/.test(before)) return false;
+  return true;
+}
 
 export function findRiskyProducts(code) {
   const mask = literalMask(code);
   const hits = [];
-  for (const m of code.matchAll(SINGLE_LETTER_PRODUCT)) {
+  for (const m of code.matchAll(RISKY_PRODUCT)) {
     if (mask[m.index]) continue; // dans une chaîne : c'est du texte, on y touche pas
+    if (!productIsRisky(code, m.index)) continue;
     hits.push({ rule: "*x (identifiant d'une lettre)", match: m[0], index: m.index });
   }
   return hits;
@@ -338,8 +357,8 @@ export function findRiskyProducts(code) {
 
 function neutralizeProducts(code) {
   const mask = literalMask(code);
-  return code.replace(SINGLE_LETTER_PRODUCT, (m, spaces, offset) =>
-    mask[offset] ? m : `*1*${spaces}`,
+  return code.replace(RISKY_PRODUCT, (m, offset) =>
+    mask[offset] || !productIsRisky(code, offset) ? m : "* 1 * ",
   );
 }
 
