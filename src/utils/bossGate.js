@@ -3,7 +3,7 @@
    Extrait de boss.js le jour ou la limite est passee a 64 fichiers : ce
    garde-fou ne connait AUCUN boss en particulier, il ne fait que repondre
    a une question ("ce coup passe ? plafonne ? refuse ?") pour les trois.
-   Arme par utils/boss.js et gameplay/saber/*, interroge par utils/combat.js
+   Arme par utils/boss.js et gameplay/saber.js, interroge par utils/combat.js
    et par onPlayerDamagingMob (index.js). */
 
 import { say } from "../core/theme";
