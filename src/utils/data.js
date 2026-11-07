@@ -152,6 +152,14 @@ export function setItemLabelLookup(fn) {
     itemLabelLookup = typeof fn === "function" ? fn : null;
 }
 
+/* Un achat reussi est un evenement utile a plusieurs domaines (le tutoriel
+   s'en sert pour l'etape "premiere arme"). Hook plutot qu'import : ce fichier
+   est le plus bas de l'echelle, il n'importe aucun gameplay. */
+let purchaseHook = null;
+export function setPurchaseHook(fn) {
+    purchaseHook = typeof fn === "function" ? fn : null;
+}
+
 export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     /* Les attributs ne portent PLUS le nom de l'item : il est pose une fois
        pour toutes par gameplay/customItem (setItemStat au join). Ici on ne
@@ -185,6 +193,7 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         else api.giveItem(playerId, item, amount);
     } catch (e) {}
     try { api.playSound(playerId, "CashRegister", 1, 1); } catch (e) {}
+    try { if (purchaseHook) purchaseHook(playerId, item); } catch (e) {}
     say(playerId, [
         ic("fa-solid fa-cart-shopping", C.SUCCESS),
         txt(" You bought " + amount + "x ", C.INFO),

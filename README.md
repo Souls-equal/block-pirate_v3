@@ -250,6 +250,55 @@ on ne leur redemande pas de choisir.
 
 ---
 
+## Le tutoriel du nouveau joueur (`src/gameplay/tutorial.js`)
+
+Un joueur qui arrive pour la première fois décroche : il ne sait pas quoi faire, ni pourquoi
+rester. Le tutoriel répond aux deux questions — **ce qu'est le jeu**, **son but** — et ne lui
+donne **qu'une chose à faire à la fois**.
+
+| Étape | Ce qu'on demande | Ce qui la valide (l'état du joueur) |
+| --- | --- | --- |
+| 1/4 | choisir son camp chez un **recruteur** | `team` ≠ `NONE` |
+| 2/4 | prendre le style **gratuit** du `Combat Teacher` | un style de combat est enregistré (`fs`) |
+| 3/4 | parler au `Quest Dealer` et tuer les mobs de la quête | `questProgress` ≥ 1 |
+| 4/4 | acheter sa première arme au `First Weapon Dealer` | l'achat d'un item d'arme (hook) ou une arme déjà en inventaire |
+
+Puis un dernier message explique **la boucle** : XP et Coins → armes, bateaux, fruits → niveaux →
+îles plus dures → les trois boss. Aucune récompense à la fin, et c'est voulu : un tutoriel qui paie
+est une raison de le farmer.
+
+**Comment on avance : par l'état, pas par des évènements.** Un sondage toutes les 2 s
+(`setInterval` de `utils/timer`) regarde les quatre conditions et fait avancer d'une étape quand
+elle est vraie. Conséquence : aucun autre fichier n'a besoin de savoir que le tutoriel existe. La
+seule exception est l'achat de l'arme : `utils/data` appelle un hook après un achat réussi (même
+style que `setItemLabelLookup`), et si l'arme a été achetée **avant** l'étape 4, l'inventaire est
+lu une fois en entrant dans l'étape — l'étape est alors sautée.
+
+**Accueil.** Trois messages espacés de 3,5 s puis du 7 s : ce qu'est le jeu et son but (« devenir le
+plus fort »), comment on joue (clic pour frapper, **deux clics** valident un achat, quêtes = XP +
+Coins), puis l'étape 1. Le message rassure aussi sur ce qui inquiète un nouveau : *« rien n'est perdu
+si tu quittes, ton niveau, ton argent et ta quête sont sauvegardés »*.
+
+**Protection.** Tant que l'étape 1 n'est pas finie (aucune team), les **autres joueurs** ne peuvent
+pas le blesser : `tutorialShield()` est posée comme les autres gardes de `utils/combat`
+(`setTutorialGuard`) et branchée aussi sur le corps à corps dans `index.js`. Les mobs, eux, le
+blessent normalement — un tutoriel n'est pas un mode pacifique.
+
+**Passer.** `skipTutorial(playerId)` demande **deux clics dans la même fenêtre** (la confirmation de
+tous les achats) : on ne jette pas une explication sur un clic malheureux. `startTutorial(playerId)`
+le relance à l'étape 1, pour tester le parcours depuis un Code Block.
+
+**DB : deux clés courtes, nouvelles, et rien d'autre.** `tut` = étape en cours (1 à 4), `tutd` = 1
+quand c'est fini. Un joueur qui a déjà une team, un niveau ou une quête (donc un ancien) est marqué
+`tutd = 1` sans rien recevoir : le tutoriel ne s'impose jamais à un vétéran.
+
+**Ce que ça coûte.** Une lecture de db par joueur toutes les 2 s, la ligne d'objectif dans la
+sidebar (une lecture de plus dans un dessin qui en fait déjà huit), et rien d'autre. `npm run check`
+rejoue tout le parcours avec une `api` simulée : accueil, les quatre étapes, l'achat de l'arme,
+l'achat hors étape, la protection, le saut en deux clics et le vétéran exclu.
+
+---
+
 ## Couleurs & icônes (`src/core/theme.js`)
 
 Un seul fichier décide de l'apparence de **tous** les textes du jeu. Chaque message
@@ -1352,6 +1401,15 @@ qui n'a aucun sens pour une créature. Shambles et Control Slash passaient déj�
 Rien n'a changé pour le joueur : mêmes quêtes, mêmes boss, mêmes récompenses, mêmes
 messages. Ce qui a changé, c'est **où** vit le code.
 
+### Fusionner pour faire de la place
+
+Le tutoriel a eu besoin d'un fichier ; la règle dit qu'on en **fusionne deux d'abord**. La victime
+était `utils/bossGate.js` : il n'existait que parce que la limite de 64 fichiers avait un jour
+obligé à sortir ce code de `boss.js`, et il ne sert qu'aux **trois boss** de ce fichier. Les paliers
+anti one-shot sont donc revenus dans `utils/boss.js`, ses deux appelants (`saber.js` et `index.js`)
+importent de là, et c'est cette place libérée qui a payé `gameplay/tutorial.js`. **32 fichiers avant,
+32 après.**
+
 ### La règle
 
 > **Un nouveau fichier doit être générique.** Il n'existe que si plusieurs domaines
@@ -1474,6 +1532,7 @@ fichier) :
 │   │   ├── variations.js         # ⭐ lobby + une variation par mer (vsea / vp<N>)
 │   │   ├── saber.js              # ⭐ Saber Quest entière (14 sections, 1 fichier)
 │   │   ├── loot.js               # ⭐ butin des mobs (4 / 6 / 9 %), tous rangs
+│   │   ├── tutorial.js           # ⭐ nouveau joueur : accueil + 4 étapes guidées
 │   ├── fruit/
 │   │   ├── index.js              # ⭐ équiper / lancer un fruit (lisible, rembourse cooldown)
 │   │   ├── abilities.js          # table FRUIT_ABILITIES (cooldowns, items)
@@ -1489,7 +1548,8 @@ fichier) :
 │   ├── build-world.mjs           # bundle optionnel src/index.js → dist/world.js
 │   ├── check-imports.mjs
 │   ├── check-handlers.mjs        # ⭐ détecte un handler sans shim (cooldown only)
-│   └── check-blocks.mjs          # ⭐ intègre les packs + simule le chargeur
+│   ├── check-blocks.mjs          # ⭐ intègre les packs + simule le chargeur
+│   └── check-tutorial.mjs        # ⭐ rejoue le parcours du nouveau joueur
 └── package.json
 ```
 
@@ -2009,6 +2069,7 @@ l'achèvement ne paient rien.
 node tools/check-imports.mjs    # imports relatifs + constantes privées d'un autre module
 node tools/check-handlers.mjs   # Code Block → shim → abilities
 node tools/check-blocks.mjs     # packs + simulation du chargeur (jeu simulé)
+node tools/check-tutorial.mjs   # parcours du nouveau joueur (api simulée)
 ```
 
 `check-imports.mjs` vérifie aussi que **la constante privée d'un module n'est utilisée nulle part

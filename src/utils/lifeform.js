@@ -200,7 +200,7 @@ export function safePosition(id) {
 export function posOf(id) { return safePosition(id); }
 
 /* Distance au sol (x/z) et distance dans l'espace, entre deux positions
-   deja lues. Trois fichiers les reecrivaient a la main (boss, bossGate,
+   deja lues. Deux fichiers les reecrivaient a la main (boss,
    saber) : une seule forme ici, donc un seul arrondi a corriger si besoin. */
 export function dist2(a, b) {
     const dx = a[0] - b[0], dz = a[2] - b[2];
