@@ -25,11 +25,11 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
 2. Dans le **monde** (les **8 Code Blocks** à `x=100000, y=100000, z=100002 … 100009`) :
    - Pour cette version « anti-censure » (le filtre de Bloxd.io cassait le pack 2 :
-     `*b,f=` reçu en `******=`, puis « encore de la censure » après un premier correctif
-     par espaces), **les huit packs changent** : les multiplications par un identifiant
-     d'une lettre s'écrivent maintenant `*1*b`. **Recopie les huit blocs.**
-   - ⚠ Changement de contenu : `flame` a quitté le pack 2 pour le pack 8 (le pack 2
-     était à 31 905 caractères, au-delà de la marge). Le tableau de
+     `*b,f=` reçu en `******=`, puis « encore de la censure » même avec des espaces),
+     **les huit packs changent** : les multiplications par un identifiant d'une lettre
+     s'écrivent maintenant `* 1 * b`, espaces compris. **Recopie les huit blocs.**
+   - ⚠ Changement de contenu : `flame` est parti au pack 8 et `song` est venu dans le
+     pack 2 (les packs 1 et 3 sont au ras de la marge). Le tableau de
      [`code-blocks/README.md`](code-blocks/README.md) fait foi.
    - Le **découpage est stable** : un module ne change pas de bloc d'un build à l'autre
      (contrôle et gravité restent entiers et groupés). Le tableau de
@@ -1614,34 +1614,38 @@ reçu par le jeu        i=(s.hi-s.lo)******=Math.atan2(c-a,s.hi-s.lo)
 Le bloc ne compile plus, donc **tout le pack 2 est perdu** (le chargeur le
 déclare `CENSURÉ` et ignore ses handlers).
 
-### Ce qui ne marchait pas : les espaces
+### Ce qui ne suffisait pas : les espaces seuls
 
 Premier correctif (demande 68) : espacer la ponctuation (`b,f` → `b , f`).
-**Insuffisant**, le joueur a retrouvé la censure au même endroit — parce que le
-filtre **recolle les lettres** de part et d'autre d'un opérateur, espaces
-compris : `s.lo)*b` se lit « slob », `f=Math` se lit « fMath ».
+**Les espaces restent** — ils ne gênaient pas — mais le joueur a retrouvé la
+censure au même endroit, donc ils ne suffisaient pas.
 
-### Ce qui marche : casser la suite de lettres par un chiffre
+### Ce qui a marché : les espaces **plus** un `1 *`
 
-C'est la correction appliquée à la main par le joueur (`1*` devant `b`, `)*`)
-et qu'on génère maintenant automatiquement :
+C'est le joueur qui l'a trouvé en jeu : garder les espaces **et** insérer un
+`1 *` devant l'identifiant d'une lettre.
 
 ```
-source      i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
-généré      i=(s.hi-s.lo)*1*b , f=Math.atan2(c-a,s.hi-s.lo)
+source                 i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
+validé en jeu          i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
+généré par le build    i=(s.hi-s.lo)* 1 * b , f=Math.atan2(c-a,s.hi-s.lo)
 ```
 
-`*1*` est une **multiplication par 1** : résultat strictement identique, mais la
-suite de lettres est coupée. `uncensorBlockCode()` (`tools/pack-format.mjs`)
-applique `*<lettre seule>` → `*1*<lettre seule>` partout où c'est du code —
-**jamais dans une chaîne, un gabarit, une regex ou un commentaire** (sinon un
-joueur verrait `*1*` dans un message du jeu). La détection est heuristique
-(`literalMask`) et `check-blocks` vérifie les deux côtés : code neutralisé,
-littéraux intacts.
+Le build reprend **la même recette**, y compris les espaces autour du `1` :
+`*<lettre seule>` → `* 1 * <lettre seule>`. `x * 1 * b` vaut `x * b` :
+résultat strictement identique, mais la suite de lettres est cassée par un
+chiffre.
 
-Les règles historiques d'espacement (`x,f`, `f,x`, `x[.,(]bdg`, `t.f`, `b(f`…)
-restent en place : elles ne coûtent que des espaces et couvrent les motifs déjà
-observés.
+`uncensorBlockCode()` (`tools/pack-format.mjs`) applique ça partout où c'est du
+code — **jamais dans une chaîne, un gabarit, une regex ou un commentaire**
+(sinon un joueur verrait `* 1 *` dans un message du jeu), et laisse tranquilles
+`2*b` (le chiffre coupe déjà), `a**b`, `a*=b`, `function*b` et `yield*x` qui ne
+sont pas des multiplications. La détection est heuristique (`literalMask`) et
+`check-blocks` vérifie les deux côtés : code neutralisé, littéraux intacts.
+
+Les règles d'espacement (`x,f`, `f,x`, `x[.,(]bdg`, `t.f`, `b(f`…) restent en
+place : elles ne coûtent que des espaces, font partie de la forme validée, et
+couvrent les motifs déjà observés.
 
 Quatre garde-fous dans la chaîne :
 
@@ -1656,15 +1660,18 @@ Quatre garde-fous dans la chaîne :
 3. Le découpage en packs est **stable** : le build réutilise le manifeste
    précédent tant que la répartition tient, donc « pack 2 » reste le pack 2. Si
    un module a grossi au point de déborder, un seul module indépendant déménage
-   (`flame` est passé du pack 2 au pack 8) au lieu de tout redistribuer.
+   au lieu de tout redistribuer (cette fois `flame` est parti au pack 8 et
+   `song` est venu dans le pack 2).
 4. `findCensoredPatterns` refuse aussi les mots reconstitués : le scan de
    dictionnaire après suppression de la ponctuation ne sert à rien (faux
    positifs : `shit` = `onPlayerClickControl` + `Slash:It`), mais il a servi à
    comprendre le mécanisme — `s.lo)*b` + `,f=` = « slob ».
 
 Il reste **une** limite assumée : la neutralisation vise les multiplications
-`*<lettre>` (le cas observé). D'autres opérateurs unaires (`-b`) collent aussi
-des lettres ; si la censure revient ailleurs, la parade est la même (`1*`).
+`*<lettre>` (le cas observé). On ne **sait pas** expliquer précisément ce que le
+filtre de Bloxd.io reconnaît — on sait seulement que `* 1 * b` est passé en jeu
+là où `b , f` ne passait pas. Si la censure revient ailleurs, la parade est la
+même (`* 1 *`), et les espaces sont gratuits : on les garde.
 
 ---
 
