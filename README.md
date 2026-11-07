@@ -812,6 +812,48 @@ sa prime la première fois qu'il abat un pirate.
 
 ---
 
+## Protection des petits niveaux : sous 50 contre plus de 100
+
+Un joueur **sous le niveau 50** ne peut pas être touché par un joueur **au-dessus du niveau 100**
+— et il ne peut pas le toucher non plus. La protection est **mutuelle** : sans ça, un niveau 30
+pourrait taper un niveau 300 sans que celui-ci puisse riposter.
+
+| Attaquant | Cible | Résultat |
+| --- | --- | --- |
+| 30 | 150 | refusé (les deux sens) |
+| 49 | 101 | refusé |
+| 49 | 100 | autorisé |
+| 50 | 300 | autorisé |
+| 300 | 300 | autorisé |
+
+**Les bornes sont strictes et volontairement larges** : `niveau < 50` est protégé, `niveau > 100`
+est « dangereux », et la bande **50 → 100** ne change rien. Un niveau 50 reste donc attaquable par
+un niveau 300 — c'est le choix littéral de la règle, pas un oubli.
+
+### Une seule porte pour les deux chemins de dégâts
+
+`canDamage()` (`src/core/team.js`) est déjà le point de passage unique des dégâts entre joueurs :
+le corps à corps y arrive par `onPlayerDamagingOtherPlayer`, les capacités des fruits par
+`combat.damage` → `setTeamGuard` → `canDamage`. La règle est donc ajoutée **là**, une seule fois —
+aucune capacité ne peut la contourner, et il n'y a pas deux versions à garder synchronisées.
+
+Trois précisions :
+
+- **seuls les joueurs sont filtrés** (`isOnlinePlayer`, cache de 80 ms) : un niveau 300 continue de
+  taper les mobs, les PNJ, les boss et les structures sans restriction ;
+- le message n'arrive qu'**une fois toutes les 4 s par attaquant** : un coup refusé tombe plusieurs
+  fois par seconde, inonder le chat ne servirait à rien ;
+- le niveau est lu dans la **même clé de base que le reste** (`lvl`), celle qu'utilisent la prime et
+  l'anti-farm — aucun état en mémoire à maintenir.
+
+La règle est vérifiée par deux simulations sur le paquet compilé : **15 cas** sur `canDamage`
+(bornes 49/50 et 100/101, sens inverse, niveaux égaux, mob, cible inconnue, marine contre marine)
+et **8 cas** sur le chemin des capacités (`combat.damage` → `setTeamGuard`) — un niveau 150 ne
+retire pas un seul PV à un niveau 30, et inversement, alors que 30 ↔ 30, 300 ↔ 300 et 300 → 60
+passent normalement.
+
+---
+
 ## Machine à fruits : on ne paie qu'un fruit livré
 
 `rollFruit` (`src/fruit/index.js`) lance une animation d'environ 2,4 s (tick par tick) avant de
