@@ -24,9 +24,13 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    - **`src/fruit/func-abilities.js`** *(pont BP3 lisible et autonome avec les 196 shims d'habilités)*
    - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
 2. Dans le **monde** (les **8 Code Blocks** à `x=100000, y=100000, z=100002 … 100009`) :
-   - Pour cette version « anti-censure » (le filtre de Bloxd.io avait cassé le pack 2 :
-     `*b,f=` reçu en `******=`, « Unexpected token »), **les huit packs changent** : les
-     packs 1 à 5 pour des espaces, les packs 6 à 8 pour quelques caractères. Recopie-les.
+   - Pour cette version « anti-censure » (le filtre de Bloxd.io cassait le pack 2 :
+     `*b,f=` reçu en `******=`, puis « encore de la censure » après un premier correctif
+     par espaces), **les huit packs changent** : les multiplications par un identifiant
+     d'une lettre s'écrivent maintenant `*1*b`. **Recopie les huit blocs.**
+   - ⚠ Changement de contenu : `flame` a quitté le pack 2 pour le pack 8 (le pack 2
+     était à 31 905 caractères, au-delà de la marge). Le tableau de
+     [`code-blocks/README.md`](code-blocks/README.md) fait foi.
    - Le **découpage est stable** : un module ne change pas de bloc d'un build à l'autre
      (contrôle et gravité restent entiers et groupés). Le tableau de
      [`code-blocks/README.md`](code-blocks/README.md) dit donc toujours **quel** bloc recopier
@@ -1608,42 +1612,59 @@ reçu par le jeu        i=(s.hi-s.lo)******=Math.atan2(c-a,s.hi-s.lo)
 ```
 
 Le bloc ne compile plus, donc **tout le pack 2 est perdu** (le chargeur le
-déclare `CENSURÉ` et ignore ses handlers). La séquence coupable est une
-**ponctuation entre deux lettres seules** — `b,f`, `b.f`, `b(f` — forme que la
-minification produit sans arrêt (`(s.hi-s.lo)*b,f=`).
+déclare `CENSURÉ` et ignore ses handlers).
 
-**La correction ne touche pas aux noms de variables** (renommer des centaines
-d'identifiants à une lettre n'était pas envisageable) : `uncensorBlockCode()`
-(`tools/pack-format.mjs`) insère des espaces autour de la ponctuation à risque,
-côté code comme dans l'ordre d'assemblage, avant d'écrire les packs :
+### Ce qui ne marchait pas : les espaces
 
-| Motif | Devient | Règle |
-| --- | --- | --- |
-| `b,f` | `b , f` | `x,f` (toutes les lettres) |
-| `t.f` | `t . f` | `f,x` / `t.f` |
-| `b(f` | `b( f` | `x[.,(]bdg` / `b(f` |
+Premier correctif (demande 68) : espacer la ponctuation (`b,f` → `b , f`).
+**Insuffisant**, le joueur a retrouvé la censure au même endroit — parce que le
+filtre **recolle les lettres** de part et d'autre d'un opérateur, espaces
+compris : `s.lo)*b` se lit « slob », `f=Math` se lit « fMath ».
 
-Le code est **identique à l'espacement près** (seule exception historique, une
-occurrence : `g(f` → `g(0||f)`, argument identique) — `npm run check` compare le
-code aux espaces près (`squash(fixed) === squash(source)`), vérifie que la
-correction est **idempotente** et que le résultat reste du JavaScript valide.
+### Ce qui marche : casser la suite de lettres par un chiffre
 
-Trois garde-fous dans la chaîne :
+C'est la correction appliquée à la main par le joueur (`1*` devant `b`, `)*`)
+et qu'on génère maintenant automatiquement :
+
+```
+source      i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
+généré      i=(s.hi-s.lo)*1*b , f=Math.atan2(c-a,s.hi-s.lo)
+```
+
+`*1*` est une **multiplication par 1** : résultat strictement identique, mais la
+suite de lettres est coupée. `uncensorBlockCode()` (`tools/pack-format.mjs`)
+applique `*<lettre seule>` → `*1*<lettre seule>` partout où c'est du code —
+**jamais dans une chaîne, un gabarit, une regex ou un commentaire** (sinon un
+joueur verrait `*1*` dans un message du jeu). La détection est heuristique
+(`literalMask`) et `check-blocks` vérifie les deux côtés : code neutralisé,
+littéraux intacts.
+
+Les règles historiques d'espacement (`x,f`, `f,x`, `x[.,(]bdg`, `t.f`, `b(f`…)
+restent en place : elles ne coûtent que des espaces et couvrent les motifs déjà
+observés.
+
+Quatre garde-fous dans la chaîne :
 
 1. `build-blocks.mjs` **refuse de produire** un pack qui contient encore un motif
-   censurable (l'appel ne dépend plus du fichier : le filtre s'applique à tout le
-   champ texte du Code Block, donc on neutralise partout).
-2. `check-blocks.mjs` rejoue les cas du bug (`*b,f=`, `x=d,f`, `t.f`, `b(f`…) et
-   scanne **chaque module** des 8 packs, pas seulement le bloc entier.
+   censurable ou un `*<lettre>` non neutralisé (le filtre s'applique à tout le
+   champ texte du Code Block : on neutralise partout, sans trier les fichiers).
+2. `check-blocks.mjs` rejoue les cas du bug (`*b,f=`, `x=d,f`, `t.f`, `b(f`…),
+   vérifie l'idempotence, la validité du JavaScript, le **résultat identique à
+   l'exécution** (les mêmes arguments donnent les mêmes valeurs avant/après),
+   l'absence d'insertion dans les littéraux, puis scanne **chaque module** des
+   8 packs.
 3. Le découpage en packs est **stable** : le build réutilise le manifeste
-   précédent tant que la répartition tient, donc « pack 2 » reste le pack 2 et
-   un bloc déjà collé ne se périme pas tout seul.
+   précédent tant que la répartition tient, donc « pack 2 » reste le pack 2. Si
+   un module a grossi au point de déborder, un seul module indépendant déménage
+   (`flame` est passé du pack 2 au pack 8) au lieu de tout redistribuer.
+4. `findCensoredPatterns` refuse aussi les mots reconstitués : le scan de
+   dictionnaire après suppression de la ponctuation ne sert à rien (faux
+   positifs : `shit` = `onPlayerClickControl` + `Slash:It`), mais il a servi à
+   comprendre le mécanisme — `s.lo)*b` + `,f=` = « slob ».
 
-Il reste **une** limite assumée : la forme est neutralisée pour les familles
-observées (`…,f`, `f,…`, `…b/d/g`) ; d'autres associations de lettres rares
-pourraient encore passer le filtre. Le scan de mots après suppression de la
-ponctuation ne sert à rien (faux positifs : `shit` = `onPlayerClickControl` +
-`Slash:It`), c'est pour ça que la vérification est faite sur les règles.
+Il reste **une** limite assumée : la neutralisation vise les multiplications
+`*<lettre>` (le cas observé). D'autres opérateurs unaires (`-b`) collent aussi
+des lettres ; si la censure revient ailleurs, la parade est la même (`1*`).
 
 ---
 

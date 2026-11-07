@@ -14,6 +14,7 @@ import {
   MARKER,
   fnv1a,
   findCensoredPatterns,
+  findRiskyProducts,
   uncensorBlockCode,
 } from "./pack-format.mjs";
 
@@ -31,46 +32,118 @@ const check = (cond, msg) => {
 };
 
 // --- Anti-censure : le bug qui a cassé le pack 2 en jeu -----------------------
-// Le 2026-11-06, le joueur a collé le pack 2 dans Bloxd.io et a reçu
-// « Unexpected token » ligne 6 : le filtre du jeu avait transformé
-// `i=(s.hi-s.lo)*b,f=Math.atan2(...)` en `i=(s.hi-s.lo)******=Math.atan2(...)`.
-// Ces cas sont la forme « deux lettres seules autour d'une ponctuation » que
-// `uncensorBlockCode` doit espacer. On vérifie qu'elle perd tout motif
-// censurable, que le résultat est toujours du JS valide et que le code est
-// identique à l'espacement près (aucune sémantique touchée).
-const CENSOR_SAMPLES = [
-  "i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo);",
-  "x=d,f=1;",
-  "q=t.f*2;",
-  "z=b(f);",
-  "n=f.b+1;",
-  "o=s.hi-s.lo,b,f=Math.atan2(c,s.hi-s.lo);",
+// Deux passes, deux symptômes :
+//  - 1re tentative (demande 68) : le filtre avait remplacé `*b,f=` par `******=`
+//    (« Unexpected token » ligne 6). On avait espacé la ponctuation.
+//  - 2e tentative : le joueur signale « encore de la censure au même endroit »,
+//    et corrige à la main en écrivant `...*b` -> `1*(...)*b` / `f=1*Math...`.
+//    Autrement dit : le filtre RECOLLE les lettres de part et d'autre d'un
+//    opérateur — espaces compris — et lit `s.lo)*b` comme le mot « slob ».
+//    La seule parade qui marche est de casser la suite de lettres par un
+//    chiffre : `*b` -> `*1*b` (multiplication par 1, résultat identique).
+//
+// On vérifie donc, pour chaque cas : plus aucun motif censurable, correction
+// idempotente, JavaScript valide, et surtout RÉSULTAT IDENTIQUE à l'exécution.
+const SEMANTIC_CASES = [
+  // [paramètres, corps, jeux d'arguments] — le `f` de `ct_dome`, en plus court
+  [
+    ["s", "b", "c", "a"],
+    "const i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo);return [i,f];",
+    [
+      [{ hi: 3, lo: 1 }, 2.5, 4, 1],
+      [{ hi: 0.5, lo: -2 }, -3, 0, 7],
+    ],
+  ],
+  [["d", "f"], "const x=d*f;return x;", [[2, 3], [-1.5, 4]]],
+  [["t"], "const q=t.f*2;return q;", [[{ f: 3.5 }], [{ f: -2 }]]],
+  [
+    ["b2", "f0"],
+    "const z=b2(f0)*1;return z;",
+    [[(v) => v * 3, 2], [(v) => v - 1, 5]],
+  ],
+  [["f0"], "const n=f0.b+1;return n;", [[{ b: 41 }], [{ b: -1 }]]],
 ];
-const squash = (s) => s.replace(/\s+/g, "");
-for (const sample of CENSOR_SAMPLES) {
-  const fixed = uncensorBlockCode(sample);
+const run = (src, params, args) => new Function(...params, src)(...args);
+for (const [params, body, argsList] of SEMANTIC_CASES) {
+  const fixed = uncensorBlockCode(body);
   const hits = findCensoredPatterns(fixed);
   check(
     hits.length === 0,
-    `anti-censure : « ${sample} » devient « ${fixed} » qui reste censurable : ` +
+    `anti-censure : « ${body} » devient « ${fixed} » qui reste censurable : ` +
       hits.map((h) => `${h.rule}(${h.match})`).join(", "),
   );
+  check(uncensorBlockCode(fixed) === fixed, `anti-censure : correction non idempotente sur « ${body} »`);
   check(
-    uncensorBlockCode(fixed) === fixed,
-    `anti-censure : correction non idempotente sur « ${sample} »`,
-  );
-  check(
-    squash(fixed) === squash(sample),
-    `anti-censure : « ${sample} » -> « ${fixed} » modifie le code (pas juste des espaces)`,
+    findRiskyProducts(fixed).length === 0,
+    `anti-censure : « ${fixed} » contient encore une multiplication suivie d'une lettre seule`,
   );
   try {
     esbuild.transformSync(fixed, { loader: "js", target: "es2019" });
   } catch (e) {
-    problems.push(`anti-censure : « ${sample} » corrigé en « ${fixed} » = JS invalide : ${e.message}`);
+    problems.push(`anti-censure : « ${body} » corrigé en « ${fixed} » = JS invalide : ${e.message}`);
+  }
+  for (const args of argsList) {
+    let before, after;
+    try {
+      before = run(body, params, args);
+      after = run(fixed, params, args);
+    } catch (e) {
+      problems.push(`anti-censure : « ${fixed} » ne s'exécute plus : ${e.message}`);
+      continue;
+    }
+    check(
+      JSON.stringify(before) === JSON.stringify(after),
+      `anti-censure : « ${body} » change de résultat (${JSON.stringify(before)} -> ${JSON.stringify(after)})`,
+    );
+  }
+}
+
+// Le contenu des chaînes, gabarits, regex et commentaires est du TEXTE : on
+// n'y touche jamais (sinon un joueur verrait `*1*` dans un message du jeu).
+const LITERAL_CASES = [
+  ["const s2=\"*b, f et *c\";return s2;", "const s2=\"*b, f et *c\";return s2;"],
+  ["const s2='x*y';return s2;", "const s2='x*y';return s2;"],
+  ["const s2=`*b ${1} *c`;return s2;", "const s2=`*b ${1} *c`;return s2;"],
+  ["// *b dans un commentaire\nconst n=1;return n;", "// *b dans un commentaire\nconst n=1;return n;"],
+  ["const re=/\\*b/;return re.source;", "const re=/\\*b/;return re.source;"],
+  [
+    "const s2=\"*b\";const n=s[0]*b;return s2+n.length;",
+    "const s2=\"*b\";const n=s[0]*1*b;return s2+n.length;",
+  ],
+];
+for (const [body, expected] of LITERAL_CASES) {
+  const fixed = uncensorBlockCode(body);
+  check(
+    fixed === expected,
+    `anti-censure : littéral mal traité : « ${body} » -> « ${fixed} » (attendu « ${expected} »)`,
+  );
+  check(
+    run(fixed, ["s", "b"], [[[7], 3]]) === run(body, ["s", "b"], [[[7], 3]]),
+    `anti-censure : littéral : le résultat change sur « ${body} »`,
+  );
+}
+
+// Les `*` qui ne sont PAS des multiplications, et ceux déjà neutralisés par un
+// chiffre, doivent rester tels quels : y insérer `1*` casserait le code.
+const UNTOUCHED_CASES = [
+  "function*b(){return 1}",
+  "const g=function*(){yield*x};",
+  "const y=e*9*b;",
+  "const p=a**b;",
+  "const q=a*=b;",
+];
+for (const body of UNTOUCHED_CASES) {
+  const fixed = uncensorBlockCode(body);
+  check(fixed === body, `anti-censure : « ${body} » ne doit pas changer (obtenu « ${fixed} »)`);
+  try {
+    esbuild.transformSync(fixed, { loader: "js", target: "es2019" });
+  } catch (e) {
+    problems.push(`anti-censure : « ${fixed} » n'est plus du JavaScript valide : ${e.message}`);
   }
 }
 
 const manifest = JSON.parse(read(path.join(OUT, "manifest.json")));
+
 const sources = fs.readdirSync(SRC).filter((f) => f.endsWith(".js")).sort();
 const listed = manifest.packs.flatMap((p) => p.sources);
 check(listed.length === sources.length, `${listed.length} sources listées / ${sources.length} fichiers`);
