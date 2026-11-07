@@ -29,6 +29,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "src", "blocks");
 const OUT = path.join(ROOT, "code-blocks");
 
+/* Marge acceptée au-dessus de MAX pour l'en-tête BP3 et les derniers espaces
+   anti-censure ajoutés sur le payload complet. Doit rester très en dessous de
+   la limite réelle du jeu (32 000 caractères par Code Block). */
+const PACK_SLACK = 120;
+
 const argMax = process.argv.find((a) => a.startsWith("--max="));
 const MAX = Number(argMax ? argMax.slice(6) : MAX_PACK_CHARS);
 if (!Number.isFinite(MAX) || MAX < 4000 || MAX > 31_800)
@@ -61,7 +66,9 @@ const fragments = files.map((file, order) => {
   if (code.includes(MARKER))
     throw new Error(`${file} : contient le séparateur réservé ${MARKER}`);
   if (!code.endsWith(";") && !code.endsWith("}")) code += ";";
-  code = uncensorBlockCode(code, file === "251-control-domain.js" || !/^0|^[12]/.test(file));
+  /* Le filtre de Bloxd.io s'applique à TOUT le champ texte du Code Block :
+     inutile de trier les fichiers, on neutralise les motifs partout. */
+  code = uncensorBlockCode(code);
   return { file, order, code, size: code.length };
 });
 
@@ -122,9 +129,58 @@ function packUnits(unitList) {
   return localBins;
 }
 
+/* ------------------------------------------------ stabilité du découpage ----
+   Le joueur colle les packs un par un dans son monde. Si les fruits changent de
+   pack d'un build à l'autre, tout est à recoller — et « le pack 2 » ne désigne
+   plus le même contenu (c'est exactement ce qui a gêné le diagnostic du bug 68).
+   On réutilise donc le découpage du manifeste précédent tant qu'il reste
+   valide : mêmes unités, entières, et aucun bloc au-dessus de MAX + PACK_SLACK.
+   Sinon on repacke normalement. */
+function reuseBins(unitList, prev) {
+  if (!prev || !Array.isArray(prev.packs) || !prev.packs.length) return null;
+  const unitOfFile = new Map();
+  for (const u of unitList) for (const it of u.items) unitOfFile.set(it.file, u);
+  const seen = new Set();
+  const bins = [];
+  for (const p of prev.packs) {
+    const files = p.sources || [];
+    const binUnits = [];
+    for (const file of files) {
+      const u = unitOfFile.get(file);
+      if (!u) return null; // fichier apparu depuis : on repacke
+      if (!binUnits.includes(u)) binUnits.push(u);
+    }
+    for (const u of binUnits)
+      if (u.items.some((it) => !files.includes(it.file))) return null; // famille coupée
+    for (const u of binUnits) {
+      if (seen.has(u)) return null;
+      seen.add(u);
+    }
+    binUnits.sort((a, b) => a.order - b.order);
+    const size =
+      binUnits.reduce((sum, u) => sum + u.size, 0) + SEPARATOR.length * (binUnits.length - 1);
+    if (size > MAX + PACK_SLACK) return null; // la répartition ne tient plus : on repacke
+    bins.push({ size, units: binUnits });
+  }
+  if (seen.size !== unitList.length) return null;
+  return bins;
+}
+
+const previousManifestForPacking = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(OUT, "manifest.json"), "utf8"));
+  } catch (e) {
+    return null;
+  }
+})();
+
 const baseUnits = units.filter((u) => /^0|^[12]/.test(u.items[0].file));
 const extraUnits = units.filter((u) => !/^0|^[12]/.test(u.items[0].file));
-const bins = [...packUnits(baseUnits), ...packUnits(extraUnits)];
+const bins =
+  reuseBins(units, previousManifestForPacking) ?? [
+    ...packUnits(baseUnits),
+    ...packUnits(extraUnits),
+  ];
 
 // --------------------------------------------------------------- sortie -----
 fs.mkdirSync(OUT, { recursive: true });
@@ -148,7 +204,7 @@ const packs = bins.map((bin, i) => {
       `Bloc ${index} : motif(s) censurable(s) par Bloxd.io : ` +
         censorHits.map((h) => `${h.rule}(${h.match})`).join(", "),
     );
-  if (block.length > MAX + 120)
+  if (block.length > MAX + PACK_SLACK)
     throw new Error(`Bloc ${index} : ${block.length} caractères, trop grand`);
 
   const name = `pack-${String(index).padStart(2, "0")}.js`;
@@ -229,6 +285,21 @@ for (const p of packs)
       " |",
   );
 lines.push(
+  "",
+  "## Anti-censure Bloxd.io",
+  "",
+  "Bloxd.io filtre le texte collé dans un Code Block. Vu en jeu : la séquence",
+  "`(s.hi-s.lo)*b,f=` est arrivée sous la forme `(s.hi-s.lo)******=`, le bloc ne",
+  "compilait plus (« Unexpected token ») et **tout le pack 2 était perdu**.",
+  "`uncensorBlockCode()` (dans `tools/pack-format.mjs`) espace donc",
+  "systématiquement les motifs à risque avant d'écrire les packs — `b,f` devient",
+  "`b , f`, `t.f` devient `t . f`, `b(f` devient `b( f`. Le code est identique à",
+  "l'espacement près, et `npm run check` **refuse** un pack qui contiendrait",
+  "encore un motif censurable.",
+  "",
+  "Le découpage est stable d'un build à l'autre : un fruit ne change pas de pack,",
+  "donc un pack déjà collé dans le monde ne doit être recopié que si son contenu",
+  "change (compare le tableau ci-dessus avec ton monde).",
   "",
   "## Modifier un fruit",
   "",

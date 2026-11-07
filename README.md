@@ -24,11 +24,11 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    - **`src/fruit/func-abilities.js`** *(pont BP3 lisible et autonome avec les 196 shims d'habilités)*
    - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
 2. Dans le **monde** (les **8 Code Blocks** à `x=100000, y=100000, z=100002 … 100009`) :
-   - Pour cette version du dôme Control (placement sûr + mobs contrôlés), seuls
-     **`pack-01.js`**, **`pack-02.js`**, **`pack-03.js`** et **`pack-05.js`** changent : recopie-les,
-     les quatre autres blocs sont identiques au bit près.
-   - L'empaquetage est un **best-fit** sur la taille des modules : un module qui grossit peut
-     déplacer du code d'un bloc à l'autre. Le tableau de
+   - Pour cette version « anti-censure » (le filtre de Bloxd.io avait cassé le pack 2 :
+     `*b,f=` reçu en `******=`, « Unexpected token »), **les huit packs changent** : les
+     packs 1 à 5 pour des espaces, les packs 6 à 8 pour quelques caractères. Recopie-les.
+   - Le **découpage est stable** : un module ne change pas de bloc d'un build à l'autre
+     (contrôle et gravité restent entiers et groupés). Le tableau de
      [`code-blocks/README.md`](code-blocks/README.md) dit donc toujours **quel** bloc recopier
      (et l'ordre de collage est libre : le chargeur lit l'en-tête `BP3:<n>/<N>`).
    - Détail dans [`code-blocks/README.md`](code-blocks/README.md).
@@ -1596,6 +1596,57 @@ Quatre causes cumulées, toutes invisibles dans les logs :
 
 ---
 
+## Censure de Bloxd.io : `*b,f=` reçu en `******=`
+
+Symptôme signalé en jeu : *« Dans le code block 2 il y a une erreur a la ligne 6
+"Unexpected token" »*. Le code local était sain — c'est **le filtre de Bloxd.io**
+qui a mangé le texte au moment du collage :
+
+```
+source                 i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
+reçu par le jeu        i=(s.hi-s.lo)******=Math.atan2(c-a,s.hi-s.lo)
+```
+
+Le bloc ne compile plus, donc **tout le pack 2 est perdu** (le chargeur le
+déclare `CENSURÉ` et ignore ses handlers). La séquence coupable est une
+**ponctuation entre deux lettres seules** — `b,f`, `b.f`, `b(f` — forme que la
+minification produit sans arrêt (`(s.hi-s.lo)*b,f=`).
+
+**La correction ne touche pas aux noms de variables** (renommer des centaines
+d'identifiants à une lettre n'était pas envisageable) : `uncensorBlockCode()`
+(`tools/pack-format.mjs`) insère des espaces autour de la ponctuation à risque,
+côté code comme dans l'ordre d'assemblage, avant d'écrire les packs :
+
+| Motif | Devient | Règle |
+| --- | --- | --- |
+| `b,f` | `b , f` | `x,f` (toutes les lettres) |
+| `t.f` | `t . f` | `f,x` / `t.f` |
+| `b(f` | `b( f` | `x[.,(]bdg` / `b(f` |
+
+Le code est **identique à l'espacement près** (seule exception historique, une
+occurrence : `g(f` → `g(0||f)`, argument identique) — `npm run check` compare le
+code aux espaces près (`squash(fixed) === squash(source)`), vérifie que la
+correction est **idempotente** et que le résultat reste du JavaScript valide.
+
+Trois garde-fous dans la chaîne :
+
+1. `build-blocks.mjs` **refuse de produire** un pack qui contient encore un motif
+   censurable (l'appel ne dépend plus du fichier : le filtre s'applique à tout le
+   champ texte du Code Block, donc on neutralise partout).
+2. `check-blocks.mjs` rejoue les cas du bug (`*b,f=`, `x=d,f`, `t.f`, `b(f`…) et
+   scanne **chaque module** des 8 packs, pas seulement le bloc entier.
+3. Le découpage en packs est **stable** : le build réutilise le manifeste
+   précédent tant que la répartition tient, donc « pack 2 » reste le pack 2 et
+   un bloc déjà collé ne se périme pas tout seul.
+
+Il reste **une** limite assumée : la forme est neutralisée pour les familles
+observées (`…,f`, `f,…`, `…b/d/g`) ; d'autres associations de lettres rares
+pourraient encore passer le filtre. Le scan de mots après suppression de la
+ponctuation ne sert à rien (faux positifs : `shit` = `onPlayerClickControl` +
+`Slash:It`), c'est pour ça que la vérification est faite sur les règles.
+
+---
+
 ## Réduire la taille (sans perdre la lisibilité)
 
 Le principe : **on n'écrit jamais le code compact**. On écrit lisible, et le build
@@ -2081,7 +2132,13 @@ plusieurs fichiers sont ignorés pour éviter le bruit.
 
 `check-blocks.mjs` rejoue le **vrai** `code-block-loader.js` avec une `api`
 simulée : scénario nominal, pack manquant et pack déplacé. Il échoue si un seul
-des 95 handlers (dont les 8 de Control/Gravity) n'est pas enregistré.
+des 196 handlers (dont les 186 de Control/Gravity) n'est pas enregistré.
+
+Il teste aussi l'**anti-censure** : sur `*b,f=`, `x=d,f`, `t.f`, `b(f`… la
+correction doit supprimer tout motif censurable, rester idempotente, ne changer
+que des espaces et produire du JavaScript valide — puis il scanne chaque module
+des 8 packs générés. C'est ce test qui empêche le bug « Unexpected token ligne 6 »
+de revenir.
 
 Il rejoue aussi le **dôme sur une falaise**, tick par tick, avec un monde solide :
 aucun placement de victime dans un bloc, les mobs du dôme sont tenus, et une cible

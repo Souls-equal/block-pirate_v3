@@ -46,11 +46,19 @@ export function parseBlock(text) {
 }
 
 // --- Protection anti-censure Bloxd.io ---------------------------------------
-// Le filtre de texte des Code Blocks de Bloxd.io remplace par « ***** »
-// certaines séquences d'identifiants et d'opérateurs collés par la minification
-// (`o[n]`, `return[n*.7`, `for(const[n,r]`, `a-s`, `a&&`, `g=f`, `18+`, `D,f`,
-// `t.f`, `b(f`, `n*de`, `c===3`). L'insertion d'espaces aux endroits critiques
-// empêche toute correspondance du filtre sans modifier les noms de variables.
+// Le filtre de texte des Code Blocks de Bloxd.io remplace par « ***** » (ou
+// « ****** ») certaines séquences d'identifiants et d'opérateurs collés par la
+// minification (`o[n]`, `return[n*.7`, `for(const[n,r]`, `a-s`, `a&&`, `g=f`,
+// `18+`, `D,f`, `g,f`, `b,f`, `t.f`, `b(f`, `n*de`, `c===3`). L'insertion
+// d'espaces aux endroits critiques empêche toute correspondance du filtre sans
+// modifier les noms de variables.
+//
+// RÈGLE PRATIQUE : deux LETTRES SEULES séparées par une ponctuation (`b,f`,
+// `b.f`, `b(f`) sont le piège. Vu en jeu : `(s.hi-s.lo)*b,f=` est devenu
+// `(s.hi-s.lo)******=` — un « Unexpected token » à la compilation du Code
+// Block, donc le pack entier ne se charge plus. Les règles `x,f`, `f,x` et
+// `x[.,=(]bdg` couvrent cette famille, et `findCensoredPatterns` REFUSE de
+// produire un pack qui en contient encore.
 
 export const CENSOR_RULES = [
   {
@@ -157,9 +165,32 @@ export const CENSOR_RULES = [
         .replace(/\b([cC])===3\b/g, "$1 === 3")
         .replace(/\b([cC])==3\b/g, "$1 == 3"),
   },
+  {
+    /* « b,f » : deux lettres seules autour d'une virgule. C'est la forme qui a
+       casse le pack 2 (`i=(s.hi-s.lo)*b,f=Math.atan2`), et celle des anciennes
+       règles `D,f` / `g,f`. On espace la virgule. */
+    name: "x,f",
+    test: /(?<![A-Za-z0-9_$])[A-Za-z],[fF](?![A-Za-z0-9_$])/g,
+    fix: (code) => code.replace(/(?<![A-Za-z0-9_$])([A-Za-z]),([fF])(?![A-Za-z0-9_$])/g, "$1 , $2"),
+  },
+  {
+    /* Même famille, mais c'est le f qui précède : `f,o`, `f.x`, `f(y`. */
+    name: "f,x",
+    test: /(?<![A-Za-z0-9_$])[fF][.,=(][A-Za-z](?![A-Za-z0-9_$])/g,
+    fix: (code) =>
+      code.replace(/(?<![A-Za-z0-9_$])([fF])([.,=(])([A-Za-z])(?![A-Za-z0-9_$])/g, "$1 $2 $3"),
+  },
+  {
+    /* Une lettre seule suivie de `b`, `d` ou `g` : `d,f` et `g,f` ont deja ete
+       censures, `b,f` aussi. On espace la ponctuation des trois familles. */
+    name: "x[.,(]bdg",
+    test: /(?<![A-Za-z0-9_$])[A-Za-z][.,(][bdgBDG](?![A-Za-z0-9_$])/g,
+    fix: (code) =>
+      code.replace(/(?<![A-Za-z0-9_$])([A-Za-z])([.,(])([bdgBDG])(?![A-Za-z0-9_$])/g, "$1 $2 $3"),
+  },
 ];
 
-export function uncensorBlockCode(code, extraSafe = false) {
+export function uncensorBlockCode(code, extraSafe = true) {
   let out = code;
   if (extraSafe) {
     out = out
@@ -171,8 +202,13 @@ export function uncensorBlockCode(code, extraSafe = false) {
       .replace(/\b([fF])([(\[])([uUkKcCfF])\b/g, "$1$2 $3")
       .replace(/\b([sSkKpP])\*(\1)\b/gi, "$1 * $2");
   }
-  for (const rule of CENSOR_RULES) {
-    out = rule.fix(out);
+  /* Une correction peut créer un motif pour une règle déjà passée (par ex.
+     `b(f)` corrigé en `b( f)` puis `b( f, x)`) : on reboucle jusqu'au point
+     fixe. Trois passes suffisent en pratique, on en garde quatre. */
+  for (let pass = 0; pass < 4; pass++) {
+    const before = out;
+    for (const rule of CENSOR_RULES) out = rule.fix(out);
+    if (out === before) break;
   }
   return out;
 }
