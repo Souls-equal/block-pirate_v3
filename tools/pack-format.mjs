@@ -19,14 +19,21 @@ export function fnv1a(text) {
   return ("00000000" + h.toString(16)).slice(-8);
 }
 
-export function makeBlock(index, total, payload) {
+/* `release` = empreinte de la version complète (tous les packs). Elle est
+   identique sur les 8 blocs d'une même version : c'est ce qui permet au
+   chargeur de dire « ce Code Block est une ancienne version » au lieu de
+   laisser l'utilisateur deviner (demande 69). */
+export function makeBlock(index, total, payload, release = "") {
   const cleanPayload = payload.replace(/\r\n?/g, "\n").trim();
-  const head = `/*${MAGIC}:${index}/${total}:len=${cleanPayload.length}:h=${fnv1a(cleanPayload)}*/\n`;
+  const v = release ? `:v=${release}` : "";
+  const head = `/*${MAGIC}:${index}/${total}:len=${cleanPayload.length}:h=${fnv1a(cleanPayload)}${v}*/\n`;
   return head + cleanPayload;
 }
 
 const HEADER_RE = new RegExp(
-  "^\\s*/\\*" + MAGIC + ":(\\d+)/(\\d+):len=(\\d+):h=([0-9a-f]{8})\\*/\\s*",
+  "^\\s*/\\*" +
+    MAGIC +
+    ":(\\d+)/(\\d+):len=(\\d+):h=([0-9a-f]{8})(?::v=([0-9a-f]{8}))?\\*/\\s*",
 );
 
 export function parseBlock(text) {
@@ -40,6 +47,7 @@ export function parseBlock(text) {
     total: Number(m[2]),
     len: Number(m[3]),
     hash: m[4],
+    release: m[5] || "",
     ok: payload.length === Number(m[3]) && fnv1a(payload) === m[4],
     payload,
   };

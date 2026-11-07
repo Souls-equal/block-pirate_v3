@@ -37,7 +37,15 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
      (et l'ordre de collage est libre : le chargeur lit l'en-tête `BP3:<n>/<N>`).
    - Détail dans [`code-blocks/README.md`](code-blocks/README.md).
 3. `FA.logStatus()` dans le World Code doit répondre
-   `8 pack(s), 196 handlers, 0 manquant(s), 0 erreur(s)`.
+   `8 pack(s), 196 handlers, 0 manquant(s), 0 erreur(s)` — et la version affichée
+   (`v=…`) doit être celle du tableau de [`code-blocks/README.md`](code-blocks/README.md).
+
+> **« J'ai peut-être oublié de mettre à jour un fichier en jeu ? »** Chaque Code
+> Block porte l'empreinte de sa publication (`/*BP3:3/8:len=…:h=…:v=f0f0c838*/`).
+> Si un bloc vient d'une autre version, le chargeur le nomme au démarrage :
+> `[FA] 1 Code Block(s) d'une AUTRE version : pack 8 (z=100009) — recopie-le…`,
+> et `FA.status().stale` le liste. Voir
+> [Un Code Block oublié](#un-code-block-oublié--le-cas-des-4-handlers-de-flame).
 
 *(Si tu modifies les sources de `src/blocks/` plus tard : `npm install && npm run build:blocks && npm run check`.)*
 
@@ -1600,6 +1608,53 @@ Quatre causes cumulées, toutes invisibles dans les logs :
 
 ---
 
+## Un Code Block oublié : le cas des 4 handlers de `flame`
+
+Symptôme, en jeu :
+
+```
+[FA] 4 handler(s) absent(s) : onPlayerClickLaser, onPlayerClickMeteorShower,
+onPlayerLeaveMeteorShower, onCancelMeteorShower (voir FA.status()).
+```
+
+Ces quatre noms sont **exactement** ceux que fournit `src/blocks/020-flame.js` —
+un seul module, quatre handlers, rien d'autre. Le module n'était donc pas chargé :
+le pack 8 du monde était une **ancienne version** (qui ne contenait que `mythical
+apex plus`), alors que `flame` y a été déplacé dans la publication suivante.
+
+Le piège : un bloc périmé est **invisible**. Son en-tête est cohérent (longueur +
+hash sont les siens), il se charge sans erreur, et il ne manque que les handlers
+dont on ignorait l'origine.
+
+### La parade : une empreinte de publication dans l'en-tête
+
+Chaque bloc annonce la version de la publication dont il vient :
+
+```
+/*BP3:8/8:len=30920:h=5493cb73:v=f0f0c838*/
+```
+
+`v=` est la même sur les 8 blocs d'une même version (empreinte de l'ensemble des
+packs). Le chargeur prend la valeur la plus fréquente comme référence et nomme
+les autres, avec leur `z` pour savoir quoi recoller :
+
+```
+[FA] 1 Code Block(s) d'une AUTRE version : pack 8 (z=100009) — recopie-les
+depuis code-blocks/ (version f0f0c838).
+[FA] 4 handler(s) absent(s) : … Un Code Block est d'une ancienne version.
+```
+
+`FA.status()` expose `release` et `stale` (`[{ index, z, release }]`). Les blocs
+d'une version antérieure à cette fonctionnalité n'ont pas de `v=` : ils restent
+lisibles, et sont simplement signalés comme périmés dès qu'un bloc de la nouvelle
+version est présent.
+
+`check-blocks.mjs` rejoue exactement ce scénario (pack 8 réduit à son dernier
+module) et exige : bloc périmé nommé, 4 handlers signalés, message renvoyant vers
+la piste « ancienne version ».
+
+---
+
 ## Censure de Bloxd.io : `*b,f=` reçu en `******=`
 
 Symptôme signalé en jeu : *« Dans le code block 2 il y a une erreur a la ligne 6
@@ -2175,7 +2230,8 @@ silencieux. Les 187 constantes de module de `src/` sont contrôlées ; les homon
 plusieurs fichiers sont ignorés pour éviter le bruit.
 
 `check-blocks.mjs` rejoue le **vrai** `code-block-loader.js` avec une `api`
-simulée : scénario nominal, pack manquant et pack déplacé. Il échoue si un seul
+simulée : scénario nominal, pack manquant, pack déplacé et **bloc d'une ancienne
+version** (le cas des 4 handlers de `flame`). Il échoue si un seul
 des 196 handlers (dont les 186 de Control/Gravity) n'est pas enregistré.
 
 Il teste aussi l'**anti-censure** : sur `*b,f=`, `x=d,f`, `t.f`, `b(f`… la
