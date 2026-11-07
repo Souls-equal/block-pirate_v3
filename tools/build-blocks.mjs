@@ -219,16 +219,29 @@ for (const f of fs.readdirSync(OUT))
   if (/^pack-\d+\.js$/.test(f)) fs.rmSync(path.join(OUT, f));
 
 const total = bins.length;
-let totalChars = 0;
-const packs = bins.map((bin, i) => {
-  const index = i + 1;
+
+/* Les payloads d'abord, l'empreinte de version ensuite : elle doit être la même
+   sur les 8 blocs, donc elle ne peut être calculée qu'une fois tous les
+   contenus connus. L'utilisateur peut ainsi vérifier d'un coup d'œil que son
+   monde contient bien une seule et même version (cf. `FA.status()`). */
+const laid = bins.map((bin, i) => {
   const items = bin.units.flatMap((u) => u.items).sort((a, b) => a.order - b.order);
   const payload = uncensorBlockCode(items.map((it) => it.code).join(SEPARATOR));
-  const block = makeBlock(index, total, payload);
+  return { index: i + 1, items, payload };
+});
+const release = fnv1a(
+  laid.map((p) => `${p.index}:${fnv1a(p.payload)}`).join("|") + ":" + total,
+);
+
+let totalChars = 0;
+const packs = laid.map(({ index, items, payload }) => {
+  const block = makeBlock(index, total, payload, release);
   // Vérification croisée : le parseur utilisé par le jeu doit accepter notre bloc.
   const check = parseBlock(block);
   if (!check || !check.ok || check.index !== index || check.total !== total)
     throw new Error(`Bloc ${index} : en-tête/hash incohérent`);
+  if (check.release !== release)
+    throw new Error(`Bloc ${index} : empreinte de version absente ou incohérente`);
   const censorHits = findCensoredPatterns(block);
   if (censorHits.length)
     throw new Error(
@@ -249,6 +262,7 @@ const packs = bins.map((bin, i) => {
     payloadChars: payload.length,
     hash: fnv1a(payload),
     modules: items.length,
+    release,
     sources: items.map((it) => it.file),
   };
 });
@@ -267,6 +281,7 @@ const previousManifest = (() => {
 const manifest = {
   format: "BP3",
   generatedAt: previousManifest ? previousManifest.generatedAt : null,
+  release,
   maxPackChars: MAX,
   origin: { x: ORIGIN[0], y: ORIGIN[1], z: ORIGIN[2] },
   sourceFiles: files.length,
@@ -306,12 +321,17 @@ const lines = [
   `à x=${ORIGIN[0]}, y=${ORIGIN[1]}, z indiqué ci-dessous (blocs consécutifs).`,
   "L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.",
   "",
-  "| Pack | z | Caractères | Fruits / modules |",
-  "| --- | --- | --- | --- |",
+  `Version de cette publication : \`v=${release}\` (la même empreinte sur les ${total} blocs).`,
+  "Colle-les tous depuis **la même publication** : un bloc d'une autre version se",
+  "charge sans erreur mais ne fournit pas les bons handlers — le chargeur te le dit",
+  "(`[FA] N Code Block(s) d'une AUTRE version`) et \`FA.status().stale\` les liste.",
+  "",
+  "| Pack | z | Caractères | Version | Fruits / modules |",
+  "| --- | --- | --- | --- | --- |",
 ];
 for (const p of packs)
   lines.push(
-    `| \`${p.file}\` | \`${p.z}\` | ${p.chars.toLocaleString("fr-FR")} | ` +
+    `| \`${p.file}\` | \`${p.z}\` | ${p.chars.toLocaleString("fr-FR")} | \`${p.release}\` | ` +
       p.sources.map(fruitOf).join(", ") +
       " |",
   );

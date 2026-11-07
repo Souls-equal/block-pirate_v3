@@ -133,7 +133,9 @@ export const MARKER = "/*BP3M*/";
 export const ORIGIN = [100000, 100000, 100002];
 export const SCAN_SLOTS = 24;
 
-const HEADER_RE = /^\s*\/\*BP3:(\d+)\/(\d+):len=(\d+):h=([0-9a-f]{8})\*\/\s*/;
+// L'empreinte `v=` (même valeur sur les 8 blocs d'une version) est optionnelle :
+// les blocs d'une version antérieure n'en ont pas et restent lisibles.
+const HEADER_RE = /^\s*\/\*BP3:(\d+)\/(\d+):len=(\d+):h=([0-9a-f]{8})(?::v=([0-9a-f]{8}))?\*\/\s*/;
 
 export function fnv1a(text) {
   let h = 0x811c9dc5;
@@ -157,6 +159,7 @@ export function parseBlock(text) {
     total: Number(m[2]),
     len,
     hash,
+    release: m[5] || "",
     censored,
     ok: !censored && payload.length === len && fnv1a(payload) === hash,
     payload,
@@ -342,6 +345,8 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   FA.generation = generation;
   FA.packInfo = [];
   FA.errors = [];
+  FA.stale = [];
+  FA.release = "";
   FA.sourceHash = "";
 
   const seen = {};
@@ -494,11 +499,50 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         FA.sourceHash = cacheKey;
       }
 
+      /* Un Code Block recopié d'une ancienne version est invisible autrement :
+         son en-tête est cohérent, il se charge, mais il ne fournit pas les bons
+         handlers (c'est ce qui a coûté 4 handlers de `flame` à la demande 69).
+         L'empreinte `v=` est la même sur tous les blocs d'une même version : on
+         prend la plus fréquente comme référence et on nomme les autres. */
+      /* Un Code Block recopié d'une ancienne version est invisible autrement :
+         son en-tête est cohérent, il se charge, mais il ne fournit pas les bons
+         handlers (c'est exactement ce qui a coûté les 4 handlers de `flame` à la
+         demande 69). L'empreinte `v=` est la même sur tous les blocs d'une même
+         version : on prend la plus fréquente comme référence, et on nomme les
+         autres — avec leur z, pour savoir quel bloc recoller. */
+      const versions = {};
+      for (const p of packs) if (p.release) versions[p.release] = (versions[p.release] || 0) + 1;
+      let release = "";
+      let best = 0;
+      for (const v in versions)
+        if (versions[v] > best) {
+          best = versions[v];
+          release = v;
+        }
+      FA.release = release;
+      FA.stale = release
+        ? packs
+            .filter((p) => (p.release || "") !== release)
+            .map((p) => ({ index: p.index, z: p.z, release: p.release || "" }))
+        : [];
+      if (FA.stale.length)
+        say(
+          `[FA] ${FA.stale.length} Code Block(s) d'une AUTRE version : ` +
+            FA.stale.map((s) => `pack ${s.index} (z=${s.z})`).join(", ") +
+            ` — recopie-les depuis code-blocks/ (version ${release}).`,
+        );
+
       const missing = expected.filter((n) => typeof FA.r[n] !== "function");
       if (missing.length) {
-        say(`[FA] ${missing.length} handler(s) absent(s) : ${missing.join(", ")} (voir FA.status()).`);
+        say(
+          `[FA] ${missing.length} handler(s) absent(s) : ${missing.join(", ")} (voir FA.status()).` +
+            (FA.stale.length ? " Un Code Block est d'une ancienne version (voir la ligne ci-dessus)." : ""),
+        );
       } else if (packs.length) {
-        say(`[FA] ${packs.length}/${total} pack(s) chargé(s), ${Object.keys(FA.r).length} handlers (${sourceHash}).`);
+        say(
+          `[FA] ${packs.length}/${total} pack(s) chargé(s), ${Object.keys(FA.r).length} handlers ` +
+            `(v=${release || "?"}, ${sourceHash}).`,
+        );
       }
 
       FA.ready = packs.length === total && missing.length === 0 && FA.errors.length === 0;
@@ -541,6 +585,8 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       ready: !!FA.ready,
       origin: origin().join(", "),
       packCount: FA.packInfo.length,
+      release: FA.release,
+      stale: FA.stale.slice(),
       packs: FA.packInfo,
       registered: Object.keys(FA.r).length,
       expected: expected.length,

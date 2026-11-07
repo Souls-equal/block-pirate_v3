@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 import {
   parseBlock,
+  makeBlock,
   MARKER,
   fnv1a,
   findCensoredPatterns,
@@ -200,6 +201,12 @@ for (const p of manifest.packs) {
   check(b.hash === p.hash && fnv1a(b.payload) === p.hash, `${p.file} : hash manifest différent`);
   check(text.length <= 32_000, `${p.file} : ${text.length} car. > limite 32 000 du jeu`);
   check(text.length === p.chars, `${p.file} : taille manifest différente`);
+  /* Tous les blocs d'une publication portent la même empreinte : c'est ce qui
+     permet au chargeur de repérer un bloc resté à une ancienne version. */
+  check(
+    b.release === manifest.release,
+    `${p.file} : empreinte de version ${b.release || "(absente)"} != ${manifest.release}`,
+  );
   check(!text.includes("*****"), `${p.file} : contient "*****" (censure Bloxd.io)`);
   /* On scanne le bloc entier ET chaque module séparément : le texte est
      identique, mais un module isolé permet de nommer le coupable. */
@@ -355,6 +362,46 @@ for (const name of FRUIT_HANDLERS) {
     }
   }
 }
+
+// --- « J'ai oublié de mettre à jour un Code Block en jeu » --------------------
+// Cas réel (demande 69) : le pack 8 resté à l'ancienne version ne fournissait
+// plus les 4 handlers de `flame` (onPlayerClickLaser, MeteorShower x2,
+// onCancelMeteorShower) et le chargeur se contentait de dire « 4 handler(s)
+// absent(s) ». Avec l'empreinte `v=`, il doit nommer le bloc coupable.
+const STALE_Z = manifest.packs[manifest.packs.length - 1].z;
+const stalePacks = new Map(texts);
+{
+  // On reconstitue le pack 8 « d'avant » : uniquement le dernier module
+  // (mythical apex) — `flame` n'y était pas, d'où les 4 handlers absents.
+  const text = stalePacks.get(STALE_Z);
+  const b = parseBlock(text);
+  const parts = b.payload.split(MARKER);
+  const payload = parts[parts.length - 1];
+  stalePacks.set(STALE_Z, makeBlock(b.index, b.total, payload, "deadbeef"));
+}
+const stale = runScenario(stalePacks, "un bloc d'une autre version");
+check(
+  stale.status.stale.length === 1 && stale.status.stale[0].z === STALE_Z,
+  `bloc d'une autre version non détecté : ${JSON.stringify(stale.status.stale)}`,
+);
+check(
+  stale.logs.some((l) => /AUTRE version/.test(l) && l.includes(`z=${STALE_Z}`)),
+  `aucun message nommant le bloc périmé (logs : ${stale.logs.join(" | ")})`,
+);
+// Les 4 handlers de `flame` (le module disparu) doivent être signalés, et le
+// message doit renvoyer vers la piste « ancienne version ».
+const FROZEN = [
+  "onPlayerClickLaser",
+  "onPlayerClickMeteorShower",
+  "onPlayerLeaveMeteorShower",
+  "onCancelMeteorShower",
+];
+for (const name of FROZEN)
+  check(stale.status.missing.includes(name), `handler ${name} non signalé comme absent`);
+check(
+  stale.logs.some((l) => /handler\(s\) absent\(s\)/.test(l) && /ancienne version/.test(l)),
+  `le message d'handlers absents ne parle pas d'ancienne version (logs : ${stale.logs.join(" | ")})`,
+);
 
 // Régression du vrai bug Control : la coroutine du dôme appelait `point()`
 // sans l'avoir déstructuré -> ReferenceError avalée, aucun effet visible.
