@@ -33,10 +33,10 @@ import {
     seg,
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
-import { INVENTORY_SLOT_MAX } from "./customItem";
+import { eachItemSlot } from "./customItem";
 import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 
 const FS_DB_KEY = "fs";
 
@@ -737,18 +737,13 @@ function hasAbilityItem(playerId, ab) {
         const amt = api.getInventoryItemAmount(playerId, ab.itemType);
         if (typeof amt === "number" && amt > 0) return true;
     } catch (e) {}
-    for (let slot = 0; slot <= INVENTORY_SLOT_MAX; slot++) {
-        let item = null;
-        try {
-            item = api.getItemSlot(playerId, slot);
-        } catch (e) {
-            item = null;
-        }
-        if (!item || !item.name) continue;
+    let found = false;
+    eachItemSlot(playerId, function (item) {
+        if (found) return;
         const cName = item.attributes && item.attributes.customDisplayName;
-        if (cName === ab.name || item.name === ab.itemType) return true;
-    }
-    return false;
+        if (cName === ab.name || item.name === ab.itemType) found = true;
+    });
+    return found;
 }
 
 export function removeFightingStyleItems(playerId, keepStyleName = null) {
@@ -768,14 +763,7 @@ export function removeFightingStyleItems(playerId, keepStyleName = null) {
             if (typeof amt === "number" && amt > 0) api.removeItemName(playerId, itemType, amt);
         } catch (e) {}
     }
-    for (let slot = 0; slot <= INVENTORY_SLOT_MAX; slot++) {
-        let item = null;
-        try {
-            item = api.getItemSlot(playerId, slot);
-        } catch (e) {
-            item = null;
-        }
-        if (!item || !item.name) continue;
+    eachItemSlot(playerId, function (item, slot) {
         const cName = item.attributes && item.attributes.customDisplayName;
         if (
             (cName && ALL_FS_ABILITY_NAMES.has(cName) && !keepNames.has(cName)) ||
@@ -785,7 +773,7 @@ export function removeFightingStyleItems(playerId, keepStyleName = null) {
                 api.setItemSlot(playerId, slot, "Air");
             } catch (e) {}
         }
-    }
+    });
 }
 
 export function giveFightingStyleItems(playerId, styleName) {
@@ -822,13 +810,13 @@ export function equipFightingStyle(playerId, styleName, silent = false) {
         } catch (e) {}
         try {
             say(playerId, [
-                { icon: "fa-solid fa-hand-fist", style: { color: "#e2e8f0", fontWeight: "bold" } }, { str: " You learned the ", style: { color: "#e2e8f0", fontWeight: "bold" } },
-                { str: style.name, style: { color: style.color, fontWeight: "bold" } },
-                { str: " Fighting Style!\n", style: { color: "#e2e8f0", fontWeight: "bold" } },
-                { str: "• Empty-hand clicks now use ", style: { color: "#94a3b8" } },
-                { str: style.name + " M1", style: { color: style.color, fontWeight: "bold" } },
-                { str: "  • Abilities: ", style: { color: "#94a3b8" } },
-                { str: style.abilities[0].name + " & " + style.abilities[1].name, style: { color: "#facc15", fontWeight: "bold" } },
+                ic("fa-solid fa-hand-fist", "#e2e8f0", {fontWeight: "bold"}), bold(" You learned the ", "#e2e8f0"),
+                bold(style.name, style.color),
+                bold(" Fighting Style!\n", "#e2e8f0"),
+                txt("• Empty-hand clicks now use ", "#94a3b8"),
+                bold(style.name + " M1", style.color),
+                txt("  • Abilities: ", "#94a3b8"),
+                bold(style.abilities[0].name + " & " + style.abilities[1].name, "#facc15"),
             ]);
         } catch (e) {}
     }
@@ -869,9 +857,9 @@ export function buyFightingStyle(playerId, styleName) {
         giveFightingStyleItems(playerId, styleName);
         try {
             say(playerId, [
-                { icon: "fa-solid fa-hand-fist", style: { color: "#cbd5e1" } }, { str: " You already use ", style: { color: "#cbd5e1" } },
-                { str: style.name, style: { color: style.color, fontWeight: "bold" } },
-                { str: "! (Your ability items have been refreshed.)", style: { color: "#cbd5e1" } },
+                ic("fa-solid fa-hand-fist", "#cbd5e1"), txt(" You already use ", "#cbd5e1"),
+                bold(style.name, style.color),
+                txt("! (Your ability items have been refreshed.)", "#cbd5e1"),
             ]);
         } catch (e) {}
         return true;
@@ -885,9 +873,9 @@ export function buyFightingStyle(playerId, styleName) {
     if (money < style.price) {
         try {
             say(playerId, [
-                { icon: "fa-solid fa-coins", style: { color: "#ff5555", fontWeight: "bold" } }, { str: " Not enough Coins to learn ", style: { color: "#ff5555", fontWeight: "bold" } },
-                { str: style.name, style: { color: style.color, fontWeight: "bold" } },
-                { str: ": " + money + "/" + style.price, style: { color: "#fbbf24", fontWeight: "bold" } },
+                ic("fa-solid fa-coins", "#ff5555", {fontWeight: "bold"}), bold(" Not enough Coins to learn ", "#ff5555"),
+                bold(style.name, style.color),
+                bold(": " + money + "/" + style.price, "#fbbf24"),
             ]);
         } catch (e) {}
         return false;
@@ -895,12 +883,12 @@ export function buyFightingStyle(playerId, styleName) {
 
     /* Meme confirmation que tous les autres achats (voir utils/data). */
     if (!confirmAction(playerId, "fs|" + styleName, [
-        { icon: "fa-solid fa-hand-fist", style: { color: style.color } },
-        { str: " Learn ", style: { color: C.INFO } },
-        { str: style.name, style: { color: style.color, fontWeight: "bold" } },
-        { str: " for ", style: { color: C.INFO } },
-        { str: style.price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: " (replaces your current Fighting Style).", style: { color: C.INFO } },
+        ic("fa-solid fa-hand-fist", style.color),
+        txt(" Learn ", C.INFO),
+        bold(style.name, style.color),
+        txt(" for ", C.INFO),
+        bold(style.price + " Coins", C.MONEY),
+        txt(" (replaces your current Fighting Style).", C.INFO),
     ])) return false;
 
     if (!payMoney(playerId, style.price)) {
@@ -999,11 +987,11 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
         const rem = Math.max(1, Math.ceil((cdEnd - now) / 1000));
         try {
             say(playerId, [
-                { str: "[", style: { color: "#94a3b8" } },
-                { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-                { str: "] ", style: { color: "#94a3b8" } },
-                { str: matched.name + " Cooldown: ", style: { color: "#fbbf24" } },
-                { str: rem + "s", style: { color: "#fde68a", fontWeight: "700" } },
+                txt("[", "#94a3b8"),
+                txt("!", "#ef4444", {fontWeight: "700"}),
+                txt("] ", "#94a3b8"),
+                txt(matched.name + " Cooldown: ", "#fbbf24"),
+                txt(rem + "s", "#fde68a", {fontWeight: "700"}),
             ]);
         } catch (e) {}
         /* Renvoie un marqueur : le clic ne lance rien, mais src/index.js
@@ -1048,11 +1036,11 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
                 api.sendFlyingMiddleMessage(
                     playerId,
                     [
-                        { icon: "fa-solid fa-sparkle", style: { color: "#facc15", fontWeight: "700" } },
-                        { str: "Ability ", style: { color: "#cbd5e1", fontWeight: "600" } },
-                        { str: matched.name, style: { color: "#67e8f9", fontWeight: "700" } },
-                        { str: " is ready!", style: { color: "#86efac", fontWeight: "700" } },
-                        { icon: "fa-solid fa-sparkle", style: { color: C.MONEY } },
+                        ic("fa-solid fa-sparkle", "#facc15", {fontWeight: "700"}),
+                        txt("Ability ", "#cbd5e1", {fontWeight: "600"}),
+                        txt(matched.name, "#67e8f9", {fontWeight: "700"}),
+                        txt(" is ready!", "#86efac", {fontWeight: "700"}),
+                        ic("fa-solid fa-sparkle", C.MONEY),
                     ],
                     100,
                 );

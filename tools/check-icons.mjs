@@ -70,8 +70,12 @@ for (const file of files) {
     const source = readFileSync(file, "utf8");
     const where = relative(ROOT, file);
     let m;
-    const re = /icon:\s*["']([^"']*)["']/g;
+    /* Deux ecritures pour la meme chose : le litteral historique
+       `icon: "fa-solid fa-x"` et la fabrique `ic("fa-solid fa-x", couleur)`
+       (core/theme.js). Sans la seconde, 200 icones echapperaient au controle. */
+    const re = /icon:\s*["']([^"']*)["']|(?<![\w$.])ic\s*\(\s*["']([^"']*)["']/g;
     while ((m = re.exec(source))) {
+        if (m[2] !== undefined) m = [m[0], m[2]];
         checked++;
         const problem = checkIcon(m[1]);
         if (problem) errors.push(where + " : \"" + m[1] + "\" — " + problem);

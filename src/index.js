@@ -11,7 +11,7 @@ import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./game
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, reconcileSP as _ } from "./utils/data";
-import { itemJoin as z } from "./gameplay/customItem";
+import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
@@ -25,7 +25,7 @@ import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss
 import { bossDamageGate as bpBossGate } from "./utils/bossGate";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
-import { installTheme as installTheme, shout } from "./core/theme";
+import { installTheme as installTheme, shout, txt } from "./core/theme";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
 /* PONT VERS LES CODE BLOCKS
@@ -124,19 +124,6 @@ function isNPCEntity(t) {
     }
 }
 
-/* Nom de l'item tenu (null si inconnu). */
-function heldItemName(t) {
-    try {
-        const h = api.getHeldItem(t);
-        if (!h) return null;
-        if ("string" == typeof h) return h;
-        return h.name || h.type || null;
-    } catch (t) {
-        _t("getHeldItem", t);
-        return null;
-    }
-}
-
 /* Pendant un dash, le coup de poing (main vide) est bloqué.
    Les dégâts venant d'une habileté (withItem = item d'habileté) passent. */
 function meleeLocked(t, withItem) {
@@ -145,7 +132,7 @@ function meleeLocked(t, withItem) {
     } catch (e) {
         return !1;
     }
-    const held = heldItemName(t);
+    const held = heldName(t);
     if (held && "Air" !== held) return !1;
     const src = Vt(withItem);
     if (src && "Air" !== src && (C(src) || fsItemName(src))) return !1;
@@ -475,17 +462,7 @@ ct((t, r, a) => {
 let $t = 0;
 
 doPeriodicSave = () => {
-    $t++, $t % 2 == 0 && shout([ {
-        str: "if you have any problems, bugs or glitch, report it on the discord!",
-        style: {
-            color: "orange"
-        }
-    }, {
-        str: "> " + [ "discord.", "gg", "/", w ].join(""),
-        style: {
-            color: "lightblue"
-        }
-    } ]);
+    $t++, $t % 2 == 0 && shout([ txt("if you have any problems, bugs or glitch, report it on the discord!", "orange"), txt("> " + [ "discord.", "gg", "/", w ].join(""), "lightblue") ]);
 }, tick = t => {Mt(t);//sphere
     ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();

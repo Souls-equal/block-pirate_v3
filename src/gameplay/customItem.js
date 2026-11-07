@@ -4,7 +4,7 @@ import { FRUITS_BY_RARITY, fruitDescription, fruitItemAttributes, getRarityEncha
 import { LEGACY_FRUIT_ITEMS, getFruitItemName, getFruitInfo } from "../fruit/fruitData";
 import { setTimeout as scheduleTick } from "../utils/timer";
 import { FRUIT_TICKETS, getStat, setItemLabelLookup } from "../utils/data";
-import { say } from "../core/theme";
+import { say, txt } from "../core/theme";
 
 /* Le tier d'enchantement n'est peut-etre pas modifiable via setItemStat :
    on tente une fois, et si le moteur refuse on ne reessaie plus jamais. */
@@ -154,13 +154,32 @@ export function convertWeaponAttributes(oldAttributes, newItemName) {
 
 export const INVENTORY_SLOT_MAX = 50;
 
-export function scanAllItems(playerId, cb) {
+/* Parcours des SEULS slots d'inventaire. scanAllItems() ajoute le Moonstone
+   Chest par-dessus. Deux boucles identiques vivaient ici et dans
+   gameplay/fightingStyles (hasAbilityItem, removeFightingStyleItems) : une
+   seule forme pour les trois. */
+export function eachItemSlot(playerId, cb) {
     for (let slot = 0; slot <= INVENTORY_SLOT_MAX; slot++) {
         let item = null;
         try { item = api.getItemSlot(playerId, slot); } catch (e) { item = null; }
         if (!item || !item.name) continue;
-        try { cb(item, "inventory", slot); } catch (e) {}
+        try { cb(item, slot); } catch (e) {}
     }
+}
+
+/* Nom de l'item en main, ou null. Indexe sur le nom (pas sur l'objet) : c'est
+   ce que comparent les quêtes et les verrous de drop. */
+export function heldItemName(playerId) {
+    try {
+        const h = api.getHeldItem(playerId);
+        if (!h) return null;
+        if (typeof h === "string") return h;
+        return h.name || h.type || null;
+    } catch (e) { return null; }
+}
+
+export function scanAllItems(playerId, cb) {
+    eachItemSlot(playerId, function (item, slot) { cb(item, "inventory", slot); });
 
     let chest = null;
     try { chest = api.getMoonstoneChestItems(playerId); } catch (e) { chest = null; }
@@ -294,13 +313,10 @@ function announceFruitMigration(playerId, result) {
     if (!result || (!result.item && !result.attrs)) return;
     try {
         say(playerId, [
-            { str: "[Fruit] ", style: { color: "#E8B4A0" } },
-            {
-                str: result.item
+            txt("[Fruit] ", "#E8B4A0"),
+            txt(result.item
                     ? result.item + (result.item > 1 ? " fruits ont ete" : " fruit a ete") + " mis a jour vers les nouveaux items."
-                    : "Tes fruits ont ete remis a neuf (enchant + description).",
-                style: { color: "#CBD5E1" },
-            },
+                    : "Tes fruits ont ete remis a neuf (enchant + description).", "#CBD5E1"),
         ]);
     } catch (e) {}
 }

@@ -3,7 +3,7 @@
 import { addStat, addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data";
 import { updateSidebar } from "../core/UI";
 import { computeQuestReward, spawnEnemy } from "./spawning";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 
 export const quests = {
     "Starter Island": {
@@ -419,12 +419,12 @@ function questMessage(quest, resolved) {
     const n = count > 1 ? count + " " : "";
     return {
         start: [
-            { icon: "fa-solid fa-swords", style: { color: C.INFO } },
-            { str: " Eliminate " + n + name + "!", style: { color: C.INFO } }
+            ic("fa-solid fa-swords", C.INFO),
+            txt(" Eliminate " + n + name + "!", C.INFO)
         ],
         complete: [
-            { icon: "fa-solid fa-party-horn", style: { color: C.SUCCESS } },
-            { str: " " + (count > 1 ? count + " " : "") + name + " defeated!", style: { color: C.SUCCESS } }
+            ic("fa-solid fa-party-horn", C.SUCCESS),
+            txt(" " + (count > 1 ? count + " " : "") + name + " defeated!", C.SUCCESS)
         ]
     };
 }
@@ -494,7 +494,7 @@ spawnQuestMob = (playerId, questId) => {
     const quest = getQuestById(questId) || getQuestForLevel(getStat(playerId, "lvl", 1));
     if (!quest) {
         say(playerId, [
-            { icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Unknown quest / no quest for your level", style: { color: "#ff4444" } }
+            ic("fa-solid fa-xmark", "#ff4444"), txt(" Unknown quest / no quest for your level", "#ff4444")
         ]);
         return false;
     }
@@ -542,9 +542,9 @@ export function startQuest(playerId) {
 
     if (!quest) {
         say(playerId, [
-            { str: "Woww... ", style: { color: C.DANGER } },
-            { icon: "fa-solid fa-xmark", style: { color: C.DANGER } },
-            { str: " No quest available...", style: { color: C.DANGER } }
+            txt("Woww... ", C.DANGER),
+            ic("fa-solid fa-xmark", C.DANGER),
+            txt(" No quest available...", C.DANGER)
         ]);
         return;
     }
@@ -558,7 +558,7 @@ export function startQuest(playerId) {
     saveQuest(playerId, resolved, 0);
 
     say(playerId, [
-        { icon: "fa-solid fa-file-lines", style: { color: "#00BFFF", fontWeight: "bold" } }, { str: " QUEST STARTED\n", style: { color: "#00BFFF", fontWeight: "bold" } },
+        ic("fa-solid fa-file-lines", "#00BFFF", {fontWeight: "bold"}), bold(" QUEST STARTED\n", "#00BFFF"),
         ...msg.start
     ]);
 
@@ -604,8 +604,8 @@ export function restorePlayerQuest(playerId) {
 
             const label = resolved.targetMob.join(" / ");
             say(playerId, [
-                { icon: "fa-solid fa-file-lines", style: { color: "#00BFFF" } }, { str: " Quest restored!\n", style: { color: "#00BFFF" } },
-                { str: label + " (" + savedProgress + "/" + quest.killAmount + ")", style: { color: "#FFFFFF" } }
+                ic("fa-solid fa-file-lines", "#00BFFF"), txt(" Quest restored!\n", "#00BFFF"),
+                txt(label + " (" + savedProgress + "/" + quest.killAmount + ")", "#FFFFFF")
             ]);
             restored = true;
         } else {
@@ -643,9 +643,9 @@ export function onQuestKill(playerId, mobName) {
     const targetLabel = quest.targetMob.join(" / ");
 
     say(playerId, [
-        { icon: "fa-solid fa-skull", style: { color: C.INFO } },
-            { str: " " + progress + "/" + quest.killAmount + " ", style: { color: C.INFO } },
-        { str: targetLabel + " defeated", style: { color: "#00FFAA" } }
+        ic("fa-solid fa-skull", C.INFO),
+            txt(" " + progress + "/" + quest.killAmount + " ", C.INFO),
+        txt(targetLabel + " defeated", "#00FFAA")
     ]);
 
     const playerLevel = getStat(playerId, "lvl", 1);
@@ -688,14 +688,14 @@ function completeQuest(playerId) {
         } catch (e) {}
 
         say(playerId, [
-            { icon: "fa-solid fa-trophy", style: { color: "#FFD700", fontWeight: "bold" } }, { str: " QUEST COMPLETE!\n", style: { color: "#FFD700", fontWeight: "bold" } },
+            ic("fa-solid fa-trophy", "#FFD700", {fontWeight: "bold"}), bold(" QUEST COMPLETE!\n", "#FFD700"),
             ...msg.complete,
-            { str: "\nYou gained: ", style: { color: "#B3B3B3" } },
-            { str: "+" + reward.money, style: { color: "#ECC727" } },
-            { str: " Money\n", style: { color: "#ECC727" } },
-            { str: "And ", style: { color: "#B3B3B3" } },
-            { str: "+" + reward.xp, style: { color: "#2791EC" } },
-            { str: " xp", style: { color: "#2791EC" } }
+            txt("\nYou gained: ", "#B3B3B3"),
+            txt("+" + reward.money, "#ECC727"),
+            txt(" Money\n", "#ECC727"),
+            txt("And ", "#B3B3B3"),
+            txt("+" + reward.xp, "#2791EC"),
+            txt(" xp", "#2791EC")
         ]);
 
         addXP(playerId, reward.xp);
@@ -736,7 +736,7 @@ export function resetQuest(playerId) {
     }
 
     say(playerId, [
-        { icon: "fa-solid fa-xmark", style: { color: "#ff4444", fontWeight: "bold" } }, { str: " Quest cancelled", style: { color: "#ff4444", fontWeight: "bold" } }
+        ic("fa-solid fa-xmark", "#ff4444", {fontWeight: "bold"}), bold(" Quest cancelled", "#ff4444")
     ]);
     updateSidebar(playerId);
 }

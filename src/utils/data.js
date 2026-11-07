@@ -16,7 +16,7 @@ resetPlayer = (id) => {
     api.clearInventory(id);
 }
 
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 export function getStat(playerId, key, def=0){
     if (!playerId) return def;
     let v;
@@ -59,7 +59,7 @@ export function changeMoney(playerId, amount, showMessage=true){
     addStat(playerId, "money", amount);
     if (showMessage) {
         const color = amount > 0 ? "#FFD700" : "#ff4444";
-        say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" "+amount+" Coins",style:{color:color} }]);
+        say(playerId,[ic("fa-solid fa-coins", C.MONEY),txt(" "+amount+" Coins", color)]);
     }
 }
 
@@ -131,10 +131,7 @@ export function confirmAction(playerId, key, what) {
         if (Array.isArray(what)) for (const w of what) parts.push(w);
         else parts.push(what);
     }
-    parts.push({
-        str: "\nClick again within " + CONFIRM_SECONDS + "s to confirm.",
-        style: { color: C.SUCCESS, fontWeight: "bold" },
-    });
+    parts.push(bold("\nClick again within " + CONFIRM_SECONDS + "s to confirm.", C.SUCCESS));
     say(playerId, parts);
     return false;
 }
@@ -162,7 +159,7 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     const attrs = attributes && typeof attributes === "object" ? attributes : {};
     const money = getStat(playerId, "money", 0);
     if (money < price) {
-        say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" You don't have enough Coins: "+money+"/"+price,style:{color:C.DANGER} }]);
+        say(playerId,[ic("fa-solid fa-coins", C.MONEY),txt(" You don't have enough Coins: "+money+"/"+price, C.DANGER)]);
         return;
     }
 
@@ -171,12 +168,12 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         || item;
     const key = "buy|" + item + "|" + amount + "|" + price;
     if (!confirmAction(playerId, key, [
-        { icon: "fa-solid fa-cart-shopping", style: { color: C.MONEY } },
-        { str: " Buy " + amount + "x ", style: { color: C.INFO } },
-        { str: label, style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: " for ", style: { color: C.INFO } },
-        { str: price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: "?", style: { color: C.INFO } },
+        ic("fa-solid fa-cart-shopping", C.MONEY),
+        txt(" Buy " + amount + "x ", C.INFO),
+        bold(label, C.MONEY),
+        txt(" for ", C.INFO),
+        bold(price + " Coins", C.MONEY),
+        txt("?", C.INFO),
     ])) return;
 
     if (!payMoney(playerId, price)) {
@@ -189,10 +186,10 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
     } catch (e) {}
     try { api.playSound(playerId, "CashRegister", 1, 1); } catch (e) {}
     say(playerId, [
-        { icon: "fa-solid fa-cart-shopping", style: { color: C.SUCCESS } },
-        { str: " You bought " + amount + "x ", style: { color: C.INFO } },
-        { str: label, style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: ".", style: { color: C.INFO } },
+        ic("fa-solid fa-cart-shopping", C.SUCCESS),
+        txt(" You bought " + amount + "x ", C.INFO),
+        bold(label, C.MONEY),
+        txt(".", C.INFO),
     ]);
 }
 
@@ -341,9 +338,9 @@ export function addXP(playerId, amount){
         applyStatEffects(playerId);
         checkQuestValidity(playerId);
         say(playerId,[
-            {icon:"fa-solid fa-sparkle",style:{color:C.SUCCESS}},
-        {str:" LEVEL UP! ",style:{color:C.SUCCESS,fontWeight:"bold"}},
-            {str:"Level "+lvl,style:{color:"white"}}
+            ic("fa-solid fa-sparkle", C.SUCCESS),
+        bold(" LEVEL UP! ", C.SUCCESS),
+            txt("Level "+lvl, "white")
         ]);
 
         reconcileSP(playerId);
@@ -368,9 +365,9 @@ export function setLevel(playerId, newLevel, resetXP = true){
     applyStatEffects(playerId);
     fullHeal(playerId);
     say(playerId, [
-        {icon:"fa-solid fa-ranking-star",style:{color:C.INFO}},
-        {str:" Level set to ", style:{color:C.INFO}},
-        {str:String(newLevel), style:{color:"#00FF00", fontWeight:"bold"}}
+        ic("fa-solid fa-ranking-star", C.INFO),
+        txt(" Level set to ", C.INFO),
+        bold(String(newLevel), "#00FF00")
     ]);
 }
 
@@ -389,13 +386,13 @@ export function reconcileSP(playerId) {
 
     if (diff > 0) {
         say(playerId, [
-            { icon: "fa-solid fa-sparkle", style: { color: "#00ff00", fontWeight: "bold" } }, { str: " SP recovered: ", style: { color: "#00ff00", fontWeight: "bold" } },
-            { str: "+" + diff, style: { color: "white" } }
+            ic("fa-solid fa-sparkle", "#00ff00", {fontWeight: "bold"}), bold(" SP recovered: ", "#00ff00"),
+            txt("+" + diff, "white")
         ]);
     } else {
         say(playerId, [
-            { icon: "fa-solid fa-triangle-exclamation", style: { color: "#ff9900", fontWeight: "bold" } }, { str: " SP corrected: ", style: { color: "#ff9900", fontWeight: "bold" } },
-            { str: String(diff), style: { color: "white" } }
+            ic("fa-solid fa-triangle-exclamation", "#ff9900", {fontWeight: "bold"}), bold(" SP corrected: ", "#ff9900"),
+            txt(String(diff), "white")
         ]);
     }
 

@@ -645,11 +645,51 @@ function toIconsOnly(message) {
     return out;
 }
 
-/* Icone seule, dans la couleur demandee. */
-export function icon(name, color) {
-    const part = { icon: safeIcon(name) };
-    if (color) part.style = { color: themeColor(color) };
-    return part;
+/* ══════════════════════════════════════════════════════════════════════════
+   SEGMENTS DE MESSAGE — txt() / bold() / ic()
+
+   Un message Bloxd est un tableau de parties, et une partie n'a que deux
+   formes utiles :
+
+       { str: " You bought ", style: { color: C.INFO } }
+       { icon: "fa-solid fa-coins", style: { color: C.MONEY } }
+
+   Le jeu en construisait un millier a la main, avec la meme ponctuation
+   recopiee : `txt(texte, couleur)` et `ic(icone, couleur)` remplacent ces
+   litteraux, `bold(texte, couleur)` le cas (tres frequent) du texte en gras.
+   La 3e valeur est reservee aux autres proprietes de style (fontSize,
+   fontWeight non standard) : elle n'est PAS fusionnee avec la couleur, donc
+   on peut passer la meme constante sans la modifier par accident.
+
+   La couleur reste celle qu'on donne : c'est format() qui la ramene a la
+   palette au moment de l'envoi (themeColor est idempotent). Aucune de ces
+   fabriques n'appelle l'API ni ne touche a l'etat : elles ne construisent
+   qu'un objet, exactement comme le litteral qu'elles remplacent.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function segmentStyle(color, extra) {
+    if (!extra) return color ? { color: color } : null;
+    if (!color) return Object.assign({}, extra);
+    /* color en premier : l'ordre des cles reste celui qu'ecrivaient les
+       litteraux, donc deux segments identiques restent identiques. */
+    return Object.assign({ color: color }, extra);
+}
+
+/* Texte seul. */
+export function txt(str, color, extra) {
+    const style = segmentStyle(color, extra);
+    return style ? { str: str, style: style } : { str: str };
+}
+
+/* Texte en gras : le style exact que le jeu ecrivait a la main. */
+export function bold(str, color) {
+    return { str: str, style: { color: color, fontWeight: "bold" } };
+}
+
+/* Icone seule. */
+export function ic(name, color, extra) {
+    const style = segmentStyle(color, extra);
+    return style ? { icon: name, style: style } : { icon: name };
 }
 
 /* --- Patch de l'API -------------------------------------------------------

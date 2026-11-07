@@ -37,7 +37,7 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
 
 Bloxd limite le World Code à **512 000 caractères** **et à 64 fichiers**, et il compte
 **le texte brut des fichiers collés**. Les sources de `src/` sont écrites pour être lues (commentaires,
-indentation, noms explicites) : ~760 000 caractères à elles seules, donc le texte brut
+indentation, noms explicites) : ~729 000 caractères à elles seules, donc le texte brut
 dépasse largement la limite dès qu'on ajoute un fichier `src/build/*`.
 
 `npm run build:src` produit donc **`world-code/`** (versionné dans git, tu peux le
@@ -56,8 +56,8 @@ par fichier, mais compactée pour le collage — commentaires et espaces retiré
 
 | | Caractères | Limite |
 | --- | --- | --- |
-| Sources lisibles (`src/`) | ~758 000 | 148 % |
-| **`world-code/` (à coller)** | **~367 000** | **72 %** |
+| Sources lisibles (`src/`) | ~729 000 | 142 % |
+| **`world-code/` (à coller)** | **~341 000** | **67 %** |
 
 Ce qui n'est **jamais** modifié, parce que le jeu s'appuie dessus :
 
@@ -265,6 +265,34 @@ passe par `say()` / `shout()` (ou par le patch de l'API posé au démarrage), qu
 Dans le code : `import { C, say, shout } from "./theme"` puis `say(id, [...])`,
 `say(id, "texte", { color: C.MONEY })` ou `{ icon: "fa-solid fa-coins" }`.
 `themeColor()` est idempotent : une couleur déjà palette revient identique.
+
+### Un message = des segments : `txt()` / `bold()` / `ic()`
+
+Une partie de message Bloxd n'a que **deux formes** utiles, et le jeu en construisait
+**~1 000 à la main**, avec la même ponctuation recopiée dans 20 fichiers :
+
+| Littéral d'avant | Aujourd'hui |
+| --- | --- |
+| `{ str: " You bought ", style: { color: C.INFO } }` | `txt(" You bought ", C.INFO)` |
+| `{ str: "Kick Player", style: { color: c, fontWeight: "bold" } }` | `bold("Kick Player", c)` |
+| `{ icon: "fa-solid fa-coins", style: { color: C.MONEY } }` | `ic("fa-solid fa-coins", C.MONEY)` |
+
+| Fabrique | Renvoie | 3ᵉ argument |
+| --- | --- | --- |
+| `txt(texte, couleur)` | `{ str, style }` | autres propriétés de style (`fontSize`, `fontWeight`) |
+| `bold(texte, couleur)` | `{ str, style: { color, fontWeight: "bold" } }` | — |
+| `ic(icone, couleur)` | `{ icon, style }` | idem `txt` |
+
+Elles vivent dans `core/theme.js` (aucun nouveau fichier : c'est déjà le module des
+messages), ne touchent ni l'API ni un état global, et renvoient **exactement** l'objet du
+littéral — `format()` continue de normaliser couleur, icône et emoji à l'envoi. Une couleur
+absente (`txt("x")`) donne `{ str: "x" }`, comme avant, et l'ordre des clés est celui des
+littéraux (deux segments identiques restent identiques, donc `mergeNeighbours()` les
+fusionne toujours).
+
+`npm run check` vérifie toujours les icônes : `tools/check-icons.mjs` lit **les deux
+écritures** (`icon: "…"` historique et `ic("…")`), sinon 200 icônes échapperaient au
+contrôle.
 
 ### Icônes : une liste blanche, sinon « ? »
 
@@ -1303,6 +1331,38 @@ Deux extractions seulement ont été gardées, parce qu'elles servent **plusieur
 La limite du World Code est passée de 30 à **64 fichiers** (`FILE_LIMIT`), mais elle n'est
 pas un objectif : on est à **32 fichiers**. Une limite haute autorise un découpage propre,
 elle ne le réclame pas.
+
+### Mutualiser d'abord, découper ensuite
+
+Avant d'ouvrir un fichier, la question est : **est-ce que ce code existe déjà ailleurs ?**
+Le même raisonnement que la règle ci-dessus, appliqué aux *fonctions* : deux copies d'un
+même calcul finissent toujours par diverger, et une correction n'atteint qu'une des deux.
+
+Ce qui a été regroupé, sans un seul fichier de plus :
+
+| Doublon | Où il vit maintenant | Ce que ça supprime |
+| --- | --- | --- |
+| ~1 000 segments `{ str, style }` / `{ icon, style }` | `txt` / `bold` / `ic` (`core/theme.js`) | la ponctuation recopiée dans 20 fichiers |
+| 143 entrées d'`ABILITY_BINDS` (`id`, `item`, `name`, `cd`, `desc`, `cast`) | fabrique `A(...)` (`fruit/abilities.js`) | six clés et un lambda par aptitude |
+| `posOf`, `dist2d`/`dist3`, `alive` | `posOf`, `dist2`, `dist3`, `aliveNow` (`utils/lifeform.js`) | 3 copies de `posOf`, 3 de la distance, 3 de `alive` |
+| `nameTagInfo` d'un boss | `nameTagInfo()` (`utils/lifeform.js`) | 2 constructions identiques, fond/bordure/graisse en paramètres |
+| bloc de 10 `setMobSetting` d'un boss | `setupBossMob()` (`utils/boss.js`) | 3 copies (Garp, Mob Leader, Saber Expert) |
+| balayage des slots d'inventaire | `eachItemSlot()` (`gameplay/customItem.js`) | 2 boucles de `gameplay/fightingStyles.js` |
+| `heldItemName` | `gameplay/customItem.js` | 2 copies (`index.js`, `gameplay/saber.js`) |
+| recherche « joueur qui possède ce `ownerDbId` » | `playerIdForDbId()` (`utils/killAttribution.js`) | 2 boucles (`spawning.js`, `killAttribution.js`) |
+| bornes d'un rectangle de blocs | `boxCorners()` (`gameplay/saber.js`) | 2 calculs dans le même fichier |
+| `tell()` = `say()` dans un `try` | `say()` (déjà protégé) | 1 fonction morte + 40 appels |
+
+Un helper ne se justifie que s'il **remplace du texte existant** : une fabrique n'a pas le
+droit d'ajouter un comportement (aucune ne touche l'API, aucune ne garde d'état). Les rares
+aptitudes qui lisent plus de deux arguments gardent leur objet écrit à la main — c'est le
+prix d'un comportement identique.
+
+**Vérification** : deux paquets esbuild (avant / après), même `api` factice, **40 parcours**
+rejoués — panel admin complet (32 items), `itemJoin`, achats, PNJ, Saber Quest, spawn des
+trois boss, chat/crew, quêtes, variations, settings. **40/40 rendent exactement les mêmes
+messages** (texte, couleur, icône) et les mêmes appels API, arguments compris. Plus
+**181 traces** de `cast()` et **41 tables de fruits** identiques au caractère près.
 
 ### `gameplay/saber.js` : un seul fichier, quatorze sections
 

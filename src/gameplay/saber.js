@@ -44,15 +44,16 @@
                 termine la quete.
    ══════════════════════════════════════════════════════════════════════════ */
 
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { deleteStat, getStat, setStat } from "../utils/data";
 import { nowMs, setInterval as every } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
-import { getAlivePlayerIds, isMobEntityType, safePosition } from "../utils/lifeform";
+import { aliveNow, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safePosition } from "../utils/lifeform";
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
-import { scanAllItems, writeItem } from "./customItem";
+import { heldItemName, scanAllItems, writeItem } from "./customItem";
 import { markBossMob } from "./loot";
 import { armBossGate, disarmBossGate } from "../utils/bossGate";
+import { setupBossMob } from "../utils/boss";
 
 /* ── 1. CONSTANTES ET POINTS DU MONDE ─────────────────────────────────────
 
@@ -197,21 +198,9 @@ export function saberLockedItem(itemName) {
    communes aux deux boss.
  */
 
-function dist3(a, b) {
-    const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
-    return Math.sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-
 function norm3(v) {
     const l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
     return [v[0] / l, v[1] / l, v[2] / l];
-}
-
-
-function alive(id) {
-    if (!id) return false;
-    try { return !!api.isAlive(id); } catch (e) { return false; }
 }
 
 
@@ -227,27 +216,22 @@ function blockAt(x, y, z) {
 }
 
 
-function tell(playerId, parts) {
-    try { say(playerId, parts); } catch (e) {}
-}
-
-
 function line(icon, color, text) {
     return [
-        { icon: icon, style: { color: color } },
-        { str: " " + text, style: { color: C.INFO } },
+        ic(icon, color),
+        txt(" " + text, C.INFO),
     ];
 }
 
 
 function speech(icon, color, speaker, quote, extra) {
     const parts = [
-        { icon: icon, style: { color: color } },
-        { str: " " + speaker + ": \"", style: { color: C.INFO } },
-        { str: quote, style: { color: "#FFFFFF" } },
-        { str: "\"", style: { color: C.INFO } },
+        ic(icon, color),
+        txt(" " + speaker + ": \"", C.INFO),
+        txt(quote, "#FFFFFF"),
+        txt("\"", C.INFO),
     ];
-    if (extra) parts.push({ str: "\n" + extra, style: { color: C.SUCCESS } });
+    if (extra) parts.push(txt("\n" + extra, C.SUCCESS));
     return parts;
 }
 
@@ -280,16 +264,6 @@ function countOf(playerId, itemName) {
 }
 
 
-function heldItemName(playerId) {
-    try {
-        const h = api.getHeldItem(playerId);
-        if (!h) return null;
-        if (typeof h === "string") return h;
-        return h.name || h.type || null;
-    } catch (e) { return null; }
-}
-
-
 /* ── 3. CLICS DANS LE MONDE ────────────────────────────────────────────── */
 
 /* Un clic arrive en coordonnees flottantes : la case cliquee est le floor.
@@ -305,17 +279,6 @@ function inClickBox(x, y, z, min, max) {
     return bx >= min[0] - 1 && bx <= max[0] + 1
         && by >= min[1] - 1 && by <= max[1] + 1
         && bz >= min[2] - 1 && bz <= max[2] + 1;
-}
-
-
-function nameTag(title, subtitle, color) {
-    const info = {
-        content: [{ str: title, style: { color: color, fontWeight: "bold" } }],
-        healthbar: { display: "always", foregroundColour: color, backgroundColour: "#22130a" },
-        border: { colour: color, style: "solid" },
-    };
-    if (subtitle) info.subtitle = [{ str: subtitle, style: { color: "#FFD166" } }];
-    return info;
 }
 
 
@@ -339,7 +302,7 @@ function despawnIfAlive(id) {
     if (!id) return;
     /* Le garde-fou de degats suit le mob : plus de mob, plus de palier. */
     disarmBossGate(id);
-    try { if (alive(id)) api.despawnMob(id); } catch (e) {}
+    try { if (aliveNow(id)) api.despawnMob(id); } catch (e) {}
 }
 
 
@@ -635,6 +598,17 @@ function clearStructArrow(playerId, key) {
    api.setBlock(0, x, y, z) : il posait un bloc a l'origine du monde et la
    porte ne s'ouvrait donc JAMAIS physiquement. On passe maintenant par le
    rectangle, exactement comme dans le monde. */
+/* Les six bornes d'un rectangle de blocs, dans l'ordre min/max : deux boucles
+   de ce fichier (percage et lecture) les recalculaient a la main. */
+function boxCorners(a, b) {
+    return [
+        Math.min(a[0], b[0]), Math.max(a[0], b[0]),
+        Math.min(a[1], b[1]), Math.max(a[1], b[1]),
+        Math.min(a[2], b[2]), Math.max(a[2], b[2]),
+    ];
+}
+
+
 function rectBlocks(a, b, name) {
     try {
         api.setBlockRect([a[0], a[1], a[2]], [b[0], b[1], b[2]], name);
@@ -642,9 +616,7 @@ function rectBlocks(a, b, name) {
     } catch (e) {}
     /* repli bloc par bloc si setBlockRect n'existe pas dans ce moteur */
     let ok = false;
-    const x1 = Math.min(a[0], b[0]), x2 = Math.max(a[0], b[0]);
-    const y1 = Math.min(a[1], b[1]), y2 = Math.max(a[1], b[1]);
-    const z1 = Math.min(a[2], b[2]), z2 = Math.max(a[2], b[2]);
+    const [x1, x2, y1, y2, z1, z2] = boxCorners(a, b);
     for (let x = x1; x <= x2; x++) {
         for (let y = y1; y <= y2; y++) {
             for (let z = z1; z <= z2; z++) {
@@ -659,9 +631,7 @@ function rectBlocks(a, b, name) {
 /* Ce qu'il y a dans le rectangle avant de le percer. */
 function readRect(a, b) {
     const out = [];
-    const x1 = Math.min(a[0], b[0]), x2 = Math.max(a[0], b[0]);
-    const y1 = Math.min(a[1], b[1]), y2 = Math.max(a[1], b[1]);
-    const z1 = Math.min(a[2], b[2]), z2 = Math.max(a[2], b[2]);
+    const [x1, x2, y1, y2, z1, z2] = boxCorners(a, b);
     for (let x = x1; x <= x2; x++) {
         for (let y = y1; y <= y2; y++) {
             for (let z = z1; z <= z2; z++) {
@@ -783,7 +753,7 @@ export function saberClick(playerId, rightClick, x, y, z, blockName, targetId) {
     const waterBlock = blockName === "Water" || blockName === "Flowing Water";
     if (toWater <= 5 || (waterBlock && toWater <= 12)) return fillCup(playerId);
     if (toWater <= 10) {
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You are too far from the water."));
+        say(playerId, line("fa-solid fa-circle-info", C.INFO, "You are too far from the water."));
         return true;
     }
 
@@ -797,12 +767,12 @@ export function saberClick(playerId, rightClick, x, y, z, blockName, targetId) {
 function pressButton(playerId, index) {
     const step = stepOf(playerId);
     if (step >= S.DOOR) {
-        tell(playerId, line("fa-solid fa-door-open", C.SUCCESS, "The hidden door is already open."));
+        say(playerId, line("fa-solid fa-door-open", C.SUCCESS, "The hidden door is already open."));
         return true;
     }
     const mask = buttonsOf(playerId);
     if (mask & (1 << index)) {
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO, "You already pressed this button."));
+        say(playerId, line("fa-solid fa-circle-info", C.INFO, "You already pressed this button."));
         return true;
     }
     const next = mask | (1 << index);
@@ -817,20 +787,19 @@ function pressButton(playerId, index) {
         openStruct("door");
         armStructArrow(playerId, "door");
         soundAt(playerId, "glass1", 1, 0.8, 40);
-        tell(playerId, [
-            { icon: "fa-solid fa-door-open", style: { color: C.SUCCESS } },
-            { str: " All five hidden buttons are pressed: ", style: { color: C.SUCCESS } },
-            { str: "a door grinds open deeper in the jungle.", style: { color: C.INFO } },
-            { str: "\nA marker points at it. It stays open for a minute.",
-                style: { color: "#94A3B8" } },
+        say(playerId, [
+            ic("fa-solid fa-door-open", C.SUCCESS),
+            txt(" All five hidden buttons are pressed: ", C.SUCCESS),
+            txt("a door grinds open deeper in the jungle.", C.INFO),
+            txt("\nA marker points at it. It stays open for a minute.", "#94A3B8"),
         ]);
     } else {
         soundAt(playerId, "coin", 0.6, 1.4, 20);
-        tell(playerId, [
-            { icon: "fa-solid fa-circle-check", style: { color: C.XP } },
-            { str: " Hidden button pressed ", style: { color: C.INFO } },
-            { str: "(" + pressed + "/" + BUTTONS.length + ")", style: { color: C.SUCCESS, fontWeight: "bold" } },
-            { str: ".", style: { color: C.INFO } },
+        say(playerId, [
+            ic("fa-solid fa-circle-check", C.XP),
+            txt(" Hidden button pressed ", C.INFO),
+            bold("(" + pressed + "/" + BUTTONS.length + ")", C.SUCCESS),
+            txt(".", C.INFO),
         ]);
     }
     return true;
@@ -848,7 +817,7 @@ function burnCurtain(playerId) {
 
     const held = heldItemName(playerId);
     if (held !== ITEM_TORCH && !hasItem(playerId, ITEM_TORCH)) {
-        tell(playerId, line("fa-solid fa-fire", C.DANGER, "The curtain will not burn. You need a Torch."));
+        say(playerId, line("fa-solid fa-fire", C.DANGER, "The curtain will not burn. You need a Torch."));
         return true;
     }
 
@@ -859,10 +828,10 @@ function burnCurtain(playerId) {
     soundAt(playerId, "bearRoar1", 1, 1.2, 40);
     const p = safePosition(playerId);
     if (p) boom(p, 2.2, { tex: TEX.effect, colors: [rgba(255, 170, 60), rgba(120, 40, 0, 0)] });
-    tell(playerId, [
-        { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
-        { str: " The Torch sets the curtain ablaze ", style: { color: C.INFO } },
-        { str: "and burns out in your hand: a passage opens behind the smoke.", style: { color: C.SUCCESS } },
+    say(playerId, [
+        ic("fa-solid fa-fire", C.MONEY),
+        txt(" The Torch sets the curtain ablaze ", C.INFO),
+        txt("and burns out in your hand: a passage opens behind the smoke.", C.SUCCESS),
     ]);
     return true;
 }
@@ -897,7 +866,7 @@ function fillCup(playerId) {
             /* Deja remplie : l'etape suit l'item, pour ne jamais laisser un
                joueur avec une Cup pleine et un Old Man qui a encore soif. */
             if (step >= S.CURTAIN && step < S.WATER) setStep(playerId, S.WATER);
-            tell(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
+            say(playerId, line("fa-solid fa-circle-info", C.INFO, "Your Cup is already full of water."));
             return true;
         }
         if (step >= S.WATER) {
@@ -905,16 +874,16 @@ function fillCup(playerId) {
                plutot que d'annoncer une etape que le joueur ne peut plus
                jouer. */
             if (giveFullCup(playerId)) {
-                tell(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
+                say(playerId, line("Water", C.SUCCESS, "Your Cup is filled again: someone must be thirsty."));
                 return true;
             }
-            tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
+            say(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup is gone, and you have no room to take it back."));
             return true;
         }
         /* Ni seau vide, ni seau plein : le clic est arrive jusqu'ici, c'est
            donc bien un probleme d'item et pas de detection. On le dit, au lieu
            de laisser le joueur croire que son clic s'est perdu. */
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO,
+        say(playerId, line("fa-solid fa-circle-info", C.INFO,
             "You have nothing to collect this water with."));
         return true;
     }
@@ -923,7 +892,7 @@ function fillCup(playerId) {
        ne fait pas avancer l'etape, mais on repond quand le joueur tient un
        seau — un clic muet ressemble a un bug. */
     if (step < S.CURTAIN) {
-        tell(playerId, line("fa-solid fa-circle-info", C.INFO,
+        say(playerId, line("fa-solid fa-circle-info", C.INFO,
             "The water is clear, but you have no reason to fill that yet."));
         return true;
     }
@@ -944,7 +913,7 @@ function fillCup(playerId) {
         customDescription: CUP_FULL_ATTRS.customDescription,
     });
     if (!ok) {
-        tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
+        say(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
         return true;
     }
     if (rest > 0) {
@@ -953,11 +922,11 @@ function fillCup(playerId) {
 
     if (step < S.WATER) setStep(playerId, S.WATER);
     soundAt(playerId, "coin", 0.5, 1.5, 20);
-    tell(playerId, [
-        { icon: "Water", style: { color: C.MARINE } },
-        { str: " You fill the Cup with water: ", style: { color: C.INFO } },
-        { str: CUP_FULL, style: { color: C.MARINE, fontWeight: "bold" } },
-        { str: ".", style: { color: C.INFO } },
+    say(playerId, [
+        ic("Water", C.MARINE),
+        txt(" You fill the Cup with water: ", C.INFO),
+        bold(CUP_FULL, C.MARINE),
+        txt(".", C.INFO),
     ]);
     return true;
 }
@@ -974,7 +943,7 @@ function passWall(playerId) {
     const burned = step >= S.WALL;
     if (!burned) {
         if (!hasItem(playerId, ITEM_RELIC)) {
-            tell(playerId, line("fa-solid fa-lock", C.DANGER, "This wall is sealed. Only the ancient relic can open it."));
+            say(playerId, line("fa-solid fa-lock", C.DANGER, "This wall is sealed. Only the ancient relic can open it."));
             return true;
         }
         try { api.removeItemName(playerId, ITEM_RELIC, 1); } catch (e) {}
@@ -986,16 +955,16 @@ function passWall(playerId) {
     soundAt(playerId, "glass1", 1, 1.3, 25);
     const p = safePosition(playerId);
     if (p) point(p, { tex: TEX.soul, count: 12, colors: [rgba(255, 90, 40), rgba(40, 10, 0, 0)] });
-    tell(playerId, burned
+    say(playerId, burned
         ? [
-            { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
-            { str: " The hole in the wall is still warm. ", style: { color: C.INFO } },
-            { str: "You slip through it.", style: { color: C.SUCCESS } },
+            ic("fa-solid fa-fire", C.MONEY),
+            txt(" The hole in the wall is still warm. ", C.INFO),
+            txt("You slip through it.", C.SUCCESS),
         ]
         : [
-            { icon: "fa-solid fa-fire", style: { color: C.MONEY } },
-            { str: " The " + ITEM_RELIC + " burns through the wall ", style: { color: C.INFO } },
-            { str: "and is consumed by the rock.", style: { color: C.SUCCESS } },
+            ic("fa-solid fa-fire", C.MONEY),
+            txt(" The " + ITEM_RELIC + " burns through the wall ", C.INFO),
+            txt("and is consumed by the rock.", C.SUCCESS),
         ]);
     return true;
 }
@@ -1008,12 +977,12 @@ export function saberOldMan(playerId) {
     const step = stepOf(playerId);
 
     if (step >= S.OLD_MAN) {
-        tell(playerId, speech("fa-solid fa-user-group", C.MARINE, "Old Man",
+        say(playerId, speech("fa-solid fa-user-group", C.MARINE, "Old Man",
             "Please meet up with my son, I'm sure he will reward you."));
         return true;
     }
     if (step < S.WATER) {
-        tell(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
+        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
         return true;
     }
 
@@ -1022,7 +991,7 @@ export function saberOldMan(playerId) {
        VIDE ne desaltere personne, et ca ne bloque pas : le point d'eau
        remplit n'importe quel seau vide (voir fillCup). */
     if (!hasItem(playerId, ITEM_CUP_FULL)) {
-        tell(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
+        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
         return true;
     }
 
@@ -1030,7 +999,7 @@ export function saberOldMan(playerId) {
     try { api.removeItemName(playerId, ITEM_CUP_FULL, 1); } catch (e) {}
     setStep(playerId, S.OLD_MAN);
     soundAt(playerId, "coin", 0.8, 1.2, 20);
-    tell(playerId, speech("Water", C.SUCCESS, "Old Man",
+    say(playerId, speech("Water", C.SUCCESS, "Old Man",
         "Thank you so much! Please meet up with my son, I'm sure he will reward you."));
     return true;
 }
@@ -1041,7 +1010,7 @@ export function saberRichMan(playerId) {
     const step = stepOf(playerId);
 
     if (step < S.OLD_MAN) {
-        tell(playerId, speech("fa-solid fa-user-group", C.MONEY, "Rich Man",
+        say(playerId, speech("fa-solid fa-user-group", C.MONEY, "Rich Man",
             "Come back when my father is not thirsty anymore."));
         return true;
     }
@@ -1050,7 +1019,7 @@ export function saberRichMan(playerId) {
         setStep(playerId, S.HUNT);
         armSecretArrow(playerId);
         soundAt(playerId, "exp_levelup", 0.8, 1.1, 20);
-        tell(playerId, speech("fa-solid fa-coins", C.MONEY, "Rich Man",
+        say(playerId, speech("fa-solid fa-coins", C.MONEY, "Rich Man",
             "Thanks for helping my father, but a mob leader has stolen all my money! "
             + "Please find and take him down as soon possible so I can reward player...",
             "A marker now points at Secret Island."));
@@ -1066,7 +1035,7 @@ export function saberRichMan(playerId) {
            cours pour que le Mob Leader puisse le lacher de nouveau. */
         if (step >= S.GOLD) setStep(playerId, S.HUNT);
         armSecretArrow(playerId);
-        tell(playerId, speech("fa-solid fa-coins", C.MONEY, "Rich Man",
+        say(playerId, speech("fa-solid fa-coins", C.MONEY, "Rich Man",
             "A mob leader still holds my money. Find him first."));
         return true;
     }
@@ -1076,12 +1045,12 @@ export function saberRichMan(playerId) {
        jamais deux reliques : la garde est l'absence de l'item ET l'etape. */
     if (step === S.RELIC && !hasItem(playerId, ITEM_RELIC)) {
         try { api.giveItem(playerId, ITEM_RELIC, 1); } catch (e) {}
-        tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
+        say(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
             "You lost the relic? Here it is again. Burn that wall."));
         return true;
     }
 
-    tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
+    say(playerId, speech("fa-solid fa-circle-info", C.INFO, "Rich Man",
         "The relic is yours. Use it on the sealed wall."));
     return true;
 }
@@ -1096,7 +1065,7 @@ function payRichard(playerId) {
     clearSecretArrow(playerId);
     try { api.giveItem(playerId, ITEM_RELIC, 1); } catch (e) {}
     soundAt(playerId, "exp_levelup", 1, 0.9, 20);
-    tell(playerId, speech("fa-solid fa-trophy", C.SUCCESS, "Rich Man",
+    say(playerId, speech("fa-solid fa-trophy", C.SUCCESS, "Rich Man",
         "Thank you for getting my money back, you can keep this ancient relic as your reward.",
         "You received " + ITEM_RELIC + "."));
     return true;
@@ -1108,18 +1077,18 @@ export function saberShanks(playerId) {
     const step = stepOf(playerId);
 
     if (step < S.RELIC) {
-        tell(playerId, speech("fa-solid fa-circle-info", C.INFO, "Shanks",
+        say(playerId, speech("fa-solid fa-circle-info", C.INFO, "Shanks",
             "Come back with something worth my time."));
         return true;
     }
     /* La relique est CONSOMMEE au mur : une fois le passage brule (etape WALL),
        Shanks n'a plus a la reclamer. Avant, il la demande encore. */
     if (step < S.WALL && !hasItem(playerId, ITEM_RELIC)) {
-        tell(playerId, line("fa-solid fa-lock", C.DANGER, "Shanks: \"The relic is the key. Bring it back.\""));
+        say(playerId, line("fa-solid fa-lock", C.DANGER, "Shanks: \"The relic is the key. Bring it back.\""));
         return true;
     }
 
-    tell(playerId, speech("fa-solid fa-swords", "#E8B4A0", "Shanks",
+    say(playerId, speech("fa-solid fa-swords", "#E8B4A0", "Shanks",
         "So you found the relic. Show me what a real sword can do."));
     startSaberFight(playerId);
     return true;
@@ -1181,7 +1150,7 @@ function stopLeader() {
 
 function thinkLeader() {
     if (!leader) { stopLeader(); return; }
-    if (!alive(leader.id)) { stopLeader(); return; }
+    if (!aliveNow(leader.id)) { stopLeader(); return; }
     const p = safePosition(leader.id);
     if (!p) { despawnIfAlive(leader.id); stopLeader(); return; }
 
@@ -1206,7 +1175,7 @@ function thinkLeader() {
     /* CIBLE : on garde la cible courante si elle est vivante et encore a
        portee, sinon on prend le joueur le plus proche. C'est ce qui fait la
        difference entre "un mob qui marche" et "un boss qui attaque". */
-    let target = leader.aiTarget && alive(leader.aiTarget) ? leader.aiTarget : null;
+    let target = leader.aiTarget && aliveNow(leader.aiTarget) ? leader.aiTarget : null;
     if (target) {
         const cp = safePosition(target);
         if (!cp || dist3(cp, p) > LEADER.AGGRO) target = null;
@@ -1350,8 +1319,8 @@ function leaderVolley(p, tp) {
 export function spawnMobLeader(x, y, z, playerId) {
     const px = Number(x), py = Number(y), pz = Number(z);
     if (!isFinite(px) || !isFinite(py) || !isFinite(pz)) return null;
-    if (leader && alive(leader.id)) {
-        if (playerId) tell(playerId, line("fa-solid fa-circle-info", C.INFO, "The Mob Leader is already on the loose."));
+    if (leader && aliveNow(leader.id)) {
+        if (playerId) say(playerId, line("fa-solid fa-circle-info", C.INFO, "The Mob Leader is already on the loose."));
         return null;
     }
 
@@ -1364,7 +1333,7 @@ export function spawnMobLeader(x, y, z, playerId) {
         });
     } catch (e) { id = null; }
     if (!id) {
-        if (playerId) tell(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
+        if (playerId) say(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
         return null;
     }
     /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
@@ -1373,20 +1342,17 @@ export function spawnMobLeader(x, y, z, playerId) {
     const hp = leaderHp();
     /* Pas de one shot : paliers a 1/2, 1/3, 1/4 et 1/5 de sa vie. */
     armBossGate(id, hp);
-    try {
-        api.setMobSetting(id, "maxHealth", hp);
-        api.setHealth(id, hp, undefined, true);
-        api.setMobSetting(id, "attackDamage", leaderDmg());
-        api.setMobSetting(id, "hostilityRadius", 40);
-        api.setMobSetting(id, "chaseRadius", 40);
-        api.setMobSetting(id, "territoryRadius", 40);
-        api.setMobSetting(id, "onDeathItemDrops", []);
-        api.setMobSetting(id, "baseRunningSpeed", LEADER.SPEED);
-        api.setMobSetting(id, "baseWalkingSpeed", LEADER.SPEED * 0.75);
-        api.setLifeformScale(id, LEADER.SCALE);
-        api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
-            nameTag(LEADER.NAME, LEADER.TITLE, "#FFD166"), true);
-    } catch (e) {}
+    setupBossMob(id, {
+        hp: hp,
+        dmg: leaderDmg(),
+        radius: 40,
+        speed: LEADER.SPEED,
+        scale: LEADER.SCALE,
+        name: LEADER.NAME,
+        title: LEADER.TITLE,
+        colour: "#FFD166",
+        background: "#22130a",
+    });
     /* Il se choisit une cible tout seul des le spawn : sans joueur en
        parametre (Code Block de Secret Island), il restait sans cible et
        n'attaquait donc jamais avec ses capacites. */
@@ -1438,17 +1404,17 @@ function killLeader(playerId, mobId) {
     }
     if (playerId) {
         if (st === S.HUNT) setStep(playerId, S.GOLD);
-        tell(playerId, wantGold
+        say(playerId, wantGold
             ? [
-                { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-                { str: " The Mob Leader drops ", style: { color: C.INFO } },
-                { str: ITEM_GOLD, style: { color: C.MONEY, fontWeight: "bold" } },
-                { str: ". Take it back to the Rich Man.", style: { color: C.INFO } },
+                ic("fa-solid fa-coins", C.MONEY),
+                txt(" The Mob Leader drops ", C.INFO),
+                bold(ITEM_GOLD, C.MONEY),
+                txt(". Take it back to the Rich Man.", C.INFO),
             ]
             : [
-                { icon: "fa-solid fa-skull", style: { color: C.SUCCESS } },
-                { str: " The Mob Leader is down. ", style: { color: C.INFO } },
-                { str: "Nothing left to take from him.", style: { color: "#94A3B8" } },
+                ic("fa-solid fa-skull", C.SUCCESS),
+                txt(" The Mob Leader is down. ", C.INFO),
+                txt("Nothing left to take from him.", "#94A3B8"),
             ]);
     }
     return true;
@@ -1538,8 +1504,8 @@ function playersInArena() {
 /* ── 12. LA BOUCLE (une decision par tick, neuf attaques) ──────────────── */
 
 function startSaberFight(playerId) {
-    if (saber && alive(saber.id)) {
-        tell(playerId, line("fa-solid fa-swords", C.DANGER,
+    if (saber && aliveNow(saber.id)) {
+        say(playerId, line("fa-solid fa-swords", C.DANGER,
             saber.fighter === playerId
                 ? "The Saber Expert is already waiting for you."
                 : "A duel is already taking place in the arena."));
@@ -1548,7 +1514,7 @@ function startSaberFight(playerId) {
     const inArena = playersInArena();
     for (let i = 0; i < inArena.length; i++) {
         if (inArena[i] !== playerId) {
-            tell(playerId, line("fa-solid fa-xmark", C.DANGER, "Someone is already fighting in the arena."));
+            say(playerId, line("fa-solid fa-xmark", C.DANGER, "Someone is already fighting in the arena."));
             return false;
         }
     }
@@ -1568,7 +1534,7 @@ function startSaberFight(playerId) {
         });
     } catch (e) { id = null; }
     if (!id) {
-        tell(playerId, line("fa-solid fa-xmark", C.DANGER, "The Saber Expert did not show up."));
+        say(playerId, line("fa-solid fa-xmark", C.DANGER, "The Saber Expert did not show up."));
         return false;
     }
     /* Meme raison que le Mob Leader : l'arene est rangee avant le credit du
@@ -1577,22 +1543,19 @@ function startSaberFight(playerId) {
     const hp = saberHp();
     /* Pas de one shot : meme garde-fou que sur le Mob Leader et Garp. */
     armBossGate(id, hp);
-    try {
-        api.setMobSetting(id, "maxHealth", hp);
-        api.setHealth(id, hp, undefined, true);
-        api.setMobSetting(id, "attackDamage", saberDmg());
-        api.setMobSetting(id, "hostilityRadius", 48);
-        api.setMobSetting(id, "chaseRadius", 48);
-        api.setMobSetting(id, "territoryRadius", 48);
-        api.setMobSetting(id, "onDeathItemDrops", []);
-        api.setMobSetting(id, "baseRunningSpeed", SABER.SPEED);
-        api.setMobSetting(id, "baseWalkingSpeed", SABER.SPEED * 0.75);
-        api.setMobSetting(id, "knockbackReceivedMultiplier", 0);
-        api.setLifeformScale(id, SABER.SCALE);
-        api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
-            nameTag(SABER.NAME, SABER.TITLE, SABER.BG), true);
-        api.setMobAiState(id, "chasing", { targetId: playerId });
-    } catch (e) {}
+    setupBossMob(id, {
+        hp: hp,
+        dmg: saberDmg(),
+        radius: 48,
+        speed: SABER.SPEED,
+        scale: SABER.SCALE,
+        knockback: 0,
+        target: playerId,
+        name: SABER.NAME,
+        title: SABER.TITLE,
+        colour: SABER.BG,
+        background: "#22130a",
+    });
 
     saber = {
         id: id,
@@ -1622,10 +1585,10 @@ function startSaberFight(playerId) {
 
     soundAt(spot, "ominousBellHit", 1, 0.6, 45);
     groundRing(spot, 4, HOT_A, HOT_B);
-    tell(playerId, [
-        { icon: "fa-solid fa-swords", style: { color: SABER.BG } },
-        { str: " SABER EXPERT", style: { color: SABER.BG, fontWeight: "bold" } },
-        { str: ": \"Then draw your steel.\"", style: { color: C.INFO } },
+    say(playerId, [
+        ic("fa-solid fa-swords", SABER.BG),
+        bold(" SABER EXPERT", SABER.BG),
+        txt(": \"Then draw your steel.\"", C.INFO),
     ]);
     return true;
 }
@@ -1643,7 +1606,7 @@ function clearArenaMobs() {
 
 function thinkSaber() {
     if (!saber) { stopSaber(); return; }
-    if (!alive(saber.id)) { saberFallen(); return; }
+    if (!aliveNow(saber.id)) { saberFallen(); return; }
     const p = safePosition(saber.id);
     if (!p) { despawnIfAlive(saber.id); stopSaber(); return; }
 
@@ -1655,7 +1618,7 @@ function thinkSaber() {
     tickSaberRain(p);
     tickSaberGrab(p);
 
-    const target = saber.fighter && alive(saber.fighter) ? saber.fighter : null;
+    const target = saber.fighter && aliveNow(saber.fighter) ? saber.fighter : null;
     if (!target) { endSaberFight("Your duel ended: the arena is empty."); return; }
     const tp = safePosition(target);
     if (!tp) { endSaberFight("Your duel ended: the arena is empty."); return; }
@@ -1734,7 +1697,7 @@ function enrage() {
         api.setMobSetting(saber.id, "baseRunningSpeed", SABER.SPEED * 1.25);
         api.setMobSetting(saber.id, "baseWalkingSpeed", SABER.SPEED);
         api.setTargetedPlayerSettingForEveryone(saber.id, "nameTagInfo",
-            nameTag(SABER.NAME + " [ENRAGED]", SABER.TITLE, "#FF4D4D"), true);
+            nameTagInfo(SABER.NAME + " [ENRAGED]", SABER.TITLE, "#FF4D4D", "#22130a"), true);
     } catch (e) {}
     const p = safePosition(saber.id);
     if (!p) return;
@@ -2095,10 +2058,10 @@ function saberFallen() {
         soundAt(p, "exp_levelup", 1, 0.8, 50);
     }
     if (fighter) {
-        tell(fighter, [
-            { icon: "fa-solid fa-trophy", style: { color: C.MONEY } },
-            { str: " SABER EXPERT defeated. ", style: { color: C.MONEY, fontWeight: "bold" } },
-            { str: "The Saber Quest is complete.", style: { color: C.SUCCESS } },
+        say(fighter, [
+            ic("fa-solid fa-trophy", C.MONEY),
+            bold(" SABER EXPERT defeated. ", C.MONEY),
+            txt("The Saber Quest is complete.", C.SUCCESS),
         ]);
         /* LA QUETE EST FINIE : etape ET boutons repartent a zero. Rien n'est
            garde en memoire pour ce joueur, donc rien a nettoyer plus tard. */
@@ -2119,7 +2082,7 @@ function endSaberFight(reason) {
     const id = saber ? saber.id : null;
     stopSaber();
     despawnIfAlive(id);
-    if (fighter && reason) tell(fighter, line("fa-solid fa-circle-info", C.INFO, reason));
+    if (fighter && reason) say(fighter, line("fa-solid fa-circle-info", C.INFO, reason));
 }
 
 

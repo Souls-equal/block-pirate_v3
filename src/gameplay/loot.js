@@ -4,8 +4,7 @@
    sait rien des degats, des quetes ou des boss, qui l'appellent.
    Source unique des bons : utils/data.js (FRUIT_TICKETS). */
 
-import { say } from "../core/theme";
-import { C } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { FRUIT_TICKETS } from "../utils/data";
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -149,10 +148,10 @@ export function rollMobLoot(playerId, mobId, data) {
 
     try {
         say(playerId, [
-            { icon: "fa-solid fa-gem", style: { color: C.MONEY } },
-            { str: " Loot! ", style: { color: C.SUCCESS, fontWeight: "bold" } },
-            { str: pick.label || pick.item, style: { color: C.MONEY, fontWeight: "bold" } },
-            { str: " dropped.", style: { color: C.INFO } },
+            ic("fa-solid fa-gem", C.MONEY),
+            bold(" Loot! ", C.SUCCESS),
+            bold(pick.label || pick.item, C.MONEY),
+            txt(" dropped.", C.INFO),
         ]);
     } catch (e) {}
     return pick.item;

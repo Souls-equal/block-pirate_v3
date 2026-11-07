@@ -10,7 +10,7 @@ import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
 import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
-import { C, fit, measure, say } from "./theme";
+import { C, fit, measure, say, txt, bold, ic } from "./theme";
 
 export const dCode = "7WGjmPHZrS"
 
@@ -102,51 +102,51 @@ function drawSidebar(playerId){
     };
 
     block([
-        { icon: "fa-solid fa-skull", style: { color: C.MARINE, fontSize: title } },
-        { str: " BLOCK PIRATES\n", style: { color: C.MARINE, fontWeight: "bold", fontSize: title } },
+        ic("fa-solid fa-skull", C.MARINE, {fontSize: title}),
+        txt(" BLOCK PIRATES\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
     ]);
     block([
-        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-        { str: " " + money + "\n", style: { color: C.MONEY } },
+        ic("fa-solid fa-coins", C.MONEY),
+        txt(" " + money + "\n", C.MONEY),
     ]);
     block([
-        { icon: "Hunger", style: { color: C.PIRATE } },
-        { str: " " + fruit + "\n", style: { color: C.PIRATE } },
+        ic("Hunger", C.PIRATE),
+        txt(" " + fruit + "\n", C.PIRATE),
     ]);
     block([
-        { icon: "fa-solid fa-hand-fist", style: { color: styleColor } },
-        { str: " " + styleLabel + "\n", style: { color: styleColor } },
+        ic("fa-solid fa-hand-fist", styleColor),
+        txt(" " + styleLabel + "\n", styleColor),
     ]);
     block([
-        { icon: "fa-solid fa-angle-double-up", style: { color: C.MONEY } },
-        { str: " LVL " + lvl + "\n", style: { color: C.MONEY } },
+        ic("fa-solid fa-angle-double-up", C.MONEY),
+        txt(" LVL " + lvl + "\n", C.MONEY),
     ]);
     block([
-        { str: "XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", style: { color: C.XP } },
-        { str: xpData.bar + "\n\n", style: { color: C.XP } },
+        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
+        txt(xpData.bar + "\n\n", C.XP),
     ], true, 2);
     block([
-        { icon: "fa-solid fa-bolt", style: { color: C.XP } },
-        { str: " " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", style: { color: C.XP } },
-        { str: stData.bar + "\n\n", style: { color: C.XP } },
+        ic("fa-solid fa-bolt", C.XP),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.XP),
+        txt(stData.bar + "\n\n", C.XP),
     ], true, 3);
     block([
-        { icon: "fa-solid fa-star", style: { color: C.SUCCESS } },
-        { str: " Stat Points " + sp + "\n\n", style: { color: C.SUCCESS } },
+        ic("fa-solid fa-star", C.SUCCESS),
+        txt(" Stat Points " + sp + "\n\n", C.SUCCESS),
     ], true, 4);
 
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            { icon: "fa-solid fa-globe", style: { color: C.MARINE } },
-            { str: " QUEST " + targetText + "\n", style: { color: C.MARINE } },
-            { str: progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n\n", style: { color: C.INFO } },
+            ic("fa-solid fa-globe", C.MARINE),
+            txt(" QUEST " + targetText + "\n", C.MARINE),
+            txt(progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n\n", C.INFO),
         ], true, 1);
     } else {
         block([
-            { icon: "fa-solid fa-globe", style: { color: C.MARINE } },
-            { str: " QUEST  no active quest\n\n", style: { color: C.INFO } },
+            ic("fa-solid fa-globe", C.MARINE),
+            txt(" QUEST  no active quest\n\n", C.INFO),
         ], true, 8);
     }
 
@@ -296,9 +296,9 @@ export function onPlayerJoinLeaderboard(playerId){
 
 export function joinUI(playerId) {
     api.setClientOption(playerId, "headerChips", [
-        { content: [{ str: "Discord:", style: { color: "#5865F2", fontWeight: "bold" } }], showBackground: true },
-        { content: [{ str: ["discord.", "gg", "/",dCode].join(""), style: { color: C.INFO } }], showBackground: true },
-        { content: [{ icon: "fa-solid fa-brands fa-discord", style: { color: C.MARINE } }, { str: " Join Now! ", style: { color: C.MONEY, fontWeight: "bold" } }], showBackground: false }
+        { content: [bold("Discord:", "#5865F2")], showBackground: true },
+        { content: [txt(["discord.", "gg", "/",dCode].join(""), C.INFO)], showBackground: true },
+        { content: [ic("fa-solid fa-brands fa-discord", C.MARINE), bold(" Join Now! ", C.MONEY)], showBackground: false }
     ]);
 
     /* Les fleches d'iles ne sont plus reservees a un compte : elles sont
@@ -526,19 +526,16 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 50,
-            customTitle: [{
-                str: "Island Arrows [" + shown.length + "/" + total + "]",
-                style: { color: SETTING_ARROW_COLOR, fontWeight: "bold" },
-            }],
-            buyButtonText: [{ str: all ? "Hide all" : "Show all", style: { color: SETTING_ARROW_COLOR } }],
+            customTitle: [bold("Island Arrows [" + shown.length + "/" + total + "]", SETTING_ARROW_COLOR)],
+            buyButtonText: [txt(all ? "Hide all" : "Show all", SETTING_ARROW_COLOR)],
             description: [
-                { icon: "fa-solid fa-map-marker-check", style: { color: SETTING_ARROW_COLOR } },
+                ic("fa-solid fa-map-marker-check", SETTING_ARROW_COLOR),
                 " One arrow per island, each in its own colour.",
                 shown.length > 0
-                    ? { str: "\n● " + shown.length, style: { color: "#4ADE80", fontWeight: "bold" } }
-                    : { str: "\n● 0", style: { color: "#888888", fontWeight: "bold" } },
-                { str: " of " + total + " islands shown.", style: { color: "#94A3B8" } },
-                { str: "\nPick the islands you need below.", style: { color: "#CBD5E1" } },
+                    ? bold("\n● " + shown.length, "#4ADE80")
+                    : bold("\n● 0", "#888888"),
+                txt(" of " + total + " islands shown.", "#94A3B8"),
+                txt("\nPick the islands you need below.", "#CBD5E1"),
             ],
         });
     } catch (e) {}
@@ -551,15 +548,15 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 48,
-            customTitle: [{ str: "Hide an island", style: { color: SETTING_HIDE_COLOR, fontWeight: "bold" } }],
-            buyButtonText: [{ str: "Hide", style: { color: SETTING_HIDE_COLOR } }],
+            customTitle: [bold("Hide an island", SETTING_HIDE_COLOR)],
+            buyButtonText: [txt("Hide", SETTING_HIDE_COLOR)],
             userInput: { type: "dropdown", dropdownOptions: shown.length ? shown : [EMPTY_CHOICE] },
             description: [
-                { icon: "fa-solid fa-eye-slash", style: { color: SETTING_HIDE_COLOR } },
+                ic("fa-solid fa-eye-slash", SETTING_HIDE_COLOR),
                 " Remove one arrow from your screen.",
-                { str: "\nShown now: ", style: { color: "#94A3B8" } },
-                { str: shown.length ? shown.join(", ") : "nothing", style: { color: SETTING_SHOW_COLOR } },
-                { str: "\nThe island moves to the other list.", style: { color: "#888888" } },
+                txt("\nShown now: ", "#94A3B8"),
+                txt(shown.length ? shown.join(", ") : "nothing", SETTING_SHOW_COLOR),
+                txt("\nThe island moves to the other list.", "#888888"),
             ],
         });
     } catch (e) {}
@@ -572,15 +569,15 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 47,
-            customTitle: [{ str: "Show an island", style: { color: SETTING_SHOW_COLOR, fontWeight: "bold" } }],
-            buyButtonText: [{ str: "Show", style: { color: SETTING_SHOW_COLOR } }],
+            customTitle: [bold("Show an island", SETTING_SHOW_COLOR)],
+            buyButtonText: [txt("Show", SETTING_SHOW_COLOR)],
             userInput: { type: "dropdown", dropdownOptions: hidden.length ? hidden : [EMPTY_CHOICE] },
             description: [
-                { icon: "fa-solid fa-eye", style: { color: SETTING_SHOW_COLOR } },
+                ic("fa-solid fa-eye", SETTING_SHOW_COLOR),
                 " Bring one arrow back.",
-                { str: "\nHidden now: ", style: { color: "#94A3B8" } },
-                { str: hidden.length ? hidden.join(", ") : "nothing", style: { color: SETTING_HIDE_COLOR } },
-                { str: "\nThe island moves to the other list.", style: { color: "#888888" } },
+                txt("\nHidden now: ", "#94A3B8"),
+                txt(hidden.length ? hidden.join(", ") : "nothing", SETTING_HIDE_COLOR),
+                txt("\nThe island moves to the other list.", "#888888"),
             ],
         });
     } catch (e) {}
@@ -592,13 +589,13 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 20,
-            customTitle: [{ str: "Respawn", style: { color: SETTING_RESPAWN_COLOR, fontWeight: "bold" } }],
-            buyButtonText: [{ str: "Respawn", style: { color: SETTING_RESPAWN_COLOR } }],
+            customTitle: [bold("Respawn", SETTING_RESPAWN_COLOR)],
+            buyButtonText: [txt("Respawn", SETTING_RESPAWN_COLOR)],
             description: [
-                { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
+                ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
                 " Kill yourself and respawn.",
-                { str: "\nStuck in a block, under the map, in a wall?", style: { color: "#CBD5E1" } },
-                { str: "\nClick two time to respawn.", style: { color: "#313D50" } },
+                txt("\nStuck in a block, under the map, in a wall?", "#CBD5E1"),
+                txt("\nClick two time to respawn.", "#313D50"),
             ],
         });
     } catch (e) {}
@@ -610,20 +607,17 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 10,
-            customTitle: [{
-                str: protect ? "PvP Protection [ON]" : "PvP Protection [OFF]",
-                style: { color: SETTING_PROTECT_COLOR, fontWeight: "bold" },
-            }],
-            buyButtonText: [{ str: protect ? "Disable" : "Enable", style: { color: SETTING_PROTECT_COLOR } }],
+            customTitle: [bold(protect ? "PvP Protection [ON]" : "PvP Protection [OFF]", SETTING_PROTECT_COLOR)],
+            buyButtonText: [txt(protect ? "Disable" : "Enable", SETTING_PROTECT_COLOR)],
             description: [
-                { icon: "fa-solid fa-shield-halved", style: { color: SETTING_PROTECT_COLOR } },
+                ic("fa-solid fa-shield-halved", SETTING_PROTECT_COLOR),
                 " The shield you get after being killed by a player.",
                 protect
-                    ? { str: "\n● ON ", style: { color: "#4ADE80", fontWeight: "bold" } }
-                    : { str: "\n● OFF ", style: { color: "#888888", fontWeight: "bold" } },
-                { str: protect
+                    ? bold("\n● ON ", "#4ADE80")
+                    : bold("\n● OFF ", "#888888"),
+                txt(protect
                     ? "— 5 minutes during which your killer cannot hit you. It drops if you attack them."
-                    : "— you accept every hit again, killer included.", style: { color: "#94A3B8" } },
+                    : "— you accept every hit again, killer included.", "#94A3B8"),
             ],
         });
     } catch (e) {}
@@ -659,8 +653,8 @@ function toggleIslandArrows(playerId) {
     createSettingsItems(playerId);
     applyIslandArrows(playerId);
     settingsSay(playerId, [
-        { icon: "fa-solid fa-map-marker-check", style: { color: SETTING_ARROW_COLOR } },
-        { str: want ? " All island arrows shown." : " All island arrows hidden.", style: { color: SETTING_ARROW_COLOR, fontWeight: "bold" } },
+        ic("fa-solid fa-map-marker-check", SETTING_ARROW_COLOR),
+        bold(want ? " All island arrows shown." : " All island arrows hidden.", SETTING_ARROW_COLOR),
     ]);
 }
 
@@ -686,8 +680,8 @@ function setIslandShown(playerId, name, want) {
 
     if (isShown === want) {
         settingsSay(playerId, [
-            { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
-            { str: " " + name + (want ? " is already shown." : " is already hidden."), style: { color: "#94A3B8" } },
+            ic("fa-solid fa-circle-info", "#94A3B8"),
+            txt(" " + name + (want ? " is already shown." : " is already hidden."), "#94A3B8"),
         ]);
         return false;
     }
@@ -711,10 +705,10 @@ function setIslandShown(playerId, name, want) {
     createSettingsItems(playerId);
     applyIslandArrows(playerId);
     settingsSay(playerId, [
-        { icon: "fa-solid fa-map-marker-check", style: { color: theme.color } },
-        { str: " " + name + " ", style: { color: theme.color, fontWeight: "bold" } },
-        { str: want ? "arrow shown." : "arrow hidden.", style: { color: theme.color } },
-        { str: onlyOne ? " The other islands stay hidden." : "", style: { color: "#94A3B8" } },
+        ic("fa-solid fa-map-marker-check", theme.color),
+        bold(" " + name + " ", theme.color),
+        txt(want ? "arrow shown." : "arrow hidden.", theme.color),
+        txt(onlyOne ? " The other islands stay hidden." : "", "#94A3B8"),
     ]);
     return true;
 }
@@ -724,11 +718,11 @@ function togglePvPProtection(playerId) {
     settingSet(playerId, "pvpProt", want);
     createSettingsItems(playerId);
     settingsSay(playerId, [
-        { icon: "fa-solid fa-shield-halved", style: { color: SETTING_PROTECT_COLOR } },
-        { str: want ? " PvP protection enabled." : " PvP protection disabled.", style: { color: SETTING_PROTECT_COLOR, fontWeight: "bold" } },
-        { str: want
+        ic("fa-solid fa-shield-halved", SETTING_PROTECT_COLOR),
+        bold(want ? " PvP protection enabled." : " PvP protection disabled.", SETTING_PROTECT_COLOR),
+        txt(want
             ? " You get 5 minutes against your killer when you respawn."
-            : " You accept every hit, killer included.", style: { color: "#94A3B8" } },
+            : " You accept every hit, killer included.", "#94A3B8"),
     ]);
 }
 
@@ -744,18 +738,18 @@ function settingsRespawn(playerId) {
         } catch (e) {}
         if (attackerIsPlayer) {
             settingsSay(playerId, [
-                { icon: "fa-solid fa-triangle-exclamation", style: { color: "#EF4444" } },
-                { str: " You are in a fight: no respawn right now.", style: { color: "#EF4444", fontWeight: "bold" } },
+                ic("fa-solid fa-triangle-exclamation", "#EF4444"),
+                bold(" You are in a fight: no respawn right now.", "#EF4444"),
             ]);
             return;
         }
     }
 
     if (!confirmAction(playerId, "respawn", [
-        { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
-        { str: " Respawn now? ", style: { color: "#CBD5E1" } },
-        { str: "You will die", style: { color: "#EF4444", fontWeight: "bold" } },
-        { str: " and come back at your spawn.", style: { color: "#CBD5E1" } },
+        ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
+        txt(" Respawn now? ", "#CBD5E1"),
+        bold("You will die", "#EF4444"),
+        txt(" and come back at your spawn.", "#CBD5E1"),
     ])) return;
 
     let killed = false;
@@ -767,14 +761,14 @@ function settingsRespawn(playerId) {
 
     if (!killed) {
         settingsSay(playerId, [
-            { icon: "fa-solid fa-circle-xmark", style: { color: "#EF4444" } },
-            { str: " Respawn failed. Try again in a moment.", style: { color: "#EF4444", fontWeight: "bold" } },
+            ic("fa-solid fa-circle-xmark", "#EF4444"),
+            bold(" Respawn failed. Try again in a moment.", "#EF4444"),
         ]);
         return;
     }
     settingsSay(playerId, [
-        { icon: "fa-solid fa-user-clock", style: { color: SETTING_RESPAWN_COLOR } },
-        { str: " Respawning…", style: { color: SETTING_RESPAWN_COLOR, fontWeight: "bold" } },
+        ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
+        bold(" Respawning…", SETTING_RESPAWN_COLOR),
     ]);
 }
 
@@ -791,8 +785,8 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         case "set_arrows_hide": {
             const name = resolveIslandName(userInput);
             if (!name) { settingsSay(playerId, [
-                { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
-                { str: " Every island is already hidden.", style: { color: "#94A3B8" } },
+                ic("fa-solid fa-circle-info", "#94A3B8"),
+                txt(" Every island is already hidden.", "#94A3B8"),
             ]); return true; }
             setIslandShown(playerId, name, false);
             return true;
@@ -800,8 +794,8 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         case "set_arrows_show": {
             const name = resolveIslandName(userInput);
             if (!name) { settingsSay(playerId, [
-                { icon: "fa-solid fa-circle-info", style: { color: "#94A3B8" } },
-                { str: " Every island is already shown.", style: { color: "#94A3B8" } },
+                ic("fa-solid fa-circle-info", "#94A3B8"),
+                txt(" Every island is already shown.", "#94A3B8"),
             ]); return true; }
             setIslandShown(playerId, name, true);
             return true;

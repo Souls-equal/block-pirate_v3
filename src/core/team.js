@@ -6,7 +6,7 @@ import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
 import { isOnlinePlayer } from "../utils/lifeform";
-import { C, say, shout } from "./theme";
+import { C, say, shout, txt, bold, ic } from "./theme";
 function safeName(id) {
     if (!id) return "Unknown";
     try { return api.getEntityName(id) || "Unknown"; } catch (e) { return "Unknown"; }
@@ -133,9 +133,9 @@ setPlayerTeam = (playerId, teamId) => {
         const replacedCount = replaceTeamWeapons(playerId, teamId);
         if (replacedCount > 0) {
             say(playerId, [
-                { icon: "fa-solid fa-swords", style: { color: "#00BFFF" } }, { str: " Team changed! Your weapons have been updated to ", style: { color: "#00BFFF" } },
-                { str: getTeamData(teamId).name, style: { color: getTeamData(teamId).color, fontWeight: "bold" } },
-                { str: " weapons. (" + replacedCount + " items replaced)", style: { color: "#AAAAAA" } }
+                ic("fa-solid fa-swords", "#00BFFF"), txt(" Team changed! Your weapons have been updated to ", "#00BFFF"),
+                bold(getTeamData(teamId).name, getTeamData(teamId).color),
+                txt(" weapons. (" + replacedCount + " items replaced)", "#AAAAAA")
             ]);
         }
     }
@@ -150,11 +150,11 @@ export function updateNameTag(playerId) {
        casser la suite de onPlayerJoin. */
     try {
         api.setTargetedPlayerSettingForEveryone(playerId, "nameTagInfo", {
-            content: [{ str: name, style: { color: "white" } }],
+            content: [txt(name, "white")],
             subtitle: [
-                { str: team.prefix, style: { color: team.color, fontWeight: "bold" } },
-                { str: " | ", style: { color: "lightgray", fontWeight: "bold" } },
-                { str: crew, style: { color: "#ffcc00", fontWeight: "bold" } },
+                bold(team.prefix, team.color),
+                bold(" | ", "lightgray"),
+                bold(crew, "#ffcc00"),
             ],
             border: { colour: team.color, applyTo: "both", style: "glow" },
             healthbar: {height:"19px", display:"always", backgroundColour:"gray" }
@@ -176,12 +176,12 @@ export function setupChatChannels(playerId) {
     const channels = [
         {
             channelName: CHAT_CHANNEL.GLOBAL,
-            elementContent: [{ icon: "fa-solid fa-globe" }, { str: " G" }],
+            elementContent: [ic("fa-solid fa-globe"), txt(" G")],
             elementBgColor: "#2671d7"
         },
         {
             channelName: CHAT_CHANNEL.TEAM,
-            elementContent: [{ icon: "fa-solid fa-flag" }, { str: playerTeamData.chatLetter}],
+            elementContent: [ic("fa-solid fa-flag"), txt(playerTeamData.chatLetter)],
             elementBgColor: playerTeamData.color
         }
     ];
@@ -189,7 +189,7 @@ export function setupChatChannels(playerId) {
     if (getCrewName(playerId)) {
         channels.push({
             channelName: CHAT_CHANNEL.CREW,
-            elementContent: [{ icon: "fa-solid fa-user-group" }, { str: " C" }],
+            elementContent: [ic("fa-solid fa-user-group"), txt(" C")],
             elementBgColor: "#ffcc00"
         });
     }
@@ -242,17 +242,17 @@ export function syncCrewFromDB(playerId) {
 function createCrew(playerId, name) {
 
     if (!name) {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Usage: /crew create <name>", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Usage: /crew create <name>", "#ff4444")]);
         return;
     }
 
     if (getCrewName(playerId)) {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are already in a crew. Leave it first (/crew leave).", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" You are already in a crew. Leave it first (/crew leave).", "#ff4444")]);
         return;
     }
 
     if (CREWS[name]) {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " A crew with this name already exists", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" A crew with this name already exists", "#ff4444")]);
         return;
     }
 
@@ -265,8 +265,8 @@ function createCrew(playerId, name) {
     setupChatChannels(playerId);
 
     shout([
-        { str: api.getEntityName(playerId) + " created the crew: ", style: { color: "#00bfff" } },
-        { str: name, style: { color: "#ffffff", fontWeight: "bold" } }
+        txt(api.getEntityName(playerId) + " created the crew: ", "#00bfff"),
+        bold(name, "#ffffff")
     ]);
 
     updateNameTag(playerId);
@@ -290,8 +290,8 @@ function joinCrew(playerId, name) {
     setupChatChannels(playerId);
 
     say(playerId, [
-        { icon: "fa-solid fa-circle-check", style: { color: "#00ff88" } }, { str: " Joined crew ", style: { color: "#00ff88" } },
-        { str: name, style: { color: "#ffffff" } }
+        ic("fa-solid fa-circle-check", "#00ff88"), txt(" Joined crew ", "#00ff88"),
+        txt(name, "#ffffff")
     ]);
 
     updateNameTag(playerId);
@@ -305,7 +305,7 @@ function leaveCrew(playerId) {
 
     const name = getCrewName(playerId);
     if (!name) {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are not in a crew", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" You are not in a crew", "#ff4444")]);
         return;
     }
 
@@ -314,8 +314,8 @@ function leaveCrew(playerId) {
     setupChatChannels(playerId);
 
     say(playerId, [
-        { icon: "fa-solid fa-sign-out-alt", style: { color: "#ffcc00" } }, { str: " You left crew ", style: { color: "#ffcc00" } },
-        { str: name, style: { color: "#ffffff" } }
+        ic("fa-solid fa-sign-out-alt", "#ffcc00"), txt(" You left crew ", "#ffcc00"),
+        txt(name, "#ffffff")
     ]);
 
     updateNameTag(playerId);
@@ -342,8 +342,8 @@ function disbandCrew(name) {
         setupChatChannels(id);
 
         say(id, [
-            { icon: "fa-solid fa-fire", style: { color: "#ff4444" } }, { str: " Crew disbanded: ", style: { color: "#ff4444" } },
-            { str: name, style: { color: "#ffffff" } }
+            ic("fa-solid fa-fire", "#ff4444"), txt(" Crew disbanded: ", "#ff4444"),
+            txt(name, "#ffffff")
         ]);
 
         updateNameTag(id);
@@ -361,35 +361,35 @@ function invitePlayer(senderId, targetName) {
     const role = getCrewRole(senderId);
 
     if (role !== "CAPTAIN") {
-        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Only the captain can invite", style: { color: "#ff4444" } }]);
+        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Only the captain can invite", "#ff4444")]);
         return;
     }
 
     if (!targetName) {
-        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Usage: /crew invite <player>", style: { color: "#ff4444" } }]);
+        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Usage: /crew invite <player>", "#ff4444")]);
         return;
     }
 
     const targetId = api.getPlayerId(targetName);
     if (!targetId) {
-        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Player not found (or offline)", style: { color: "#ff4444" } }]);
+        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Player not found (or offline)", "#ff4444")]);
         return;
     }
 
     if (getCrewName(targetId)) {
-        say(senderId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Player already in a crew", style: { color: "#ff4444" } }]);
+        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Player already in a crew", "#ff4444")]);
         return;
     }
 
     setStat(targetId, "crew:invite", crewName);
 
     say(targetId, [
-        { icon: "fa-solid fa-bell", style: { color: "#00bfff" } }, { str: " Crew invite from ", style: { color: "#00bfff" } },
-        { str: crewName, style: { color: "#ffffff" } },
-        { str: " — type /crew accept " + crewName, style: { color: "#888888" } }
+        ic("fa-solid fa-bell", "#00bfff"), txt(" Crew invite from ", "#00bfff"),
+        txt(crewName, "#ffffff"),
+        txt(" — type /crew accept " + crewName, "#888888")
     ]);
 
-    say(senderId, [{ icon: "fa-solid fa-circle-check", style: { color: "#00ff88" } }, { str: " Invite sent", style: { color: "#00ff88" } }]);
+    say(senderId, [ic("fa-solid fa-circle-check", "#00ff88"), txt(" Invite sent", "#00ff88")]);
 }
 
 /* ACCEPT */
@@ -397,7 +397,7 @@ function acceptInvite(playerId, name) {
 
     const invite = getStat(playerId, "crew:invite", null);
     if (invite !== name) {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " No invite from this crew", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" No invite from this crew", "#ff4444")]);
         return;
     }
 
@@ -405,7 +405,7 @@ function acceptInvite(playerId, name) {
     if (ok) {
         deleteStat(playerId, "crew:invite");
     } else {
-        say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Could not join the crew (full / disbanded / already in one)", style: { color: "#ff4444" } }]);
+        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Could not join the crew (full / disbanded / already in one)", "#ff4444")]);
     }
 }
 
@@ -442,10 +442,10 @@ export function handleChat(playerId, message, channel) {
 
     if (isVanished(playerId)) {
         say(playerId, [
-            { str: "[Vanish] ", style: { color: "#cef3ff", fontWeight: "bold" } },
-            { str: "Message not sent : ", style: { color: "#ff4444", fontWeight: "bold" } },
-            { str: "you are vanished (fully invisible for other players).", style: { color: "#ffffff" } },
-            { str: "\n(desactive Vanish from the admin panel to 'rejoin')", style: { color: "#888888" } }
+            bold("[Vanish] ", "#cef3ff"),
+            bold("Message not sent : ", "#ff4444"),
+            txt("you are vanished (fully invisible for other players).", "#ffffff"),
+            txt("\n(desactive Vanish from the admin panel to 'rejoin')", "#888888")
         ]);
         return false;
     }
@@ -457,7 +457,7 @@ export function handleChat(playerId, message, channel) {
     const rank = getRankDataForPlayer(playerId);
 
     const rankSeg = rank.prefix
-        ? [{ str: rank.prefix + " ", style: { color: rank.color, fontWeight: "bold" } }]
+        ? [bold(rank.prefix + " ", rank.color)]
         : [];
 
     const all = api.getPlayerIds();
@@ -481,7 +481,7 @@ export function handleChat(playerId, message, channel) {
                 if (!canBypassChatRestriction(id)) continue;
                 try {
                     say(id, [
-                        { str: "[" + tag + "] ", style: { color: "#888888" } },
+                        txt("[" + tag + "] ", "#888888"),
                         ...segments
                     ]);
                 } catch (e) {}
@@ -491,10 +491,10 @@ export function handleChat(playerId, message, channel) {
 
     const buildMsg = (msgColor) => [
         ...rankSeg,
-        { str: team.prefix + " ", style: { color: team.color, fontWeight: "bold" } },
-        { str: name, style: { color: "#bbbbbb" } },
-        { str: " : ", style: { color: "#888888" } },
-        { str: message, style: { color: msgColor } }
+        bold(team.prefix + " ", team.color),
+        txt(name, "#bbbbbb"),
+        txt(" : ", "#888888"),
+        txt(message, msgColor)
     ];
 
     /* Pas de passe-droit a l'ECRITURE : un admin qui parle dans le canal Team
@@ -545,13 +545,10 @@ export function handleChat(playerId, message, channel) {
         const role = getCrewRole(playerId);
         deliver([...crew.members].filter(id => online.has(id)), [
             ...rankSeg,
-            {
-                str: `[CREW:${role}] `,
-                style: { color: role === "CAPTAIN" ? "#ffd700" : "#3DDC84", fontWeight: "bold" }
-            },
-            { str: name, style: { color: "#bbbbbb" } },
-            { str: " : ", style: { color: "#888888" } },
-            { str: message, style: { color: "#ffffff" } }
+            bold(`[CREW:${role}] `, role === "CAPTAIN" ? "#ffd700" : "#3DDC84"),
+            txt(name, "#bbbbbb"),
+            txt(" : ", "#888888"),
+            txt(message, "#ffffff")
         ], "Crew " + crewName);
         return false;
     }
@@ -610,11 +607,11 @@ function warnLevelShield(attacker, target) {
     if (LEVEL_NOTICE[attacker] && now - LEVEL_NOTICE[attacker] < LEVEL_NOTICE_MS) return;
     LEVEL_NOTICE[attacker] = now;
     say(attacker, [
-        { icon: "fa-solid fa-shield", style: { color: C.INFO } },
-        { str: " You can't damage ", style: { color: C.MONEY } },
-        { str: safeName(target), style: { color: C.INFO, fontWeight: "bold" } },
-        { str: " (level " + levelOf(target) + "): players under level " + LEVEL_SHIELD.LOW +
-               " are protected from level " + LEVEL_SHIELD.HIGH + "+ players.", style: { color: C.MONEY } },
+        ic("fa-solid fa-shield", C.INFO),
+        txt(" You can't damage ", C.MONEY),
+        bold(safeName(target), C.INFO),
+        txt(" (level " + levelOf(target) + "): players under level " + LEVEL_SHIELD.LOW +
+               " are protected from level " + LEVEL_SHIELD.HIGH + "+ players.", C.MONEY),
     ]);
 }
 
@@ -692,7 +689,7 @@ export function crewCommands(playerId, command) {
             if (getCrewRole(playerId) === "CAPTAIN") {
                 disbandCrew(getCrewName(playerId));
             } else {
-                say(playerId, [{ icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " Only the captain can disband the crew", style: { color: "#ff4444" } }]);
+                say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Only the captain can disband the crew", "#ff4444")]);
             }
             break;
         }
@@ -713,28 +710,28 @@ function crewInfo(playerId) {
 
     /* HELP HEADER */
     say(playerId, [
-        { icon: "fa-solid fa-swords", style: { color: "#ffd700", fontWeight: "bold" } }, { str: " ===== CREW COMMANDS =====\n", style: { color: "#ffd700", fontWeight: "bold" } },
+        ic("fa-solid fa-swords", "#ffd700", {fontWeight: "bold"}), bold(" ===== CREW COMMANDS =====\n", "#ffd700"),
 
-        { str: "/crew create <name> ", style: { color: "#ffffff" } },
-        { str: "- Create a crew\n", style: { color: "#888888" } },
+        txt("/crew create <name> ", "#ffffff"),
+        txt("- Create a crew\n", "#888888"),
 
-        { str: "/crew invite <player> ", style: { color: "#ffffff" } },
-        { str: "- Invite a player\n", style: { color: "#888888" } },
+        txt("/crew invite <player> ", "#ffffff"),
+        txt("- Invite a player\n", "#888888"),
 
-        { str: "/crew accept <name> ", style: { color: "#ffffff" } },
-        { str: "- Accept invite\n", style: { color: "#888888" } },
+        txt("/crew accept <name> ", "#ffffff"),
+        txt("- Accept invite\n", "#888888"),
 
-        { str: "/crew leave ", style: { color: "#ffffff" } },
-        { str: "- Leave your crew\n", style: { color: "#888888" } },
+        txt("/crew leave ", "#ffffff"),
+        txt("- Leave your crew\n", "#888888"),
 
-        { str: "/crew disband ", style: { color: "#ffffff" } },
-        { str: "- Disband crew (captain only)\n\n", style: { color: "#888888" } }
+        txt("/crew disband ", "#ffffff"),
+        txt("- Disband crew (captain only)\n\n", "#888888")
     ]);
 
     /* IF NO CREW */
     if (!crewName) {
         say(playerId, [
-            { icon: "fa-solid fa-xmark", style: { color: "#ff4444" } }, { str: " You are not in a crew\n", style: { color: "#ff4444" } }
+            ic("fa-solid fa-xmark", "#ff4444"), txt(" You are not in a crew\n", "#ff4444")
         ]);
         return true;
     }
@@ -743,7 +740,7 @@ function crewInfo(playerId) {
 
     if (!crew) {
         say(playerId, [
-            { icon: "fa-solid fa-triangle-exclamation", style: { color: "#ffcc00" } }, { str: " Crew not found in memory (rejoin to resync)\n", style: { color: "#ffcc00" } }
+            ic("fa-solid fa-triangle-exclamation", "#ffcc00"), txt(" Crew not found in memory (rejoin to resync)\n", "#ffcc00")
         ]);
         return true;
     }
@@ -756,13 +753,13 @@ function crewInfo(playerId) {
         : "Unknown";
 
     say(playerId, [
-        { icon: "fa-solid fa-swords", style: { color: "#00bfff", fontWeight: "bold" } }, { str: " ===== YOUR CREW =====\n", style: { color: "#00bfff", fontWeight: "bold" } },
-        { str: crewName + "\n", style: { color: "#ffd700" } },
+        ic("fa-solid fa-swords", "#00bfff", {fontWeight: "bold"}), bold(" ===== YOUR CREW =====\n", "#00bfff"),
+        txt(crewName + "\n", "#ffd700"),
 
-        { str: "Owner: ", style: { color: "#ffffff", fontWeight: "bold" } },
-        { str: ownerName + "\n", style: { color: "#00bfff" } },
+        bold("Owner: ", "#ffffff"),
+        txt(ownerName + "\n", "#00bfff"),
 
-        { str: "Online Members (" + members.length + ")\n", style: { color: "#ffffff", fontWeight: "bold" } }
+        bold("Online Members (" + members.length + ")\n", "#ffffff")
     ]);
 
     for (const id of members) {
@@ -771,18 +768,9 @@ function crewInfo(playerId) {
         const mName = safeName(id);
 
         say(playerId, [
-            { str: "- ", style: { color: "#888888" } },
-            {
-                str: mName + " ",
-                style: {
-                    color: role === "CAPTAIN" ? "#ffd700" : "#bbbbbb",
-                    fontWeight: role === "CAPTAIN" ? "bold" : "normal"
-                }
-            },
-            {
-                str: `[${role}]\n`,
-                style: { color: role === "CAPTAIN" ? "#ffd700" : "#00bfff" }
-            }
+            txt("- ", "#888888"),
+            txt(mName + " ", role === "CAPTAIN" ? "#ffd700" : "#bbbbbb", {fontWeight: role === "CAPTAIN" ? "bold" : "normal"}),
+            txt(`[${role}]\n`, role === "CAPTAIN" ? "#ffd700" : "#00bfff")
         ]);
     }
 
@@ -858,7 +846,7 @@ function giveMoney(playerId, amount) {
 }
 
 function bountySay(playerId, text, color) {
-    say(playerId, [ { str: text, style: { color: color } } ]);
+    say(playerId, [ txt(text, color) ]);
 }
 
 /* La prime et l'argent sont affiches dans la leaderboard : on rafraichit les
@@ -1286,10 +1274,10 @@ export function unmutePlayer(playerId) {
 export function muteRefusal(playerId) {
     const info = getMuteInfo(muteNameOf(playerId)) || { by: "an admin", remaining: "unknown" };
     return [
-        { icon: "fa-solid fa-volume-slash", style: { color: "#EF4444" } },
-        { str: " You are muted", style: { color: "#EF4444", fontWeight: "bold" } },
-        { str: " (" + info.remaining + ") by ", style: { color: "#CBD5E1" } },
-        { str: info.by, style: { color: "#FFD700", fontWeight: "bold" } },
-        { str: " — you can play, but not talk.", style: { color: "#CBD5E1" } },
+        ic("fa-solid fa-volume-slash", "#EF4444"),
+        bold(" You are muted", "#EF4444"),
+        txt(" (" + info.remaining + ") by ", "#CBD5E1"),
+        bold(info.by, "#FFD700"),
+        txt(" — you can play, but not talk.", "#CBD5E1"),
     ];
 }
