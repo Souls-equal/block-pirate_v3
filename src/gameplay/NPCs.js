@@ -4,7 +4,7 @@ import { startQuest } from "./quest";
 import { buyItem, changeMoney, confirmAction, CONFIRM_MS } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
 import { getPlayerTeam, getTeamData } from "../core/team";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
 import { safeEntityName, safeEntityType } from "../utils/lifeform";
@@ -60,41 +60,38 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
 
     if (current === teamId) {
         say(playerId, [
-            { icon: "fa-solid fa-circle-info", style: { color: color } },
-            { str: " You are already a ", style: { color: "#CBD5E1" } },
-            { str: target.replace(/s$/, ""), style: { color: color, fontWeight: "bold" } },
-            { str: ". Nothing to change.", style: { color: "#94A3B8" } },
+            ic("fa-solid fa-circle-info", color),
+            txt(" You are already a ", "#CBD5E1"),
+            bold(target.replace(/s$/, ""), color),
+            txt(". Nothing to change.", "#94A3B8"),
         ]);
         return;
     }
 
     /* Premier clic : on dit exactement ce qui va se passer. */
     if (!confirmAction(playerId, "team|" + teamId, [
-        { icon: "fa-solid fa-user-group", style: { color: color } },
-        { str: " " + npcName + ": double-click me and you will be switched to the ", style: { color: "#CBD5E1" } },
-        { str: target, style: { color: color, fontWeight: "bold" } },
-        { str: ".", style: { color: "#CBD5E1" } },
-        {
-            str: "\nYou are currently " + (current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, "")) + ".",
-            style: { color: "#94A3B8" },
-        },
-        { str: "\nYour weapons will be converted to " + target + " ones.", style: { color: "#94A3B8" } },
+        ic("fa-solid fa-user-group", color),
+        txt(" " + npcName + ": double-click me and you will be switched to the ", "#CBD5E1"),
+        bold(target, color),
+        txt(".", "#CBD5E1"),
+        txt("\nYou are currently " + (current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, "")) + ".", "#94A3B8"),
+        txt("\nYour weapons will be converted to " + target + " ones.", "#94A3B8"),
     ])) return;
 
     if (!applyTeamChoice(playerId, teamId)) {
         say(playerId, [
-            { icon: "fa-solid fa-xmark", style: { color: "#EF4444" } },
-            { str: " The team change failed. Try again.", style: { color: "#EF4444" } },
+            ic("fa-solid fa-xmark", "#EF4444"),
+            txt(" The team change failed. Try again.", "#EF4444"),
         ]);
         return;
     }
 
     try { api.playSound(playerId, "exp_levelup", 1, 1.1); } catch (e) {}
     say(playerId, [
-        { icon: "fa-solid fa-flag", style: { color: color } },
-        { str: " You are now a ", style: { color: "#CBD5E1" } },
-        { str: target.replace(/s$/, ""), style: { color: color, fontWeight: "bold" } },
-        { str: "!", style: { color: "#CBD5E1" } },
+        ic("fa-solid fa-flag", color),
+        txt(" You are now a ", "#CBD5E1"),
+        bold(target.replace(/s$/, ""), color),
+        txt("!", "#CBD5E1"),
     ]);
 }
 
@@ -139,9 +136,8 @@ function sellHakiFragments(playerId) {
 
     if (!total) {
         say(playerId, [
-            { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-            { str: " Haki Buyer: Bring me Haki Fragments and I will pay well for them.",
-                style: { color: C.INFO } },
+            ic("fa-solid fa-coins", C.MONEY),
+            txt(" Haki Buyer: Bring me Haki Fragments and I will pay well for them.", C.INFO),
         ]);
         return;
     }
@@ -153,14 +149,13 @@ function sellHakiFragments(playerId) {
         : 100 + Math.floor(Math.random() * 201); /* 100 a 300 inclus */
 
     if (!confirmAction(playerId, "hakiFragments", [
-        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-        { str: " Sell ", style: { color: C.INFO } },
-        { str: total + " Haki Fragment" + (total > 1 ? "s" : ""), style: { color: "#E8B4A0", fontWeight: "bold" } },
-        { str: " for ", style: { color: C.INFO } },
-        { str: price + " Coins each", style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: " (" + total * price + " Coins total)?", style: { color: C.INFO } },
-        { str: "\nThey are Black Carpets: any kept for the Haki Seller goes too.",
-            style: { color: "#94A3B8" } },
+        ic("fa-solid fa-coins", C.MONEY),
+        txt(" Sell ", C.INFO),
+        bold(total + " Haki Fragment" + (total > 1 ? "s" : ""), "#E8B4A0"),
+        txt(" for ", C.INFO),
+        bold(price + " Coins each", C.MONEY),
+        txt(" (" + total * price + " Coins total)?", C.INFO),
+        txt("\nThey are Black Carpets: any kept for the Haki Seller goes too.", "#94A3B8"),
     ])) {
         HAKI_DEAL[playerId] = { price: price, until: now + CONFIRM_MS };
         return;
@@ -177,8 +172,8 @@ function sellHakiFragments(playerId) {
     }
     if (!sold) {
         say(playerId, [
-            { icon: "fa-solid fa-xmark", style: { color: C.DANGER } },
-            { str: " Nothing left to sell.", style: { color: C.DANGER } },
+            ic("fa-solid fa-xmark", C.DANGER),
+            txt(" Nothing left to sell.", C.DANGER),
         ]);
         return;
     }
@@ -186,12 +181,12 @@ function sellHakiFragments(playerId) {
     changeMoney(playerId, sold * price, false);
     try { api.playSound(playerId, "coin", 1, 1); } catch (e) {}
     say(playerId, [
-        { icon: "fa-solid fa-coins", style: { color: C.MONEY } },
-        { str: " Sold ", style: { color: C.INFO } },
-        { str: sold + " Haki Fragment" + (sold > 1 ? "s" : ""), style: { color: "#E8B4A0", fontWeight: "bold" } },
-        { str: " for ", style: { color: C.INFO } },
-        { str: sold * price + " Coins", style: { color: C.MONEY, fontWeight: "bold" } },
-        { str: ".", style: { color: C.INFO } },
+        ic("fa-solid fa-coins", C.MONEY),
+        txt(" Sold ", C.INFO),
+        bold(sold + " Haki Fragment" + (sold > 1 ? "s" : ""), "#E8B4A0"),
+        txt(" for ", C.INFO),
+        bold(sold * price + " Coins", C.MONEY),
+        txt(".", C.INFO),
     ]);
 }
 
@@ -212,14 +207,12 @@ function sellHakiFragments(playerId) {
 
 function startGarpFight(playerId) {
     if (!confirmAction(playerId, "garpBoss", [
-        { icon: "fa-solid fa-skull", style: { color: C.DANGER } },
-        { str: " Fight ", style: { color: C.INFO } },
-        { str: "GARP", style: { color: "#7EC8FF", fontWeight: "bold" } },
-        { str: ", the Marine Protector? ", style: { color: C.INFO } },
-        { str: "You will be teleported into his arena and his guards will wake up.",
-            style: { color: "#94A3B8" } },
-        { str: "\nHe drops a Haki fragment, which the Haki Buyer will take off your hands.",
-            style: { color: "#94A3B8" } },
+        ic("fa-solid fa-skull", C.DANGER),
+        txt(" Fight ", C.INFO),
+        bold("GARP", "#7EC8FF"),
+        txt(", the Marine Protector? ", C.INFO),
+        txt("You will be teleported into his arena and his guards will wake up.", "#94A3B8"),
+        txt("\nHe drops a Haki fragment, which the Haki Buyer will take off your hands.", "#94A3B8"),
     ])) return;
 
     /* Pas de message ici en cas d'echec : le combat parle lui-meme
@@ -424,9 +417,9 @@ function nearestPlayer(pos) {
 function dressUpNPC(NPC, name) {
     api.setTargetedPlayerSettingForEveryone(NPC, "nameTagInfo", {
         subtitle: [
-            { str: "Click on the NPC!", style: {color: "lightgray", fontWeight: "bold"} },
-            { str: "", style: {color: "gray"} },
-            { str: "", style: {color: "#00bfff"} }
+            bold("Click on the NPC!", "lightgray"),
+            txt("", "gray"),
+            txt("", "#00bfff")
         ],
         healthbar: {
             display: "never"

@@ -2,7 +2,7 @@
 
 import { addStat, getStat, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 
 /* BASE VALUES */
 const BASE_HP = 100;
@@ -226,9 +226,9 @@ export function initUpgradeShop() {
             imageColour: c.imageColour,
             customTitle: c.name,
             description: [
-                { str: "Each point " },
-                { str: c.perPoint + "\n\n", style: { color: c.color } },
-                { str: "Current: — | Stat Points available: 0" }
+                txt("Each point "),
+                txt(c.perPoint + "\n\n", c.color),
+                txt("Current: — | Stat Points available: 0")
             ],
             sortPriority: prio,
             buyButtonText: "Upgrade",
@@ -241,8 +241,8 @@ export function initUpgradeShop() {
         imageColour: "white",
         customTitle: "Reset Stats",
         description: [
-            { str: "Refund all spent SP.\n\n" },
-            { str: "Your level is kept.", style: { color: "orange" } }
+            txt("Refund all spent SP.\n\n"),
+            txt("Your level is kept.", "orange")
         ],
         sortPriority: 0,
         buyButtonText: "Reset"
@@ -257,10 +257,10 @@ export function updateUpgradePanel(playerId) {
         const c = STAT_CONFIG[k];
         api.updateShopItemForPlayer(playerId, "upgrade", "upg_" + k, {
             description: [
-                { str: "Each point " },
-                { str: c.perPoint + "\n\n", style: { color: c.color } },
-                { str: statEffectText(k, u[k]) + "\n", style: { color: c.color, fontWeight: "bold" } },
-                { str: "Points: " + u[k] + " | Stat Points available: " + sp }
+                txt("Each point "),
+                txt(c.perPoint + "\n\n", c.color),
+                bold(statEffectText(k, u[k]) + "\n", c.color),
+                txt("Points: " + u[k] + " | Stat Points available: " + sp)
             ]
         });
     }
@@ -275,7 +275,7 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
     if (itemKey === "upg_reset") {
         const refund = resetStats(playerId);
         say(playerId, [
-            { str: "Stats reset! (" + refund + " Stat Points recovered)", style: { color: "lime", fontWeight: "bold" } }
+            bold("Stats reset! (" + refund + " Stat Points recovered)", "lime")
         ]);
         return true;
     }
@@ -287,12 +287,12 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
 
     if (!upgStat(playerId, stat, amt)) {
         say(playerId, [
-            { str: "Not enough Stat Points! (Have: " + getStat(playerId, "sp", 0) + ", Need: " + amt + ")", style: { color: "red" } }
+            txt("Not enough Stat Points! (Have: " + getStat(playerId, "sp", 0) + ", Need: " + amt + ")", "red")
         ]);
     } else {
         say(playerId, [
-            { icon: "fa-solid fa-circle-check", style: { color: C.SUCCESS } },
-            { str: " " + STAT_CONFIG[stat].name + " +" + amt, style: { color: C.SUCCESS, fontWeight: "bold" } }
+            ic("fa-solid fa-circle-check", C.SUCCESS),
+            bold(" " + STAT_CONFIG[stat].name + " +" + amt, C.SUCCESS)
         ]);
     }
 

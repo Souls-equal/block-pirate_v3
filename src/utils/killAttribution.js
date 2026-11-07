@@ -1,4 +1,6 @@
 // utils/killAttribution.js
+import { posOf } from "./lifeform";
+
 
 const HITS = {};
 const KILL_TTL_MS = 120000;
@@ -18,20 +20,6 @@ const CLAIMED = {};
    toujours chargee. */
 const CREDIT_MAX_DIST = 64;
 const CREDIT_MAX_DIST_SQ = CREDIT_MAX_DIST * CREDIT_MAX_DIST;
-
-function posOf(id) {
-    if (!id) return null;
-    try {
-        const p = api.getPosition(id);
-        if (!p || p.length < 3) return null;
-        const x = +p[0], y = +p[1], z = +p[2];
-        /* NaN => coordonnee illisible : on considere la position inconnue. */
-        if (x !== x || y !== y || z !== z) return null;
-        return [x, y, z];
-    } catch (e) {
-        return null;
-    }
-}
 
 /* Position de la cible : vivante si lisible, sinon celle memorisee au dernier
    coup recu (le mob a disparu avec le chunk, api.getPosition leve). */
@@ -70,26 +58,34 @@ export function noteMobSeen(mobId) {
     try { mobSeenHook(mobId); } catch (e) {}
 }
 
+/* Joueur qui possede ce dbId, ou null. Un mob invoque (Creation, etc.) porte
+   le dbId de son proprietaire dans son reglage `ownerDbId` ; deux modules
+   balayaient les joueurs pour le retrouver, c'est fait ici une seule fois. */
+export function playerIdForDbId(dbId) {
+    if (!dbId) return null;
+    let pids = [];
+    try { pids = api.getPlayerIds() || []; } catch (e) { return null; }
+    for (let i = 0; i < pids.length; i++) {
+        try {
+            if (api.getPlayerDbId(pids[i]) === dbId) return pids[i];
+        } catch (e2) {}
+    }
+    return null;
+}
+
 function resolveOwnerId(id) {
     if (!id) return id;
-    // 1) table des invocations (Creation golem, etc)
+    /* 1) table des invocations (Creation golem, etc) */
     try {
-        // import dynamique évite cycle, mais on tente via global si dispo
         const mod = globalThis.__combatSummonOwner || null;
         if (mod && mod[id]) return resolveOwnerId(mod[id]);
     } catch (e) {}
+    /* 2) le mob invoque porte le dbId de son proprietaire */
     try {
-        // direct require via api? on tente lecture ownerDbId
         const db = api.getMobSetting(id, "ownerDbId", false);
         if (db) {
-            // cherche joueur avec ce dbId
-            let pids = [];
-            try { pids = api.getPlayerIds() || []; } catch (e) {}
-            for (let i = 0; i < pids.length; i++) {
-                try {
-                    if (api.getPlayerDbId(pids[i]) === db) return pids[i];
-                } catch (e2) {}
-            }
+            const owner = playerIdForDbId(db);
+            if (owner) return owner;
         }
     } catch (e) {}
     return id;

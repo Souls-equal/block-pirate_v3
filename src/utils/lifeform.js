@@ -1,5 +1,6 @@
 // utils/lifeform.js
 import { norm } from "./fx";
+import { txt } from "../core/theme";
 
 const ALIVE_TTL_MS = 80;
 
@@ -197,6 +198,45 @@ export function safePosition(id) {
 /* POSITIONS & VISEE */
 
 export function posOf(id) { return safePosition(id); }
+
+/* Distance au sol (x/z) et distance dans l'espace, entre deux positions
+   deja lues. Trois fichiers les reecrivaient a la main (boss, bossGate,
+   saber) : une seule forme ici, donc un seul arrondi a corriger si besoin. */
+export function dist2(a, b) {
+    const dx = a[0] - b[0], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dz * dz);
+}
+
+export function dist3(a, b) {
+    const dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/* api.isAlive en version qui ne leve jamais. isAliveId() repond depuis le
+   cache (plus rapide) ; celle-ci interroge le moteur, ce que veulent les
+   boucles de boss qui ne tournent que toutes les 20 ms. */
+export function aliveNow(id) {
+    if (!id) return false;
+    try { return !!api.isAlive(id); } catch (e) { return false; }
+}
+
+/* nameTagInfo d'un mob ou d'un boss. boss.js et saber.js construisaient le
+   meme objet avec deux fonds et deux graisses differents : ce qui changeait
+   est un parametre (fond, bordure, graisse), le reste est ecrit une fois. */
+export function nameTagInfo(title, subtitle, colour, background, border, weight) {
+    const info = {
+        content: [txt(title, colour, { fontWeight: weight || "bold" })],
+        healthbar: {
+            display: "always",
+            foregroundColour: colour,
+            backgroundColour: background || "#2a1210",
+        },
+        border: { colour: border || colour, style: "solid" },
+    };
+    if (subtitle) info.subtitle = [txt(subtitle, "#ffb347")];
+    return info;
+}
+
 
 export function facing(id) {
     try {

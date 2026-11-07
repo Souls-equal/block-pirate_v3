@@ -2,6 +2,7 @@
 import { setTimeout, setInterval, sleep, run } from "./timer";
 import { say } from "../core/theme";
 import { markBossMob } from "../gameplay/loot";
+import { aliveNow, dist2, nameTagInfo, posOf } from "./lifeform";
 import { armBossGate, disarmBossGate } from "./bossGate";
 
 // config
@@ -41,23 +42,7 @@ export function getRandomPosition(pos1, pos2) {
 
     return [x, y, z];
 }
-function pos(id) {
-  try {
-    const p = api.getPosition(id);
-    return p ? [p[0], p[1], p[2]] : null;
-  } catch (_) {
-    return null;
-  }
-}
 
-function alive(id) {
-  if (!id) return false;
-  try {
-    return !!api.isAlive(id);
-  } catch (_) {
-    return false;
-  }
-}
 
 function fighterId() {
   return boss && boss.fighter ? boss.fighter : null;
@@ -84,16 +69,11 @@ function around(origin, radius, angle, yOff) {
   ];
 }
 
-function dist2d(a, b) {
-  const dx = a[0] - b[0];
-  const dz = a[2] - b[2];
-  return Math.sqrt(dx * dx + dz * dz);
-}
 
 function nearestPlayer(from) {
   const fighter = fighterId();
-  if (fighter && alive(fighter)) {
-    const p = pos(fighter);
+  if (fighter && aliveNow(fighter)) {
+    const p = posOf(fighter);
     if (p) return fighter;
   }
   let ids = [];
@@ -106,10 +86,10 @@ function nearestPlayer(from) {
   let bestD = Infinity;
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i];
-    if (!alive(id)) continue;
-    const p = pos(id);
+    if (!aliveNow(id)) continue;
+    const p = posOf(id);
     if (!p) continue;
-    const d = dist2d(from, p);
+    const d = dist2(from, p);
     if (d < bestD) {
       bestD = d;
       best = id;
@@ -134,21 +114,6 @@ function sound(name, volume, rate) {
   } catch (_) {}
 }
 
-function nameTag(title, subtitle, colour) {
-  const info = {
-    content: [{ str: title, style: { color: colour || "#7ec8ff", fontWeight: "700" } }],
-    healthbar: {
-      display: "always",
-      foregroundColour: colour || "#ff2f1a",
-      backgroundColour: "#2a1210",
-    },
-    border: { colour: "#7ec8ff", style: "solid" },
-  };
-  if (subtitle) {
-    info.subtitle = [{ str: subtitle, style: { color: "#ffb347" } }];
-  }
-  return info;
-}
 
 function setupMob(id, hp, extra) {
   api.setMobSetting(id, "maxHealth", hp);
@@ -161,10 +126,53 @@ function setupMob(id, hp, extra) {
   for (const key in extra) api.setMobSetting(id, key, extra[key]);
 }
 
+/* MISE EN PLACE D'UN BOSS — une seule fonction pour les trois.
+
+   Garp (ici), le Mob Leader et le Saber Expert (gameplay/saber.js) demandaient
+   le meme bloc de dix reglages, recopie trois fois avec deux ou trois valeurs
+   qui changeaient. La difference est desormais un objet :
+
+     hp, dmg, radius, speed, scale   les nombres du boss
+     name, title, colour, background le nameTag (weight : graisse du texte)
+     knockback, target, settings     ce qui n'appartient qu'a un seul boss
+
+   Tout est dans UN try/catch : un reglage refuse par le moteur ne doit jamais
+   empecher le boss d'exister (c'est ce que faisait deja boss.js). */
+export function setupBossMob(id, cfg) {
+  if (!id) return null;
+  const radius = cfg.radius === undefined ? 48 : cfg.radius;
+  try {
+    api.setMobSetting(id, "maxHealth", cfg.hp);
+    api.setHealth(id, cfg.hp, undefined, true);
+    if (cfg.dmg !== undefined) api.setMobSetting(id, "attackDamage", cfg.dmg);
+    api.setMobSetting(id, "hostilityRadius", radius);
+    api.setMobSetting(id, "chaseRadius", radius);
+    api.setMobSetting(id, "territoryRadius", radius);
+    api.setMobSetting(id, "onDeathItemDrops", []);
+    /* settings d'abord : c'est l'ordre qu'avait Garp (name avant les vitesses). */
+    if (cfg.settings) {
+      for (const key in cfg.settings) api.setMobSetting(id, key, cfg.settings[key]);
+    }
+    if (cfg.speed !== undefined) {
+      api.setMobSetting(id, "baseRunningSpeed", cfg.speed);
+      api.setMobSetting(id, "baseWalkingSpeed", cfg.speed * 0.75);
+    }
+    if (cfg.knockback === 0) api.setMobSetting(id, "knockbackReceivedMultiplier", 0);
+    if (cfg.scale !== undefined) api.setLifeformScale(id, cfg.scale);
+    if (cfg.colour) {
+      api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
+        nameTagInfo(cfg.name, cfg.title, cfg.colour, cfg.background, null, cfg.weight), true);
+    }
+    if (cfg.target) api.setMobAiState(id, "chasing", { targetId: cfg.target });
+  } catch (e) {}
+  return id;
+}
+
+
 function pruneGuards() {
   if (!boss) return 0;
   for (let i = boss.guards.length - 1; i >= 0; i--) {
-    if (!alive(boss.guards[i])) boss.guards.splice(i, 1);
+    if (!aliveNow(boss.guards[i])) boss.guards.splice(i, 1);
   }
   return boss.guards.length;
 }
@@ -176,8 +184,8 @@ function setInv(inv) {
 }
 
 function chase() {
-  if (!boss || !alive(boss.id)) return;
-  const p = pos(boss.id);
+  if (!boss || !aliveNow(boss.id)) return;
+  const p = posOf(boss.id);
   if (!p) return;
   const target = nearestPlayer(p);
   if (!target || boss.aiTarget === target) return;
@@ -187,7 +195,7 @@ function chase() {
 
 function watch() {
   if (!boss) return;
-  if (!alive(boss.id)) {
+  if (!aliveNow(boss.id)) {
     onBossDeath(fighterId());
     return;
   }
@@ -227,7 +235,7 @@ function cleanup() {
         api.despawnMob(boss.guards[i]);
       } catch (_) {}
     }
-    if (alive(boss.id)) {
+    if (aliveNow(boss.id)) {
       try {
         api.despawnMob(boss.id);
       } catch (_) {}
@@ -246,10 +254,10 @@ export function spawnBoss(position, playerId) {
   if (boss) cleanup();
 
   let spawnPos = position;
-  if (!spawnPos && playerId) spawnPos = pos(playerId);
+  if (!spawnPos && playerId) spawnPos = posOf(playerId);
   if (!spawnPos) {
     const ids = api.getPlayerIds() || [];
-    spawnPos = ids.length ? pos(ids[0]) : null;
+    spawnPos = ids.length ? posOf(ids[0]) : null;
   }
   if (!spawnPos) spawnPos = [0, 64, 0];
   spawnPos = clearSpawnPos(spawnPos[0], spawnPos[1], spawnPos[2]);
@@ -275,16 +283,22 @@ export function spawnBoss(position, playerId) {
      kill, donc son nom ne sera plus lisible a ce moment-la. */
   markBossMob(id, CFG.NAME);
 
-  setupMob(id, CFG.HP, {
+  setupBossMob(id, {
+    hp: CFG.HP,
+    radius: 48,
+    speed: CFG.SPEED,
+    scale: CFG.SCALE,
+    knockback: 0,
     name: CFG.NAME,
-    baseRunningSpeed: CFG.SPEED,
-    baseWalkingSpeed: CFG.SPEED * 0.75,
-    knockbackReceivedMultiplier: 0,
+    title: CFG.TITLE,
+    colour: "#7ec8ff",
+    background: "#2a1210",
+    weight: "700",
+    settings: { name: CFG.NAME },
   });
-  api.setLifeformScale(id, CFG.SCALE);
   /* Pas de one shot : paliers a 1/2, 1/3, 1/4 et 1/5 (voir bossDamageGate). */
   armBossGate(id, CFG.HP);
-  api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo", nameTag(CFG.NAME, CFG.TITLE, "#7ec8ff"), true);
+
 
   sound("bearRoar1", 1, 0.55);
   chat(CFG.NAME + " awakens", "#7ec8ff");
@@ -306,7 +320,7 @@ export function spawnBoss(position, playerId) {
 
 function* summonGuards() {
   if (!boss) return;
-  const origin = pos(boss.id);
+  const origin = posOf(boss.id);
   if (!origin) return;
 
   chat(CFG.GUARD_NAME + " woke up — the boss is now invincible.", "#ff9d4d");
@@ -326,7 +340,7 @@ function* summonGuards() {
       name: CFG.GUARD_NAME,
       attackDamage: CFG.GUARD_DMG,
     });
-    api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo", nameTag(CFG.GUARD_NAME, null, "#ff9d4d"), true);
+    api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo", nameTagInfo(CFG.GUARD_NAME, null, "#ff9d4d", null, "#7ec8ff"), true);
     const target = nearestPlayer(p);
     if (target) api.setMobAiState(id, "chasing", { targetId: target });
     boss.guards.push(id);
@@ -339,7 +353,7 @@ function* summonGuards() {
 function onBossDeath(playerId) {
   if (!boss || boss.dead) return;
   boss.dead = true;
-  const p = pos(boss.id);
+  const p = posOf(boss.id);
   dropHaki(p);
   chat(CFG.NAME + " has fallen", "#ffd166", playerId);
   sound("exp_levelup", 1, 0.9);

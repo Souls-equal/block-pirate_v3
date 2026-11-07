@@ -26,7 +26,7 @@ import {
     targetBlock,
 } from "./lifeform";
 import { setTimeout, nowMs, getActor, withActor } from "./timer";
-import { C, say } from "../core/theme";
+import { C, say, txt, ic } from "../core/theme";
 import { isCrowdControlImmune } from "../core/ranks";
 export const summonOwner = {};
 /* Garde d'equipe (marines entre eux, meme crew). Posee par index.js avec
@@ -181,7 +181,7 @@ const PVP_NOTICE = {};  /* "killer|victim" -> dernier message */
 
 function pvpSay(playerId, text, color) {
     try {
-        say(playerId, [ { str: text, style: { color: color } } ]);
+        say(playerId, [ txt(text, color) ]);
     } catch (e) {}
 }
 
@@ -552,8 +552,8 @@ function moveNotice(id, text) {
     lastMoveNotice[id] = now;
     try {
         say(id, [
-            { icon: "fa-solid fa-circle-xmark", style: { color: "#FFD166" } },
-            { str: " " + text, style: { color: "#FFD166" } },
+            ic("fa-solid fa-circle-xmark", "#FFD166"),
+            txt(" " + text, "#FFD166"),
         ]);
     } catch (e) {}
 }

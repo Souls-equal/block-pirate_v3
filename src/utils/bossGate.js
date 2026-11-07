@@ -6,24 +6,11 @@
    Arme par utils/boss.js et gameplay/saber.js, interroge par utils/combat.js
    et par onPlayerDamagingMob (index.js). */
 
-import { say } from "../core/theme";
+import { say, txt } from "../core/theme";
 import { nowMs } from "./timer";
+import { dist2, posOf } from "./lifeform";
 
-/* Position lisible, ou null : meme garde que partout ailleurs (une entite
-   qui vient de disparaitre leve, on ne veut pas d'exception). */
-function posOf(id) {
-  try {
-    const p = api.getPosition(id);
-    return p ? [p[0], p[1], p[2]] : null;
-  } catch (_) {
-    return null;
-  }
-}
 
-function dist2d(a, b) {
-  const dx = a[0] - b[0], dz = a[2] - b[2];
-  return Math.sqrt(dx * dx + dz * dz);
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    PALIERS DE DEGATS DES BOSS — l'anti one shot
@@ -99,7 +86,7 @@ function playersNear(at, radius) {
   try { ids = api.getPlayerIds() || []; } catch (e) { return out; }
   for (let i = 0; i < ids.length; i++) {
     const p = posOf(ids[i]);
-    if (p && dist2d(at, p) <= radius) out.push(ids[i]);
+    if (p && dist2(at, p) <= radius) out.push(ids[i]);
   }
   return out;
 }
@@ -116,11 +103,11 @@ function announceGate(mobId, restPct) {
     try { api.playSound(near[i], "bearRoar1", 0.8, 1.25); } catch (e) {}
     try {
       say(near[i], [
-        { str: "[", style: { color: "#94a3b8" } },
-        { str: name, style: { color: "#ffd166", fontWeight: "700" } },
-        { str: "] endures ", style: { color: "#cbd5e1" } },
-        { str: restPct + "% health left", style: { color: "#ffd166", fontWeight: "700" } },
-        { str: " - no damage for a moment.", style: { color: "#cbd5e1" } },
+        txt("[", "#94a3b8"),
+        txt(name, "#ffd166", {fontWeight: "700"}),
+        txt("] endures ", "#cbd5e1"),
+        txt(restPct + "% health left", "#ffd166", {fontWeight: "700"}),
+        txt(" - no damage for a moment.", "#cbd5e1"),
       ]);
     } catch (e) {}
   }

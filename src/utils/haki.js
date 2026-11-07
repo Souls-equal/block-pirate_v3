@@ -4,7 +4,7 @@ import { point, TEX } from "./fx";
 import { isMobEntityType, posOf } from "./lifeform";
 import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "./data";
 
-import { say } from "../core/theme";
+import { say, txt, bold, ic } from "../core/theme";
 /* Nom d'ITEM (interne) du pod qui arme le haki. Ce que le joueur lit est
    "Armament Haki" : le nom et la description sont poses par gameplay/customItem
    (ITEM_LOOKS), comme tous les items custom. */
@@ -119,17 +119,14 @@ export function onPlayerClickArmamentHaki(playerId) {
     if (!held || held.name !== HK_CLICK) return false;
     if (!hasArmamentHaki(playerId)) {
         hk_say(playerId, [
-            { str: "You do not know Armament Haki yet.\n", style: { color: "#FF5555", fontWeight: "bold" } },
-            { str: "It is bought, not found.", style: { color: "#AAAAAA" } }
+            bold("You do not know Armament Haki yet.\n", "#FF5555"),
+            txt("It is bought, not found.", "#AAAAAA")
         ]);
         return true;
     }
     const on = hkArmed[playerId] !== 1;
     setArmamentHaki(playerId, on);
-    hk_say(playerId, [{
-        str: on ? "Armament Haki: your fists turn black." : "Armament Haki: released.",
-        style: { color: "#2A232B", fontWeight: "bold" }
-    }]);
+    hk_say(playerId, [bold(on ? "Armament Haki: your fists turn black." : "Armament Haki: released.", "#2A232B")]);
     return true;
 }
 
@@ -153,12 +150,12 @@ export function buyArmamentHaki(playerId) {
         const refreshed = giveHakiPod(playerId);
         hk_say(playerId, refreshed
             ? [
-                { icon: "fa-solid fa-hand-fist", style: { color: "#B98CFF" } },
-                { str: " You already know Armament Haki.\n", style: { color: "#FFD700" } },
-                { str: "Your " + HK_LABEL + " item has been given back — click with it to arm your fists.", style: { color: "#AAAAAA" } }
+                ic("fa-solid fa-hand-fist", "#B98CFF"),
+                txt(" You already know Armament Haki.\n", "#FFD700"),
+                txt("Your " + HK_LABEL + " item has been given back — click with it to arm your fists.", "#AAAAAA")
             ]
             : [
-                { str: "You already know Armament Haki, and the item is in your inventory.", style: { color: "#FFD700" } }
+                txt("You already know Armament Haki, and the item is in your inventory.", "#FFD700")
             ]);
         return false;
     }
@@ -167,8 +164,8 @@ export function buyArmamentHaki(playerId) {
     try { tolls = api.getInventoryItemAmount(playerId, HK_TOLL) } catch (e) { tolls = 0 }
     if (!tolls) {
         hk_say(playerId, [
-            { str: "You need a Black Carpet to learn this.\n", style: { color: "#FF5555", fontWeight: "bold" } },
-            { str: "You have none.", style: { color: "#AAAAAA" } }
+            bold("You need a Black Carpet to learn this.\n", "#FF5555"),
+            txt("You have none.", "#AAAAAA")
         ]);
         return false;
     }
@@ -176,26 +173,26 @@ export function buyArmamentHaki(playerId) {
     const money = getTotalMoney(playerId);
     if (money < HK_PRICE) {
         hk_say(playerId, [
-            { str: "Not enough Gold Coins!\n", style: { color: "#FF5555", fontWeight: "bold" } },
-            { str: "Cost: ", style: { color: "#AAAAAA" } },
-            { str: HK_PRICE + " Gold Coins\n", style: { color: "#FFD700", fontWeight: "bold" } },
-            { str: "You have: ", style: { color: "#AAAAAA" } },
-            { str: money + " Gold Coins", style: { color: "#55FF55", fontWeight: "bold" } }
+            bold("Not enough Gold Coins!\n", "#FF5555"),
+            txt("Cost: ", "#AAAAAA"),
+            bold(HK_PRICE + " Gold Coins\n", "#FFD700"),
+            txt("You have: ", "#AAAAAA"),
+            bold(money + " Gold Coins", "#55FF55")
         ]);
         return false;
     }
 
     /* Meme confirmation que tous les autres achats (voir utils/data). */
     if (!confirmAction(playerId, "haki", [
-        { icon: "fa-solid fa-hand-fist", style: { color: "#B98CFF" } },
-        { str: " Learn Armament Haki for ", style: { color: "#AAAAAA" } },
-        { str: HK_PRICE + " Gold Coins", style: { color: "#FFD700", fontWeight: "bold" } },
-        { str: " and 1 Black Carpet.", style: { color: "#AAAAAA" } },
+        ic("fa-solid fa-hand-fist", "#B98CFF"),
+        txt(" Learn Armament Haki for ", "#AAAAAA"),
+        bold(HK_PRICE + " Gold Coins", "#FFD700"),
+        txt(" and 1 Black Carpet.", "#AAAAAA"),
     ])) return false;
 
     if (!payMoney(playerId, HK_PRICE)) {
         cancelConfirm(playerId);
-        hk_say(playerId, [{ str: "Payment failed.", style: { color: "#FF5555", fontWeight: "bold" } }]);
+        hk_say(playerId, [bold("Payment failed.", "#FF5555")]);
         return false;
     }
     try { api.removeItemName(playerId, HK_TOLL, 1) } catch (e) {}
@@ -205,10 +202,10 @@ export function buyArmamentHaki(playerId) {
     setArmamentHaki(playerId, true);
     try { api.playSound(playerId, "coin", 1, 1) } catch (e) {}
     hk_say(playerId, [
-        { str: "Armament Haki learned.\n", style: { color: "#B98CFF", fontWeight: "bold", fontSize: "1.3em" } },
-        { str: "Your arms are hard as steel: every hit you land deals ", style: { color: "#AAAAAA" } },
-        { str: "+25%", style: { color: "#FFD700", fontWeight: "bold" } },
-        { str: " more, fruit included.\nClick with your " + HK_LABEL + " item to arm or release it.", style: { color: "#AAAAAA" } }
+        txt("Armament Haki learned.\n", "#B98CFF", {fontWeight: "bold", fontSize: "1.3em"}),
+        txt("Your arms are hard as steel: every hit you land deals ", "#AAAAAA"),
+        bold("+25%", "#FFD700"),
+        txt(" more, fruit included.\nClick with your " + HK_LABEL + " item to arm or release it.", "#AAAAAA")
     ]);
     return true;
 }

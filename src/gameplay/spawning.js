@@ -2,8 +2,9 @@
 
 import { updateSidebar } from "../core/UI";
 import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { rollMobLoot } from "./loot";
+import { playerIdForDbId } from "../utils/killAttribution";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},
@@ -262,10 +263,10 @@ function setMobNameTag(mobId, rank, level, name) {
     const accent = rank === 3 ? C.DANGER : rank === 2 ? C.MONEY : C.INFO;
     const label = rank === 3 ? "BOSS" : rank === 2 ? "TIER 2" : "NORMAL";
     const rich = {
-        content: [{ str: String(name || "Mob"), style: { color: accent, fontWeight: "bold" } }],
+        content: [bold(String(name || "Mob"), accent)],
         subtitle: [
-            { str: label, style: { color: accent, fontWeight: "bold" } },
-            { str: "  |  Lvl " + level, style: { color: C.MARINE } }
+            bold(label, accent),
+            txt("  |  Lvl " + level, C.MARINE)
         ],
         /* `height` volontairement omis : la valeur attendue (nombre ou "13px")
                n'est pas documentee, et une valeur refusee ferait perdre tout le
@@ -280,7 +281,7 @@ function setMobNameTag(mobId, rank, level, name) {
     /* Repli minimal : un nom + une barre de vie, sans style exotique. */
     try {
         api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
-            content: [{ str: String(name || "Mob") }],
+            content: [txt(String(name || "Mob"))],
             healthbar: { display: "always" }
         });
     } catch (e) {}
@@ -293,15 +294,10 @@ function resolveSummonOwnerForXp(playerId) {
         if (map && map[playerId]) return map[playerId];
     } catch (e) {}
     try {
-        const db = api.getMobSetting(playerId, "ownerDbId", false);
-        if (db) {
-            let pids = [];
-            try { pids = api.getPlayerIds() || []; } catch (e) {}
-            for (let i = 0; i < pids.length; i++) {
-                try { if (api.getPlayerDbId(pids[i]) === db) return pids[i]; } catch (e2) {}
-            }
-        }
+        const owner = playerIdForDbId(api.getMobSetting(playerId, "ownerDbId", false));
+        if (owner) return owner;
     } catch (e) {}
+
     try {
         if (globalThis.__resolveKillOwner) {
             const r = globalThis.__resolveKillOwner(playerId);
@@ -375,8 +371,8 @@ export function killdMob(playerId, mobId) {
 
     try {
         say(realPlayerId,[
-            {icon:"fa-solid fa-sparkle",style:{color:C.XP}},
-            {str:" +"+xp+" XP  ",style:{color:C.XP}},
+            ic("fa-solid fa-sparkle", C.XP),
+            txt(" +"+xp+" XP  ", C.XP),
         ]);
     } catch (e) {}
 

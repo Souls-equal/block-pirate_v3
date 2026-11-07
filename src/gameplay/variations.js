@@ -25,7 +25,7 @@
 // Aucune cle existante (money, lvl, team, xp...) n'est modifiee.
 
 import { setInterval } from "../utils/timer";
-import { C, say } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { forgetChatChannel } from "../core/team";
 
 /* ---------------------------------------------------------------- reglages */
@@ -295,10 +295,10 @@ export function idInSafeZone(id) {
 /* Message (limite a un toutes les 3 s) quand une action est refusee. */
 export function safeZoneBlocked(playerId) {
     tell(playerId, [
-        { icon: "fa-solid fa-shield-halved", style: { color: C.MARINE } },
-        { str: " Safe zone: ", style: { color: C.INFO } },
-        { str: "no abilities, no damage", style: { color: C.MARINE, fontWeight: "bold" } },
-        { str: " in this area.", style: { color: C.INFO } },
+        ic("fa-solid fa-shield-halved", C.MARINE),
+        txt(" Safe zone: ", C.INFO),
+        bold("no abilities, no damage", C.MARINE),
+        txt(" in this area.", C.INFO),
     ], "safeZone");
     return true;
 }
@@ -379,9 +379,9 @@ export function chooseTeam(playerId, teamId) {
     if (!variationsOn) {
         const ok = teleport(playerId, teamSpawn(sea, team));
         tell(playerId, [
-            { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
-            { str: ok ? " You joined the " : " Could not move you to the ", style: { color: C.INFO } },
-            { str: teamLabel, style: { color: team === "PIRATES" ? C.PIRATE : C.MARINE, fontWeight: "bold" } },
+            ic("fa-solid fa-map-marker-check", C.MARINE),
+            txt(ok ? " You joined the " : " Could not move you to the ", C.INFO),
+            bold(teamLabel, team === "PIRATES" ? C.PIRATE : C.MARINE),
         ]);
         return ok;
     }
@@ -390,10 +390,10 @@ export function chooseTeam(playerId, teamId) {
     setPending(playerId, teamSpawn(sea, team));
     const ok = moveToVariation(playerId, sea.id);
     tell(playerId, [
-        { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
-        { str: ok ? " Sailing to " : " Could not board ", style: { color: C.INFO } },
-        { str: sea.title, style: { color: C.XP, fontWeight: "bold" } },
-        { str: " as " + teamLabel, style: { color: C.PIRATE } }
+        ic("fa-solid fa-map-marker-check", C.MARINE),
+        txt(ok ? " Sailing to " : " Could not board ", C.INFO),
+        bold(sea.title, C.XP),
+        txt(" as " + teamLabel, C.PIRATE)
     ]);
     return ok;
 }
@@ -406,17 +406,17 @@ export function continueJourney(playerId) {
     if (!variationsOn) {
         const ok = teleport(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
         tell(playerId, [
-            { icon: "Boat", style: { color: C.MARINE } },
-            { str: ok ? " Welcome back." : " Could not move you.", style: { color: C.INFO } },
+            ic("Boat", C.MARINE),
+            txt(ok ? " Welcome back." : " Could not move you.", C.INFO),
         ]);
         return ok;
     }
     setPending(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
     const ok = moveToVariation(playerId, sea.id);
     tell(playerId, [
-        { icon: "Boat", style: { color: C.MARINE } },
-        { str: ok ? " Welcome back to " : " Could not board ", style: { color: C.INFO } },
-        { str: sea.title, style: { color: C.XP, fontWeight: "bold" } }
+        ic("Boat", C.MARINE),
+        txt(ok ? " Welcome back to " : " Could not board ", C.INFO),
+        bold(sea.title, C.XP)
     ]);
     return ok;
 }
@@ -431,18 +431,18 @@ export function launch(playerId) {
         if (team === "PIRATES" || team === "MARINES") {
             teleport(playerId, teamSpawn(sea, team));
             say(playerId, [
-                { icon: "fa-solid fa-map-marker-check", style: { color: C.MARINE } },
-                { str: " Welcome back, ", style: { color: C.INFO } },
-                { str: team === "PIRATES" ? "Pirate" : "Marine", style: { color: team === "PIRATES" ? C.PIRATE : C.MARINE, fontWeight: "bold" } },
+                ic("fa-solid fa-map-marker-check", C.MARINE),
+                txt(" Welcome back, ", C.INFO),
+                bold(team === "PIRATES" ? "Pirate" : "Marine", team === "PIRATES" ? C.PIRATE : C.MARINE),
             ]);
             return true;
         }
         say(playerId, [
-            { icon: "fa-solid fa-user-group", style: { color: C.MONEY } },
-            { str: " Choose your side at the recruiter: ", style: { color: C.INFO } },
-            { str: "Pirates", style: { color: C.PIRATE, fontWeight: "bold" } },
-            { str: " / ", style: { color: C.INFO } },
-            { str: "Marines", style: { color: C.MARINE, fontWeight: "bold" } },
+            ic("fa-solid fa-user-group", C.MONEY),
+            txt(" Choose your side at the recruiter: ", C.INFO),
+            bold("Pirates", C.PIRATE),
+            txt(" / ", C.INFO),
+            bold("Marines", C.MARINE),
         ]);
         return false;
     }
@@ -450,19 +450,19 @@ export function launch(playerId) {
     teleport(playerId, firstTime ? LOBBY.hubFirst : LOBBY.hubReturning);
     if (firstTime) {
         say(playerId, [
-            { icon: "fa-solid fa-user-group", style: { color: C.MONEY } },
-            { str: " Choose your side: ", style: { color: C.INFO } },
-            { str: "Pirates", style: { color: C.PIRATE, fontWeight: "bold" } },
-            { str: " / ", style: { color: C.INFO } },
-            { str: "Marines", style: { color: C.MARINE, fontWeight: "bold" } },
-            { str: " / ", style: { color: C.INFO } },
-            { str: "None", style: { color: C.INFO, fontWeight: "bold" } }
+            ic("fa-solid fa-user-group", C.MONEY),
+            txt(" Choose your side: ", C.INFO),
+            bold("Pirates", C.PIRATE),
+            txt(" / ", C.INFO),
+            bold("Marines", C.MARINE),
+            txt(" / ", C.INFO),
+            bold("None", C.INFO)
         ]);
     } else {
         say(playerId, [
-            { icon: "Boat", style: { color: C.MARINE } },
-            { str: " Continue your journey in ", style: { color: C.INFO } },
-            { str: (seaByNumber(playerSea(playerId)) || SEAS[1]).title, style: { color: C.XP, fontWeight: "bold" } }
+            ic("Boat", C.MARINE),
+            txt(" Continue your journey in ", C.INFO),
+            bold((seaByNumber(playerSea(playerId)) || SEAS[1]).title, C.XP)
         ]);
     }
     return true;

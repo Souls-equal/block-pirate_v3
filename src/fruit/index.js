@@ -1,5 +1,5 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
-import { C as THEME, say, shout } from "../core/theme";
+import { C as THEME, say, shout, txt, ic } from "../core/theme";
 import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket } from "../utils/data";
 let o = function () {},
   r = function () {};
@@ -268,12 +268,12 @@ function spawnWildFruit() {
   const color = a(rarity);
   try {
     shout([
-      { icon: "fa-solid fa-star", style: { color: color } },
-      { str: " A ", style: { color: "#cbd5e1" } },
-      { str: rarity, style: { color: color, fontWeight: "700" } },
-      { str: " fruit block appeared at ", style: { color: "#cbd5e1" } },
-      { str: spot.where, style: { color: "#f8fafc", fontWeight: "700" } },
-      { str: ". Click it to claim a random " + rarity + " fruit. It rots in 15 minutes.", style: { color: "#94a3b8" } },
+      ic("fa-solid fa-star", color),
+      txt(" A ", "#cbd5e1"),
+      txt(rarity, color, {fontWeight: "700"}),
+      txt(" fruit block appeared at ", "#cbd5e1"),
+      txt(spot.where, "#f8fafc", {fontWeight: "700"}),
+      txt(". Click it to claim a random " + rarity + " fruit. It rots in 15 minutes.", "#94a3b8"),
     ]);
   } catch (e) {}
   return !0;
@@ -287,8 +287,8 @@ function rotWildFruits() {
     y.delete(key);
     try {
       shout([
-        { icon: "fa-solid fa-hourglass", style: { color: "#94a3b8" } },
-        { str: " The fruit block nobody claimed rotted away.", style: { color: "#94a3b8" } },
+        ic("fa-solid fa-hourglass", "#94a3b8"),
+        txt(" The fruit block nobody claimed rotted away.", "#94a3b8"),
       ]);
     } catch (e) {}
   }
@@ -333,13 +333,13 @@ export function pickupFruit(t, e, o, r) {
     p(
       t,
       [
-        { str: "[", style: { color: "#94a3b8" } },
-        { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-        { str: "] ", style: { color: "#94a3b8" } },
-        { str: l, style: { color: "#f8fafc", fontWeight: "600" } },
-        { str: " picked up ", style: { color: "#cbd5e1" } },
-        { str: fruitName, style: { color: u || "#ffffff", fontWeight: "700" } },
-        { str: "!", style: { color: "#cbd5e1" } },
+        txt("[", "#94a3b8"),
+        txt("!", "#ef4444", {fontWeight: "700"}),
+        txt("] ", "#94a3b8"),
+        txt(l, "#f8fafc", {fontWeight: "600"}),
+        txt(" picked up ", "#cbd5e1"),
+        txt(fruitName, u || "#ffffff", {fontWeight: "700"}),
+        txt("!", "#cbd5e1"),
       ],
       "pickupFruit",
     ),
@@ -373,12 +373,12 @@ export function activateFruit(t) {
       p(
         t,
         [
-          { str: "[", style: { color: "#94a3b8" } },
-          { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-          { str: "] ", style: { color: "#94a3b8" } },
-          { str: "This fruit is already equipped: ", style: { color: "#cbd5e1" } },
-          { str: r, style: { color: "#67e8f9", fontWeight: "700" } },
-          { str: ".", style: { color: "#cbd5e1" } },
+          txt("[", "#94a3b8"),
+          txt("!", "#ef4444", {fontWeight: "700"}),
+          txt("] ", "#94a3b8"),
+          txt("This fruit is already equipped: ", "#cbd5e1"),
+          txt(r, "#67e8f9", {fontWeight: "700"}),
+          txt(".", "#cbd5e1"),
         ],
         "activateFruit",
       ),
@@ -529,12 +529,12 @@ function N(t, e, o) {
       p(
         t,
         [
-          { str: "[", style: { color: "#94a3b8" } },
-          { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-          { str: "] ", style: { color: "#94a3b8" } },
-          { str: "You ate ", style: { color: "#cbd5e1" } },
-          { str: e, style: { color: (o ? o.color : "#FFFFFF") || "#ffffff", fontWeight: "700" } },
-          { str: " fruit!", style: { color: "#cbd5e1" } },
+          txt("[", "#94a3b8"),
+          txt("!", "#ef4444", {fontWeight: "700"}),
+          txt("] ", "#94a3b8"),
+          txt("You ate ", "#cbd5e1"),
+          txt(e, (o ? o.color : "#FFFFFF") || "#ffffff", {fontWeight: "700"}),
+          txt(" fruit!", "#cbd5e1"),
         ],
         "equipFruit",
       );
@@ -592,11 +592,11 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
     (!x[d] || I - x[d] > 2e3) &&
       ((x[d] = I),
       say(t, [
-        { str: "[", style: { color: "#94a3b8" } },
-        { str: "!", style: { color: "#ef4444", fontWeight: "700" } },
-        { str: "] ", style: { color: "#94a3b8" } },
-        { str: "Cooldown: ", style: { color: "#fbbf24" } },
-        { str: e + "s", style: { color: "#fde68a", fontWeight: "700" } },
+        txt("[", "#94a3b8"),
+        txt("!", "#ef4444", {fontWeight: "700"}),
+        txt("] ", "#94a3b8"),
+        txt("Cooldown: ", "#fbbf24"),
+        txt(e + "s", "#fde68a", {fontWeight: "700"}),
       ]));
     /* "cooldown" => src/index.js enchaîne sur le coup de poing du style. */
     return "cooldown";
@@ -612,11 +612,11 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
               api.sendFlyingMiddleMessage(
                 t,
                 [
-                  { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
-                  { str: "Ability ", style: { color: "#cbd5e1", fontWeight: "600" } },
-                  { str: e, style: { color: "#67e8f9", fontWeight: "700" } },
-                  { str: " is ready!", style: { color: "#86efac", fontWeight: "700" } },
-                  { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
+                  ic("fa-solid fa-sparkle", THEME.MONEY),
+                  txt("Ability ", "#cbd5e1", {fontWeight: "600"}),
+                  txt(e, "#67e8f9", {fontWeight: "700"}),
+                  txt(" is ready!", "#86efac", {fontWeight: "700"}),
+                  ic("fa-solid fa-sparkle", THEME.MONEY),
                 ],
                 100,
               );
@@ -865,21 +865,21 @@ function P(t, e = "#f8fafc") {
 }
 function w(t, e, o, r, n, i = "#facc15") {
   const c = [
-      { str: "╔════════════════════════════════╗\n", style: { color: "#facc15", fontWeight: "700", fontSize: "20px" } },
-      { str: "        FRUIT MACHINE\n\n", style: { color: i, fontWeight: "700", fontSize: "26px" } },
-      { str: "      ║  ", style: { color: "#94a3b8", fontWeight: "700", fontSize: "20px" } },
+      txt("╔════════════════════════════════╗\n", "#facc15", {fontWeight: "700", fontSize: "20px"}),
+      txt("        FRUIT MACHINE\n\n", i, {fontWeight: "700", fontSize: "26px"}),
+      txt("      ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
     ],
-    a = e.map((t) => ({ str: "  " + S(t) + "  ", style: { color: P(t), fontWeight: "700", fontSize: "24px" } }));
+    a = e.map((t) => (txt("  " + S(t) + "  ", P(t), {fontWeight: "700", fontSize: "24px"})));
   (c.push(
     a[0],
-    { str: "  ║  ", style: { color: "#94a3b8", fontWeight: "700", fontSize: "20px" } },
+    txt("  ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
     a[1],
-    { str: "  ║  ", style: { color: "#94a3b8", fontWeight: "700", fontSize: "20px" } },
+    txt("  ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
     a[2],
-    { str: "  ║\n\n", style: { color: "#94a3b8", fontWeight: "700", fontSize: "20px" } },
-    { str: "        " + o + "\n", style: { color: i, fontWeight: "700", fontSize: "20px" } },
-    { str: "        PRICE: " + r + "  •  LEVEL: " + n + "\n", style: { color: "#cbd5e1", fontWeight: "600", fontSize: "16px" } },
-    { str: "╚════════════════════════════════╝", style: { color: "#facc15", fontWeight: "700", fontSize: "20px" } },
+    txt("  ║\n\n", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
+    txt("        " + o + "\n", i, {fontWeight: "700", fontSize: "20px"}),
+    txt("        PRICE: " + r + "  •  LEVEL: " + n + "\n", "#cbd5e1", {fontWeight: "600", fontSize: "16px"}),
+    txt("╚════════════════════════════════╝", "#facc15", {fontWeight: "700", fontSize: "20px"}),
   ),
     (function (t, e) {
       try {
@@ -1032,13 +1032,13 @@ function E(t, o, r) {
                     p(
                       t,
                       [
-                        { str: "[", style: { color: "#94a3b8" } },
-                        { icon: "fa-solid fa-sparkle", style: { color: THEME.MONEY } },
-                        { str: "] You received ", style: { color: "#cbd5e1" } },
-                        { str: r, style: { color: (l && l.color) || "#ffffff", fontWeight: "700" } },
-                        { str: " fruit for ", style: { color: "#cbd5e1" } },
-                        { str: String(i.price), style: { color: "#facc15", fontWeight: "700" } },
-                        { str: "!", style: { color: "#cbd5e1" } },
+                        txt("[", "#94a3b8"),
+                        ic("fa-solid fa-sparkle", THEME.MONEY),
+                        txt("] You received ", "#cbd5e1"),
+                        txt(r, (l && l.color) || "#ffffff", {fontWeight: "700"}),
+                        txt(" fruit for ", "#cbd5e1"),
+                        txt(String(i.price), "#facc15", {fontWeight: "700"}),
+                        txt("!", "#cbd5e1"),
                       ],
                       "fruitRoll.reward",
                     ));
@@ -1108,16 +1108,16 @@ export function rollFruit(t, e = 1) {
   }
   const rollNote = rollTicket
     ? [
-        { str: " (" + rollTicket.pct + "% off with your ", style: { color: "#86efac" } },
-        { str: rollTicket.label, style: { color: "#86efac", fontWeight: "700" } },
-        { str: ")", style: { color: "#86efac" } },
+        txt(" (" + rollTicket.pct + "% off with your ", "#86efac"),
+        txt(rollTicket.label, "#86efac", {fontWeight: "700"}),
+        txt(")", "#86efac"),
       ]
     : [];
   if (rollBalance >= rollPrice && !confirmAction(t, "fruit", [
-    { icon: "fa-solid fa-dice", style: { color: THEME.MONEY } },
-    { str: " Spin the fruit machine for ", style: { color: "#cbd5e1" } },
-    { str: String(rollPrice), style: { color: "#facc15", fontWeight: "700" } },
-    { str: " (level " + rollLevel + ").", style: { color: "#cbd5e1" } },
+    ic("fa-solid fa-dice", THEME.MONEY),
+    txt(" Spin the fruit machine for ", "#cbd5e1"),
+    txt(String(rollPrice), "#facc15", {fontWeight: "700"}),
+    txt(" (level " + rollLevel + ").", "#cbd5e1"),
   ].concat(rollNote))) return null;
 
   const r = (function (t) {
@@ -1141,12 +1141,12 @@ export function rollFruit(t, e = 1) {
         p(
           t,
           [
-            { str: "[", style: { color: "#94a3b8" } },
-            { icon: "fa-solid fa-xmark", style: { color: "#ef4444", fontWeight: "700" } },
-            { str: "] Not enough money. Price: ", style: { color: "#cbd5e1" } },
-            { str: String(o), style: { color: "#fbbf24", fontWeight: "700" } },
-            { str: ". You have: ", style: { color: "#cbd5e1" } },
-            { str: String(r.balance), style: { color: "#f87171", fontWeight: "700" } },
+            txt("[", "#94a3b8"),
+            ic("fa-solid fa-xmark", "#ef4444", {fontWeight: "700"}),
+            txt("] Not enough money. Price: ", "#cbd5e1"),
+            txt(String(o), "#fbbf24", {fontWeight: "700"}),
+            txt(". You have: ", "#cbd5e1"),
+            txt(String(r.balance), "#f87171", {fontWeight: "700"}),
           ],
           "fruitRoll.payment",
         ),
