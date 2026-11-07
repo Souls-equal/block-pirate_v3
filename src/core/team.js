@@ -5,6 +5,7 @@ import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
+import { isOnlinePlayer } from "../utils/lifeform";
 import { C, say, shout } from "./theme";
 function safeName(id) {
     if (!id) return "Unknown";
@@ -561,6 +562,58 @@ export function handleChat(playerId, message, channel) {
 const TEAM_NOTICE = {};
 const TEAM_NOTICE_MS = 4000;
 
+/* PROTECTION DES PETITS NIVEAUX
+   Un joueur SOUS le niveau 50 ne peut pas etre touche par un joueur AU-DESSUS
+   du niveau 100, et il ne peut pas le toucher non plus : la protection est
+   mutuelle, sinon un petit niveau pourrait taper un gros sans riposte.
+
+   Les deux bornes sont volontairement larges : entre 50 et 100, tout reste
+   permis, y compris contre un niveau 300 (c'est un choix de jeu, pas un oubli).
+   La regle s'applique AUX DEUX CHEMINS de degats : le corps a corps
+   (onPlayerDamagingOtherPlayer) et les capacites (combat.damage -> setTeamGuard),
+   qui passent tous les deux par canDamage().
+
+   On ne filtre QUE les joueurs : un niveau 300 continue de taper les mobs, les
+   PNJ et les structures sans restriction. */
+const LEVEL_SHIELD = {
+    LOW: 50,   // en dessous : protege (niveau 49 et moins)
+    HIGH: 100, // au dessus : dangereux pour les petits (niveau 101 et plus)
+};
+const LEVEL_NOTICE = {};
+const LEVEL_NOTICE_MS = 4000;
+
+/* Renvoie true si un des deux est protege contre l'autre. La lecture du niveau
+   passe par la base (cle "lvl"), comme la prime et l'anti-farm. */
+function levelShielded(attacker, target) {
+    if (!attacker || !target || attacker === target) return false;
+    if (!isOnlinePlayer(attacker) || !isOnlinePlayer(target)) return false;
+    /* Lecture courte : un attaquant entre 50 et 100 ne peut jamais etre
+       protege contre quelqu'un, et personne ne le protege non plus. On evite
+       ainsi la seconde lecture de base dans le cas le plus courant. */
+    const a = levelOf(attacker);
+    const aLow = a < LEVEL_SHIELD.LOW;
+    const aHigh = a > LEVEL_SHIELD.HIGH;
+    if (!aLow && !aHigh) return false;
+    const b = levelOf(target);
+    if (aLow) return b > LEVEL_SHIELD.HIGH;
+    return b < LEVEL_SHIELD.LOW;
+}
+
+/* Un message toutes les 4 s par attaquant : en combat, un coup refuse arrive
+   plusieurs fois par seconde et inonderait le chat. */
+function warnLevelShield(attacker, target) {
+    const now = Date.now();
+    if (LEVEL_NOTICE[attacker] && now - LEVEL_NOTICE[attacker] < LEVEL_NOTICE_MS) return;
+    LEVEL_NOTICE[attacker] = now;
+    say(attacker, [
+        { icon: "fa-solid fa-shield", style: { color: C.INFO } },
+        { str: " You can't damage ", style: { color: C.MONEY } },
+        { str: safeName(target), style: { color: C.INFO, fontWeight: "bold" } },
+        { str: " (level " + levelOf(target) + "): players under level " + LEVEL_SHIELD.LOW +
+               " are protected from level " + LEVEL_SHIELD.HIGH + "+ players.", style: { color: C.MONEY } },
+    ]);
+}
+
 function warnFriendly(attacker) {
     const now = Date.now();
     if (TEAM_NOTICE[attacker] && now - TEAM_NOTICE[attacker] < TEAM_NOTICE_MS) return;
@@ -598,6 +651,12 @@ export function canDamage(attacker, target) {
     const teamB = getPlayerTeam(target);
     if (teamA === "MARINES" && teamB === "MARINES") {
         warnFriendly(attacker);
+        return "preventDamage";
+    }
+
+    /* Petit niveau contre gros niveau : aucun des deux ne touche l'autre. */
+    if (levelShielded(attacker, target)) {
+        warnLevelShield(attacker, target);
         return "preventDamage";
     }
     return;
