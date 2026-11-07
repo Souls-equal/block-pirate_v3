@@ -219,6 +219,69 @@ try {
 check(pointCalls > 0, "Control Domain : point() n'est jamais appelé (ReferenceError masquée ?)");
 void domain;
 
+// Régression du joueur enfermé dans un mur : le dôme posait ses prisonniers en
+// orbite à l'aveugle. Sur une falaise, 19 placements sur 40 tombaient DANS le
+// solide, et la victime y restait après la fermeture. On rejoue le vrai pack
+// tick par tick sur une arête rocheuse (x 10..12 solide).
+function runDomainOnCliff(actors, ticks) {
+  const pos = { ...actors };
+  const teleports = [];
+  let co = null;
+  const res = runScenario(texts, "dôme sur une falaise", (helpers, api) => {
+    const wall = (x) => x >= 10 && x <= 12;
+    const at = (id) => (pos[id] ? pos[id].slice() : null);
+    api.getPlayerIds = () => Object.keys(pos).filter((id) => id[0] === "p");
+    api.getMobIds = () => Object.keys(pos).filter((id) => id[0] === "m");
+    api.getPosition = at;
+    api.getEntityType = (id) => (id[0] === "p" ? "Player" : "Mob");
+    api.getBlockSolidity = (q) => wall(q[0]);
+    api.setPosition = (id, x, y, z) => {
+      teleports.push({ id, at: [x, y, z] });
+      pos[id] = [x, y, z];
+      return true;
+    };
+    helpers.posOf = at;
+    helpers.safePosition = at;
+    helpers.isAliveId = (id) => !!pos[id];
+    helpers.isPlayerAlive = (id) => !!pos[id] && id[0] === "p";
+    helpers.isMobAlive = (id) => !!pos[id] && id[0] === "m";
+    helpers.solidVoxel = (x) => wall(x);
+    helpers.isSolid = (x) => wall(x);
+    helpers.teleport = api.setPosition;
+    helpers.entitiesIn = (lo, hi) =>
+      Object.keys(pos).filter((id) => {
+        const q = pos[id];
+        return q[0] >= lo[0] && q[0] <= hi[0] && q[1] >= lo[1] && q[1] <= hi[1] &&
+          q[2] >= lo[2] && q[2] <= hi[2];
+      });
+    helpers.run = (c) => { co = c; };
+  });
+  const cast = () =>
+    globalThis.FA.r.onPlayerClickControlDomain("p1", "item", false, 0, 0, 0, "Air", null);
+  cast();
+  for (let i = 0; i < ticks && co && !co.next().done; i++);
+  return { res, pos, teleports, cast };
+}
+{
+  const inWall = (q) => q[0] >= 10 && q[0] <= 12;
+  const a = runDomainOnCliff({ p1: [0, 64, 0], p2: [11, 64, 0], m1: [4, 64, 2] }, 60);
+  const held = a.teleports.filter((t) => t.id === "p2");
+  check(held.length > 10, `dôme : la victime n'est pas tenue (${held.length} placements)`);
+  check(
+    held.every((t) => !inWall(t.at) && !inWall([t.at[0], t.at[1] + 1, t.at[2]])),
+    "dôme : une victime est posée DANS le mur",
+  );
+  check(
+    a.teleports.filter((t) => t.id === "m1").length > 5,
+    "dôme : les mobs ne sont pas contrôlés",
+  );
+  // Au relâchement, une cible dans le bloc doit ressortir à l'air le plus proche.
+  const b = runDomainOnCliff({ p1: [0, 64, 0], p2: [5, 64, 0] }, 20);
+  b.pos.p2 = [11, 64, 0];
+  b.cast();
+  check(!inWall(b.pos.p2), `dôme : la victime reste enfermée au relâchement (${b.pos.p2[0]})`);
+}
+
 // Un trou au milieu NE DOIT PLUS faire tomber tous les packs suivants.
 const withHole = new Map(texts);
 withHole.delete(manifest.packs[1].z);
