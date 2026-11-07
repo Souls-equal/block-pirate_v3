@@ -206,7 +206,7 @@
     }
     if (!blocks.length) {
       gv_probe(pid);
-      gv_whisper(pid, "no ground here, use it closer of any blocks");
+      gv_whisper(pid, "no ground here : use it closer of any blocks");
       return false;
     }
     for (let i = 0; i < blocks.length; i++) blocks[i].fire = GV_B_RISE + i * GV_B_GAP;

@@ -25,9 +25,9 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
 2. Dans le **monde** (les **8 Code Blocks** à `x=100000, y=100000, z=100002 … 100009`) :
    - Pour cette version « anti-censure » (le filtre de Bloxd.io cassait le pack 2 :
-     `*b,f=` reçu en `******=`, puis « encore de la censure » même avec des espaces),
+     `*b,f=` reçu en `******=`, puis « encore de la censure » sur `b , f`),
      **les huit packs changent** : les multiplications par un identifiant d'une lettre
-     s'écrivent maintenant `* 1 * b`, espaces compris. **Recopie les huit blocs.**
+     s'écrivent `* 1 * b` et la virgule reste collée au `f` (`b ,f`). **Recopie les huit blocs.**
    - ⚠ Changement de contenu : `flame` est parti au pack 8 et `song` est venu dans le
      pack 2 (les packs 1 et 3 sont au ras de la marge). Le tableau de
      [`code-blocks/README.md`](code-blocks/README.md) fait foi.
@@ -1620,15 +1620,24 @@ Premier correctif (demande 68) : espacer la ponctuation (`b,f` → `b , f`).
 **Les espaces restent** — ils ne gênaient pas — mais le joueur a retrouvé la
 censure au même endroit, donc ils ne suffisaient pas.
 
-### Ce qui a marché : les espaces **plus** un `1 *`
+### Ce qui a marché : les espaces **plus** un `1 *`… et la virgule collée
 
-C'est le joueur qui l'a trouvé en jeu : garder les espaces **et** insérer un
-`1 *` devant l'identifiant d'une lettre.
+Trois mesures successives, toutes faites **en jeu** par le joueur (c'est le seul
+juge — le filtre n'est pas documenté) :
+
+| Ce qui a été collé | Reçu dans le bloc | Verdict |
+| --- | --- | --- |
+| `*b,f=` | `******=` | censuré |
+| `*b , f=` (espaces autour de la virgule) | `*****=` | censuré |
+| `* 1 * b ,f =` | intact | **passe** |
+
+La dernière ligne est la recette : **garder les espaces**, ajouter `1 *` devant
+l'identifiant, et **coller la virgule au `f`** (l'espace va *avant* la virgule,
+jamais après). Le build génère exactement ça :
 
 ```
-source                 i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
-validé en jeu          i= (s.hi- s.lo ) * 1 * b ,f =Math.atan2(c-a,s.hi-s.lo)
-généré par le build    i=(s.hi-s.lo)* 1 * b , f=Math.atan2(c-a,s.hi-s.lo)
+source         i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo)
+généré         i=(s.hi-s.lo)* 1 * b ,f=Math.atan2(c-a,s.hi-s.lo)
 ```
 
 Le build reprend **la même recette**, y compris les espaces autour du `1` :
@@ -1640,8 +1649,14 @@ chiffre.
 code — **jamais dans une chaîne, un gabarit, une regex ou un commentaire**
 (sinon un joueur verrait `* 1 *` dans un message du jeu), et laisse tranquilles
 `2*b` (le chiffre coupe déjà), `a**b`, `a*=b`, `function*b` et `yield*x` qui ne
-sont pas des multiplications. La détection est heuristique (`literalMask`) et
-`check-blocks` vérifie les deux côtés : code neutralisé, littéraux intacts.
+sont pas des multiplications. Deuxième passe : **`normalizeCommas`** enlève tout
+blanc entre une virgule et une lettre (`b , f` → `b ,f`), et `findRiskyCommas`
+fait échouer le build s'il en reste un. En revanche les virgules ordinaires du
+code minifié (`f(a,b)`) ne bougent pas : les espacer coûterait des milliers de
+caractères pour rien.
+
+La détection est heuristique (`literalMask`) et `check-blocks` vérifie les deux
+côtés : code neutralisé, littéraux intacts.
 
 Les règles d'espacement (`x,f`, `f,x`, `x[.,(]bdg`, `t.f`, `b(f`…) restent en
 place : elles ne coûtent que des espaces, font partie de la forme validée, et
@@ -1656,7 +1671,8 @@ Quatre garde-fous dans la chaîne :
    vérifie l'idempotence, la validité du JavaScript, le **résultat identique à
    l'exécution** (les mêmes arguments donnent les mêmes valeurs avant/après),
    l'absence d'insertion dans les littéraux, puis scanne **chaque module** des
-   8 packs.
+   8 packs. La ligne du dôme a un test dédié : elle doit valoir exactement
+   `i=(s.hi-s.lo)* 1 * b ,f=Math.atan2(c-a,s.hi-s.lo)`.
 3. Le découpage en packs est **stable** : le build réutilise le manifeste
    précédent tant que la répartition tient, donc « pack 2 » reste le pack 2. Si
    un module a grossi au point de déborder, un seul module indépendant déménage

@@ -76,7 +76,7 @@ export const CENSOR_RULES = [
     fix: (code) =>
       code
         .replace(/\b(return|const|let|var)\[n\*/gi, "$1 [ n * ")
-        .replace(/\b(return|const|let|var)\[n,/gi, "$1 [ n, ")
+        .replace(/\b(return|const|let|var)\[n,/gi, "$1 [ n ,")
         .replace(/\b(return|const|let|var)\[n(?![A-Za-z0-9_$])/gi, "$1 [ n "),
   },
   {
@@ -129,7 +129,7 @@ export const CENSOR_RULES = [
     fix: (code) =>
       code
         .replace(/\*([dD]),([fF])=/g, " * $1, $2 = ")
-        .replace(/([dD]),([fF])\b/g, "$1, $2"),
+        .replace(/([dD]),([fF])\b/g, "$1 ,$2"),
   },
   {
     name: "t.f",
@@ -177,10 +177,13 @@ export const CENSOR_RULES = [
   {
     /* « b,f » : deux lettres seules autour d'une virgule. C'est la forme qui a
        casse le pack 2 (`i=(s.hi-s.lo)*b,f=Math.atan2`), et celle des anciennes
-       règles `D,f` / `g,f`. On espace la virgule. */
+       règles `D,f` / `g,f`.
+       ATTENTION : l'espace se met AVANT la virgule, jamais après. En jeu,
+       `b , f` a été remplacé par `*****` (5 caractères, espaces comprises),
+       alors que `b ,f` — la forme écrite à la main par le joueur — passe. */
     name: "x,f",
     test: /(?<![A-Za-z0-9_$])[A-Za-z],[fF](?![A-Za-z0-9_$])/g,
-    fix: (code) => code.replace(/(?<![A-Za-z0-9_$])([A-Za-z]),([fF])(?![A-Za-z0-9_$])/g, "$1 , $2"),
+    fix: (code) => code.replace(/(?<![A-Za-z0-9_$])([A-Za-z]),([fF])(?![A-Za-z0-9_$])/g, "$1 ,$2"),
   },
   {
     /* Même famille, mais c'est le f qui précède : `f,o`, `f.x`, `f(y`. */
@@ -367,7 +370,7 @@ export function uncensorBlockCode(code, extraSafe = true) {
   if (extraSafe) {
     out = out
       .replace(/([A-Za-z0-9_$])\[([A-Za-z_$][A-Za-z0-9_$]*)\]/g, "$1[ $2 ]")
-      .replace(/\b([A-Za-z])([.,=])([fF])\b/g, "$1 $2 $3")
+      .replace(/\b([A-Za-z])([.,=])([fF])\b/g, (m, a, p, f) => (p === "," ? `${a} ,${f}` : `${a} ${p} ${f}`))
       .replace(/\b([A-Za-z])([(\[])([fF])\b/g, "$1$2 $3")
       .replace(/(\]|&&|\|\|)=?([fF])\(/g, (m) => m.replace(/([fF])\(/, " $1("))
       .replace(/\b([fF])([.,=*+\-/])([uUkKcCfF])\b/g, "$1 $2 $3")
@@ -380,9 +383,38 @@ export function uncensorBlockCode(code, extraSafe = true) {
   for (let pass = 0; pass < 4; pass++) {
     const before = out;
     for (const rule of CENSOR_RULES) out = rule.fix(out);
+    out = normalizeCommas(out);
     if (out === before) break;
   }
-  return neutralizeProducts(out);
+  return normalizeCommas(neutralizeProducts(out));
+}
+
+/* --- `, ` + lettre : la forme censurée ------------------------------------
+   Relevé en jeu (le joueur a collé le bloc et lu le résultat) :
+     i=(s.hi-s.lo)* 1 * *****=
+   Les cinq astérisques remplacent exactement `b , f` : le filtre a mangé
+   l'espace APRÈS la virgule. Sa correction manuelle, qui compilait, disait
+   `b ,f =` — espace avant la virgule, aucun après.
+   Donc : jamais `,` + blanc + lettre. `normalizeCommas` déplace ce blanc avant
+   la virgule (`b , f` devient `b ,f`). On ne rajoute PAS d'espace devant toutes
+   les virgules du code minifié : `,f` tout seul n'est pas censuré, et ça
+   coûterait des milliers de caractères. */
+const COMMA_THEN_SPACE = /,\s+(?=[A-Za-z])/g;
+const SPACE_BEFORE_COMMA = /[ \t]*,\s+(?=[A-Za-z])/g;
+
+export function findRiskyCommas(code) {
+  const mask = literalMask(code);
+  const hits = [];
+  for (const m of code.matchAll(COMMA_THEN_SPACE)) {
+    if (mask[m.index]) continue; // dans une chaîne : code valide, texte juste censuré
+    hits.push({ rule: "« , » + espace + lettre", match: m[0], index: m.index });
+  }
+  return hits;
+}
+
+function normalizeCommas(code) {
+  const mask = literalMask(code);
+  return code.replace(SPACE_BEFORE_COMMA, (m, offset) => (mask[offset] ? m : " ,"));
 }
 
 export function findCensoredPatterns(code) {
@@ -393,5 +425,6 @@ export function findCensoredPatterns(code) {
     }
   }
   hits.push(...findRiskyProducts(code));
+  hits.push(...findRiskyCommas(code));
   return hits;
 }
