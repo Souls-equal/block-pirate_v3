@@ -184,6 +184,8 @@ import {
     onPlayerClickBoroBreath,
     onPlayerClickDragonTwister,
     onPlayerClickDraconicAscent,
+    onPlayerUsedThrowablePaint,
+    onPlayerThrowableHitTerrainPaint,
 } from "./func-abilities";
 import { applyEffect, withEffectSource } from "../utils/combat";
 

@@ -3,7 +3,7 @@
 import { updateSidebar } from "../core/UI";
 import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
 import { C, say, txt, bold, ic } from "../core/theme";
-import { rollMobLoot } from "./loot";
+import { forgetBossMob, rollMobLoot } from "./loot";
 import { playerIdForDbId } from "../utils/killAttribution";
 
 export const RANK_MULT = {
@@ -380,7 +380,12 @@ export function killdMob(playerId, mobId) {
        viennent d'etre lues. Un kill n'est credite qu'une fois (voir
        utils/killAttribution), donc un mob ne peut pas lacher deux fois. */
     try { rollMobLoot(realPlayerId, mobId, data); } catch (e) {}
-    delete BOSS_MOBS[mobId];
+    /* Le marquage de boss appartient a loot.js : il s'efface ici, une fois le
+       kill credite. Ecrire `delete BOSS_MOBS[...]` ici ne pouvait pas marcher
+       (la table est privee a loot.js) : chaque kill levait un ReferenceError
+       APRES avoir paye XP et argent, donc killdMob ne rendait jamais le nom du
+       mob — plus de message de kill, plus de credit de quete. */
+    try { forgetBossMob(mobId); } catch (e) {}
 
     return resolvedName || data.name || null;
 };

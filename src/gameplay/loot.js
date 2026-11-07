@@ -63,6 +63,16 @@ export function markBossMob(mobId, name) {
     return true;
 }
 
+/* Un mob ne meurt qu'une fois, mais le moteur peut reutiliser un id : on
+   oublie le marquage des que le kill est credite (voir killdMob). La table
+   appartient a ce fichier, donc c'est ici qu'on la nettoie — spawning.js ne
+   doit pas y toucher : `BOSS_MOBS` n'est pas exporte et ne le sera pas. */
+export function forgetBossMob(mobId) {
+    if (!mobId) return false;
+    return delete BOSS_MOBS[mobId];
+}
+
+
 /* Tableau de butin complet, construit a l'appel : FRUIT_TICKETS est lu a ce
    moment-la, donc aucun acces avant initialisation du module de data. */
 function lootTable() {

@@ -1033,6 +1033,12 @@ disent seulement **quand** ils tombent.
   Mob Leader sont `despawn` **avant** le crédit de leur kill, donc leur nom n'est plus lisible à ce
   moment-là. Sans cet enregistrement ils retomberaient dans le rang des mobs ordinaires et ne
   pourraient jamais lâcher leurs objets réservés. Un boss nommé est de toute façon forcé au rang 3.
+- **Le marquage s'efface après le kill** (`forgetBossMob`, appelé par `killdMob`) : un id de mob
+  peut être réutilisé, et un marquage oublié ferait tomber le butin d'un boss sur un mob ordinaire.
+  La table `BOSS_MOBS` appartient à `loot.js` : elle n'est **pas** exportée, et `spawning.js` passe
+  par la fonction. Écrire `delete BOSS_MOBS[...]` depuis `spawning.js` compilait mais levait un
+  `ReferenceError` à chaque kill — **après** le paiement de l'XP, donc sans message de kill ni crédit
+  de quête. `npm run check` refuse désormais ce cas (voir « Vérifications »).
 - **Aucun objet de quête n'est dans ce tableau** (`Torch`, `Cup`, `Gold Grit`, `Magmaward Fuel`) :
   ce sont des dons garantis, et un doublon bloquerait la quête — un `Gold Grit` de trop ne se donne
   à personne et ne peut pas être lâché.
@@ -1961,10 +1967,17 @@ l'achèvement ne paient rien.
 ## Vérifications
 
 ```bash
-node tools/check-imports.mjs    # imports relatifs
+node tools/check-imports.mjs    # imports relatifs + constantes privées d'un autre module
 node tools/check-handlers.mjs   # Code Block → shim → abilities
 node tools/check-blocks.mjs     # packs + simulation du chargeur (jeu simulé)
 ```
+
+`check-imports.mjs` vérifie aussi que **la constante privée d'un module n'est utilisée nulle part
+ailleurs** : une constante en MAJUSCULES (`BOSS_MOBS`, `LOOT_CHANCE`…) non exportée n'existe que dans
+son fichier, donc l'utiliser depuis un autre fichier devient un global absent. Bloxd ne le signale
+pas à la compilation : c'est un `ReferenceError` **à l'exécution**, et le `try/catch` appelant le rend
+silencieux. Les 187 constantes de module de `src/` sont contrôlées ; les homonymes déclarés dans
+plusieurs fichiers sont ignorés pour éviter le bruit.
 
 `check-blocks.mjs` rejoue le **vrai** `code-block-loader.js` avec une `api`
 simulée : scénario nominal, pack manquant et pack déplacé. Il échoue si un seul
