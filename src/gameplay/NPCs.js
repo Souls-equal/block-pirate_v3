@@ -319,39 +319,39 @@ export function attackNPC(playerId, mobId) {
     }
 
     else if (name === "Boat Dealer") {
-        buyItem(playerId, "Boat", 500, 1, {customDisplayName:"Normal Boat", customDescription:"A classic boat made to travel all seas."})
+        buyItem(playerId, "Boat", 500, 1)
     }
     else if (name === "Advanced Boat Dealer") {
-         buyItem(playerId, "Obsidian Boat", 1000, 1, {customDisplayName:"Advanced Boat", customDescription:"A stronger boat made to travel all seas."})
+         buyItem(playerId, "Obsidian Boat", 1000, 1)
     }
     else if (name === "Luxury Boat Dealer") {
-         buyItem(playerId, "Speedboat", 5000, 1, {customDisplayName:"Luxury Boat", customDescription:"A super fast boat made to travel all seas."})
+         buyItem(playerId, "Speedboat", 5000, 1)
     }
         
     else if (name === "Sand Weapon Dealer") {
-         buyItem(playerId, "Stone Dagger", 230, 1, {customDisplayName:"Sand Dagger", customDescription:"A dagger made of the rock of the desert."})
+         buyItem(playerId, "Stone Dagger", 230, 1)
     }
         
     else if (name === "First Weapon Dealer") {
         if (team === "PIRATES") {
-            buyItem(playerId, "Wood Sword", 60, 1, {customDisplayName:"Basic Dagger", customDescription:"The first weapon of every Pirates."})
+            buyItem(playerId, "Wood Sword", 60, 1)
         }
         else if(team === "MARINES") {
-            buyItem(playerId, "Wood Spear", 60, 1, {customDisplayName:"Basic Spear", customDescription:"The spear of the Justice!"})
+            buyItem(playerId, "Wood Spear", 60, 1)
         }
         else {
-            buyItem(playerId, "Wood Sword", 30, 1, {customDisplayName:"Basic Sword", customDescription:"Just a sword for a normal people..."})
+            buyItem(playerId, "Wood Sword", 30, 1)
         }
     }
     else if (name === "Weapon Dealer T2") {
         if (team === "PIRATES") {
-            buyItem(playerId, "Stone Sword", 230, 1, {customDisplayName:"Advanced Sword", customDescription:"The sword of a strong Pirates."})
+            buyItem(playerId, "Stone Sword", 230, 1)
         }
         else if(team === "MARINES") {
-            buyItem(playerId, "M1911", 260, 1, {customDisplayName:"Flintlock", customDescription:"A slow Flintlock to kill enemies from the distance!"})
+            buyItem(playerId, "M1911", 260, 1)
         }
         else {
-            buyItem(playerId, "Stone Spear", 200, 1, {customDisplayName:"Advanced Spear", customDescription:"Just a sword for a normal people..."})
+            buyItem(playerId, "Stone Spear", 200, 1)
         }
     }
 

@@ -57,7 +57,7 @@ par fichier, mais compactée pour le collage — commentaires et espaces retiré
 | | Caractères | Limite |
 | --- | --- | --- |
 | Sources lisibles (`src/`) | ~758 000 | 148 % |
-| **`world-code/` (à coller)** | **~368 000** | **72 %** |
+| **`world-code/` (à coller)** | **~367 000** | **72 %** |
 
 Ce qui n'est **jamais** modifié, parce que le jeu s'appuie dessus :
 
@@ -521,6 +521,56 @@ Ils passent donc par **`shoutRaw()`** et non `shout()` — sinon `themeColor()` 
 `#cef3ff` à `#7DD3FC` (MARINE), ce qui trahissait le faux message. La teinte est réunie
 dans une seule constante, `VANISH_CHAT_COLOR` (`src/core/admin.js`) : c'est le seul
 endroit à changer si la couleur réelle du moteur évolue.
+
+---
+
+## Noms et descriptions d'items : une seule table
+
+Un item Bloxd porte **deux noms**. Le **nom technique** (`Small Black Pod`, `M1911`, `Boat`…) :
+c'est le seul que reconnaissent `api.getInventoryItemAmount`, `api.giveItem`, `getHeldItem`,
+les drops, les recettes et les quêtes. Et le **nom affiché**, posé par
+`api.setItemStat(playerId, item, "customDisplayName", …)` / `"customDescription"`.
+
+Avant, le nom affiché était écrit **au moment du give** (`buyItem(playerId, "Boat", 500, 1,
+{customDisplayName: "Normal Boat"})`). Deux conséquences : un item acheté chez un PNJ arrivait
+renommé, mais le **même** item obtenu autrement (butin, quête, échange, admin) repartait avec
+son nom Bloxd brut ; et chaque nouvel appel était un oubli en puissance.
+
+Désormais les deux tables vivent dans **`src/gameplay/customItem.js`**, et nulle part ailleurs :
+
+| Table | Contenu |
+| --- | --- |
+| `ITEM_LOOKS` | `nom technique → { name, description }`, indépendant de la team |
+| `TEAM_ITEM_LOOKS` | `nom technique → { PIRATES, MARINES, DEFAULT }`, un nom par team |
+
+`applyItemLooks(playerId)` parcourt l'inventaire et écrit ces attributs ; elle est appelée :
+
+* **au join** (`itemJoin`) — les items déjà possédés (inventaire, Moonstone Chest, butin,
+  récompense de quête) sont donc corrigés **sans re-give** ;
+* **au changement de team** (`replaceTeamWeapons`, `src/core/team.js`) — le `Wood Sword`
+  devient « Basic Dagger » chez les Pirates et « Basic Sword » sinon. `LEGACY_TEAM_WEAPON`
+  reconnaît les anciens noms pour convertir une arme déjà portée.
+
+`buyItem` (`src/utils/data.js`) ne pose plus aucun nom : il ne transmet que les attributs
+réellement demandés par l'appelant (`api.giveItem` est appelé **sans 4e argument** s'il n'y en
+a pas), et affiche le libellé dans ses deux messages via `setItemLabelLookup` — un hook branché
+sur `itemLabel` de `customItem.js`, comme `setTeamGuard` dans `utils/combat` (importer la table
+ici créerait le cycle `customItem → data`).
+
+| Item technique | Nom affiché | Description |
+| --- | --- | --- |
+| `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
+| `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
+| `Magmaward Fuel` | **Ancient Relic** | butin de la Saber Quest |
+| `M1911` | **Flintlock** | armurerie, arme avancée des Marines |
+| `Boat` / `Obsidian Boat` / `Speedboat` | **Normal Boat** / **Advanced Boat** / **Luxury Boat** | chantier naval |
+| `Stone Dagger` / `Stone Sword` / `Stone Spear` | **Sand Dagger** / **Advanced Sword** / **Advanced Spear** | armurerie |
+| `Wood Spear` | **Basic Spear** | armurerie |
+| `Wood Sword` | **Basic Dagger** (Pirates) / **Basic Sword** (autres) | arme de team |
+
+**Règle** : un renommage ne s'écrit **jamais** dans un `giveItem` / `buyItem`. On ajoute une
+ligne à `ITEM_LOOKS` (ou `TEAM_ITEM_LOOKS`), c'est tout — le nom technique reste celui du jeu,
+sinon les `getInventoryItemAmount` et les `removeItemName` cassent.
 
 ---
 
@@ -1100,11 +1150,22 @@ l'armer : le vendeur répondait « You already know Armament Haki. » et rien d'
 | État du joueur | Réponse du vendeur |
 | --- | --- |
 | ne connaît pas le haki | achat normal : **3 s de confirmation** (clé `haki`), 14 000 pièces + 1 Black Carpet |
-| connaît le haki, **pod absent** | « You already know Armament Haki. Your Small Black Pod has been given back. » — **gratuit**, sans confirmation |
-| connaît le haki, pod présent | « …your Small Black Pod is in your inventory. » — aucun doublon |
+| connaît le haki, **pod absent** | « Your Armament Haki item has been given back — click with it to arm your fists. » — **gratuit**, sans confirmation |
+| connaît le haki, pod présent | « You already know Armament Haki, and the item is in your inventory. » — aucun doublon |
 
 `giveHakiPod()` est partagé par l'achat et le refresh : il ne crée jamais un second pod
 (`getInventoryItemAmount` avant `giveItem`).
+
+**Le pod ne peut plus être lâché.** `onPlayerDropItem` (`src/index.js`) refuse le drop (retour
+`"preventDrop"`) dès que `isHakiPod()` (`src/utils/haki.js`) reconnaît l'item : le joueur ne
+peut plus se séparer de l'unique moyen d'armer son haki. C'est le même verrou que pour les items
+de capacité (`C`), les items de style de combat (`fsItemName`) et les items de la Saber Quest
+(`spLocked`). S'il le perd malgré tout (filtre d'inventaire, respawn), le vendeur le redonne
+gratuitement.
+
+Le nom technique reste `Small Black Pod` — c'est lui que le code interroge ; seul le **nom
+affiché** est « Armament Haki », posé au join par `customItem.js` (voir « Noms et descriptions
+d'items »). Les messages du vendeur n'exposent donc plus le nom Bloxd.
 
 ---
 

@@ -1,6 +1,6 @@
 // team.js
 
-import { convertWeaponAttributes, scanAllItems, writeItem } from "../gameplay/customItem";
+import { applyItemLooks, convertWeaponAttributes, scanAllItems, writeItem } from "../gameplay/customItem";
 import { deleteStat, getStat, setStat } from "../utils/data";
 import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
@@ -37,70 +37,74 @@ export const TEAM = {
     }
 };
 
-/* TEAM WEAPONS MAPPING (NOUVEAU) */
-const WEAPON_MAPPING = {
-    "Basic Dagger": {
-        PIRATES: { item: "Wood Sword", displayName: "Basic Dagger", description: "The first weapon of every Pirates." },
-        MARINES: { item: "Wood Spear", displayName: "Basic Spear", description: "The spear of the Justice!" },
-        DEFAULT: { item: "Wood Sword", displayName: "Basic Sword", description: "Just a sword for a normal people..." }
-    },
-    "Basic Spear": {
-        PIRATES: { item: "Wood Sword", displayName: "Basic Dagger", description: "The first weapon of every Pirates." },
-        MARINES: { item: "Wood Spear", displayName: "Basic Spear", description: "The spear of the Justice!" },
-        DEFAULT: { item: "Wood Sword", displayName: "Basic Sword", description: "Just a sword for a normal people..." }
-    },
-    "Basic Sword": {
-        PIRATES: { item: "Wood Sword", displayName: "Basic Dagger", description: "The first weapon of every Pirates." },
-        MARINES: { item: "Wood Spear", displayName: "Basic Spear", description: "The spear of the Justice!" },
-        DEFAULT: { item: "Wood Sword", displayName: "Basic Sword", description: "Just a sword for a normal people..." }
-    },
-    "Advanced Sword": {
-        PIRATES: { item: "Stone Sword", displayName: "Advanced Sword", description: "The sword of a strong Pirates." },
-        MARINES: { item: "M1911", displayName: "Flintlock", description: "A slow Flintlock to kill enemies from the distance!" },
-        DEFAULT: { item: "Stone Spear", displayName: "Advanced Spear", description: "Just a sword for a normal people..." }
-    },
-    "Flintlock": {
-        PIRATES: { item: "Stone Sword", displayName: "Advanced Sword", description: "The sword of a strong Pirates." },
-        MARINES: { item: "M1911", displayName: "Flintlock", description: "A slow Flintlock to kill enemies from the distance!" },
-        DEFAULT: { item: "Stone Spear", displayName: "Advanced Spear", description: "Just a sword for a normal people..." }
-    },
-    "Advanced Spear": {
-        PIRATES: { item: "Stone Sword", displayName: "Advanced Sword", description: "The sword of a strong Pirates." },
-        MARINES: { item: "M1911", displayName: "Flintlock", description: "A slow Flintlock to kill enemies from the distance!" },
-        DEFAULT: { item: "Stone Spear", displayName: "Advanced Spear", description: "Just a sword for a normal people..." }
-    }
+/* ARMES DE TEAM
+   Ce n'est pas qu'un nom : l'ITEM change avec la team (epee de bois pour un
+   pirate, lance de bois pour un marine). Deux tables, et elles ne disent que
+   ca : le tier de l'arme et l'item de chaque team.
+
+   Les NOMS, eux, ne sont plus ecrits ici. Ils vivent dans gameplay/customItem
+   (ITEM_LOOKS / TEAM_ITEM_LOOKS) et sont poses par setItemStat au join puis a
+   chaque changement de team (applyItemLooks). Un item converti est donc ecrit
+   SANS customDisplayName : sinon l'ancien nom resterait colle dans les
+   attributs et gagnerait contre la table. */
+const TEAM_WEAPON_TIER = {
+    "Wood Sword": "BASIC",
+    "Wood Spear": "BASIC",
+    "Stone Sword": "ADVANCED",
+    "Stone Spear": "ADVANCED",
+    "M1911": "ADVANCED",
+};
+
+/* Anciens noms affiches : un item achete avant la centralisation porte encore
+   son nom dans ses attributs. On le reconnait pour le convertir quand meme, et
+   le nom est alors repris par la table de customItem. */
+const LEGACY_TEAM_WEAPON = {
+    "Basic Dagger": "BASIC",
+    "Basic Spear": "BASIC",
+    "Basic Sword": "BASIC",
+    "Advanced Sword": "ADVANCED",
+    "Flintlock": "ADVANCED",
+    "Advanced Spear": "ADVANCED",
+};
+
+const TEAM_WEAPON_ITEM = {
+    BASIC: { PIRATES: "Wood Sword", MARINES: "Wood Spear", DEFAULT: "Wood Sword" },
+    ADVANCED: { PIRATES: "Stone Sword", MARINES: "M1911", DEFAULT: "Stone Spear" },
 };
 
 function replaceTeamWeapons(playerId, newTeam) {
     let replacedCount = 0;
 
     scanAllItems(playerId, (item, where, slot) => {
-        const displayName = item.attributes?.customDisplayName;
-        if (!displayName) return;
+        const legacyName = item.attributes?.customDisplayName;
+        const tier = TEAM_WEAPON_TIER[item.name] || LEGACY_TEAM_WEAPON[legacyName];
+        if (!tier) return;
 
-        const weaponMap = WEAPON_MAPPING[displayName];
-        if (!weaponMap) return;
+        const target = TEAM_WEAPON_ITEM[tier][newTeam] || TEAM_WEAPON_ITEM[tier].DEFAULT;
+        if (!target) return;
 
-        const newWeaponInfo = weaponMap[newTeam] || weaponMap.DEFAULT;
-        if (!newWeaponInfo) return;
-
-        const newAttributes = {
-            customDisplayName: newWeaponInfo.displayName,
-            customDescription: newWeaponInfo.description
-        };
+        /* Meme item ET nom deja centralise : rien a faire. Un item qui porte
+           encore un ancien nom, lui, est reecrit meme a item egal, sinon ses
+           attributs garderaient le nom de l'ancienne team. */
+        if (target === item.name && !LEGACY_TEAM_WEAPON[legacyName]) return;
 
         const customAttributes = convertWeaponAttributes(
             item.attributes?.customAttributes,
-            newWeaponInfo.item
+            target
         );
-        if (Object.keys(customAttributes).length) {
-            newAttributes.customAttributes = customAttributes;
-        }
+        const attributes = Object.keys(customAttributes).length
+            ? { customAttributes: customAttributes }
+            : undefined;
 
-        if (writeItem(playerId, where, slot, newWeaponInfo.item, 1, newAttributes)) {
+        if (writeItem(playerId, where, slot, target, 1, attributes)) {
             replacedCount++;
         }
     });
+
+    /* Les noms suivent l'item : le nouveau et l'ancien sont renommes (le Wood
+       Sword d'un pirate s'appelle "Basic Dagger", celui d'un joueur sans team
+       "Basic Sword"). */
+    if (replacedCount) applyItemLooks(playerId);
 
     return replacedCount;
 }

@@ -20,7 +20,7 @@ import { forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobT
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
-import { onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
+import { isHakiPod as hkPod, onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { bossDamageGate as bpBossGate } from "./utils/bossGate";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
@@ -406,13 +406,15 @@ ct((t, r, a) => {
     const n = api.getEntityName(t);
     if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) || fsItemName(o) ? "preventChange" : void 0;
 }, onPlayerDropItem = (t, r, a, i, e, o, m) => {
-    /* Seuls les items d'habilité sont bloqués : ce sont des items uniques,
-       perdus pour toujours s'ils sont lâchés. Tout le reste peut tomber,
-       y compris un fruit ramassé (customAttributes.isFruitBlock) — c'est le
-       seul moyen de le donner à un autre joueur — et un bloc de construction
-       qui partage son nom avec le fruit équipé (Stone, Ice, Sand, Glass...). */
+    /* Seuls les items uniques sont bloqués : perdus, ils ne reviennent pas
+       tout seuls. Tout le reste peut tomber, y compris un fruit ramassé
+       (customAttributes.isFruitBlock) — c'est le seul moyen de le donner à un
+       autre joueur — et un bloc de construction qui partage son nom avec le
+       fruit équipé (Stone, Ice, Sand, Glass...).
+       hkPod : le pod du Haki, affiché "Armament Haki". Perdu, il laisserait un
+       joueur qui CONNAÎT le haki sans aucun moyen de l'armer. */
     const l = "string" == typeof e ? e : e?.name || e?.type;
-    return l && (C(l) || fsItemName(l) || spLocked(l)) ? "preventDrop" : void 0;
+    return l && (C(l) || fsItemName(l) || spLocked(l) || hkPod(l)) ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
