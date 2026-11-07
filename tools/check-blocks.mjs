@@ -9,7 +9,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
-import { parseBlock, MARKER, fnv1a, findCensoredPatterns } from "./pack-format.mjs";
+import {
+  parseBlock,
+  MARKER,
+  fnv1a,
+  findCensoredPatterns,
+  uncensorBlockCode,
+} from "./pack-format.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const funcAbilitiesCode = fs.readFileSync(path.join(ROOT, "src/fruit/func-abilities.js"), "utf8");
@@ -23,6 +29,46 @@ const problems = [];
 const check = (cond, msg) => {
   if (!cond) problems.push(msg);
 };
+
+// --- Anti-censure : le bug qui a cassé le pack 2 en jeu -----------------------
+// Le 2026-11-06, le joueur a collé le pack 2 dans Bloxd.io et a reçu
+// « Unexpected token » ligne 6 : le filtre du jeu avait transformé
+// `i=(s.hi-s.lo)*b,f=Math.atan2(...)` en `i=(s.hi-s.lo)******=Math.atan2(...)`.
+// Ces cas sont la forme « deux lettres seules autour d'une ponctuation » que
+// `uncensorBlockCode` doit espacer. On vérifie qu'elle perd tout motif
+// censurable, que le résultat est toujours du JS valide et que le code est
+// identique à l'espacement près (aucune sémantique touchée).
+const CENSOR_SAMPLES = [
+  "i=(s.hi-s.lo)*b,f=Math.atan2(c-a,s.hi-s.lo);",
+  "x=d,f=1;",
+  "q=t.f*2;",
+  "z=b(f);",
+  "n=f.b+1;",
+  "o=s.hi-s.lo,b,f=Math.atan2(c,s.hi-s.lo);",
+];
+const squash = (s) => s.replace(/\s+/g, "");
+for (const sample of CENSOR_SAMPLES) {
+  const fixed = uncensorBlockCode(sample);
+  const hits = findCensoredPatterns(fixed);
+  check(
+    hits.length === 0,
+    `anti-censure : « ${sample} » devient « ${fixed} » qui reste censurable : ` +
+      hits.map((h) => `${h.rule}(${h.match})`).join(", "),
+  );
+  check(
+    uncensorBlockCode(fixed) === fixed,
+    `anti-censure : correction non idempotente sur « ${sample} »`,
+  );
+  check(
+    squash(fixed) === squash(sample),
+    `anti-censure : « ${sample} » -> « ${fixed} » modifie le code (pas juste des espaces)`,
+  );
+  try {
+    esbuild.transformSync(fixed, { loader: "js", target: "es2019" });
+  } catch (e) {
+    problems.push(`anti-censure : « ${sample} » corrigé en « ${fixed} » = JS invalide : ${e.message}`);
+  }
+}
 
 const manifest = JSON.parse(read(path.join(OUT, "manifest.json")));
 const sources = fs.readdirSync(SRC).filter((f) => f.endsWith(".js")).sort();
@@ -47,12 +93,22 @@ for (const p of manifest.packs) {
   check(text.length <= 32_000, `${p.file} : ${text.length} car. > limite 32 000 du jeu`);
   check(text.length === p.chars, `${p.file} : taille manifest différente`);
   check(!text.includes("*****"), `${p.file} : contient "*****" (censure Bloxd.io)`);
+  /* On scanne le bloc entier ET chaque module séparément : le texte est
+     identique, mais un module isolé permet de nommer le coupable. */
   const censorHits = findCensoredPatterns(text);
   check(
     censorHits.length === 0,
     `${p.file} : motif(s) censurable(s) par Bloxd.io : ` +
       censorHits.map((h) => `${h.rule}(${h.match})`).join(", "),
   );
+  for (const [k, part] of b.payload.split(MARKER).entries()) {
+    const partHits = findCensoredPatterns(part);
+    check(
+      partHits.length === 0,
+      `${p.file} module ${k + 1} : motif(s) censurable(s) : ` +
+        partHits.map((h) => `${h.rule}(${h.match})`).join(", "),
+    );
+  }
   const parts = b.payload.split(MARKER).map((s) => s.trim()).filter((s) => s && s !== ";");
   check(parts.length === p.modules, `${p.file} : ${parts.length} modules / ${p.modules} annoncés`);
   for (const part of parts) {
