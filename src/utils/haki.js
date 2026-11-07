@@ -5,7 +5,17 @@ import { isMobEntityType, posOf } from "./lifeform";
 import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "./data";
 
 import { say } from "../core/theme";
+/* Nom d'ITEM (interne) du pod qui arme le haki. Ce que le joueur lit est
+   "Armament Haki" : le nom et la description sont poses par gameplay/customItem
+   (ITEM_LOOKS), comme tous les items custom. */
 const HK_CLICK = "Small Black Pod";
+const HK_LABEL = "Armament Haki";
+
+/* Le pod est UNIQUE : perdu, le joueur sait le haki mais ne peut plus l'armer.
+   Il est donc interdit au lacher (branche dans onPlayerDropItem, index.js). */
+export function isHakiPod(itemName) {
+    return itemName === HK_CLICK;
+}
 const HK_TOLL = "Black Carpet", HK_PRICE = 14000;
 const HK_BOOST = 1.25;
 const HK_BLOCK = "Black Concrete", HK_SIZE = 0.4;
@@ -145,10 +155,10 @@ export function buyArmamentHaki(playerId) {
             ? [
                 { icon: "fa-solid fa-hand-fist", style: { color: "#B98CFF" } },
                 { str: " You already know Armament Haki.\n", style: { color: "#FFD700" } },
-                { str: "Your Small Black Pod has been given back — click with it to arm your fists.", style: { color: "#AAAAAA" } }
+                { str: "Your " + HK_LABEL + " item has been given back — click with it to arm your fists.", style: { color: "#AAAAAA" } }
             ]
             : [
-                { str: "You already know Armament Haki, and your Small Black Pod is in your inventory.", style: { color: "#FFD700" } }
+                { str: "You already know Armament Haki, and the item is in your inventory.", style: { color: "#FFD700" } }
             ]);
         return false;
     }
@@ -198,7 +208,7 @@ export function buyArmamentHaki(playerId) {
         { str: "Armament Haki learned.\n", style: { color: "#B98CFF", fontWeight: "bold", fontSize: "1.3em" } },
         { str: "Your arms are hard as steel: every hit you land deals ", style: { color: "#AAAAAA" } },
         { str: "+25%", style: { color: "#FFD700", fontWeight: "bold" } },
-        { str: " more, fruit included.\nClick with the Small Black Pod to arm or release it.", style: { color: "#AAAAAA" } }
+        { str: " more, fruit included.\nClick with your " + HK_LABEL + " item to arm or release it.", style: { color: "#AAAAAA" } }
     ]);
     return true;
 }

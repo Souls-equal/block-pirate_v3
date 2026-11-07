@@ -3,12 +3,115 @@
 import { FRUITS_BY_RARITY, fruitDescription, fruitItemAttributes, getRarityEnchantTier } from "../fruit/index";
 import { LEGACY_FRUIT_ITEMS, getFruitItemName, getFruitInfo } from "../fruit/fruitData";
 import { setTimeout as scheduleTick } from "../utils/timer";
-import { FRUIT_TICKETS } from "../utils/data";
+import { FRUIT_TICKETS, getStat, setItemLabelLookup } from "../utils/data";
 import { say } from "../core/theme";
 
 /* Le tier d'enchantement n'est peut-etre pas modifiable via setItemStat :
    on tente une fois, et si le moteur refuse on ne reessaie plus jamais. */
 let tierStatUnsupported = false;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NOMS ET DESCRIPTIONS DES ITEMS CUSTOM — SOURCE UNIQUE
+
+   Un item n'est plus habille au moment du give (customDisplayName /
+   customDescription dans les attributs) : son nom et sa description sont
+   poses UNE fois pour toutes par setItemStat, au join. Trois consequences :
+
+     - un item deja en banque, ramasse au sol, rendu par un Code Block ou
+       vendu par un PNJ affiche le bon nom sans que l'appelant y pense ;
+     - un nom ne peut plus etre OUBLIE au moment du give (c'est comme ca que
+       le vendeur de haki rendait un "Small Black Pod" brut) ;
+     - les attributs redeviennent ce qu'ils auraient toujours du etre : ce qui
+       est PROPRE a une instance (enchantements, uniqueRollId, isFruitBlock).
+
+   Seul le Wood Sword a deux noms : un pirate et un joueur sans team n'ont pas
+   la meme arme de depart, mais c'est le meme item. applyItemLooks() est donc
+   rappele a chaque changement de team (voir replaceTeamWeapons, core/team).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const ITEM_LOOKS = {
+    /* Haki : l'item UNIQUE qui arme le poing. Il ne peut pas etre lache (voir
+       onPlayerDropItem) ; le nom d'item, lui, reste "Small Black Pod". */
+    "Small Black Pod": {
+        displayName: "Armament Haki",
+        description: "Click to arm or release your Armament Haki. It cannot be dropped.",
+    },
+    /* Saber Quest : le butin du Mob Leader et la relique du mur. Ce sont de
+       VRAIS items du jeu, on ne fait que changer ce que le joueur lit.
+         - Gold Grit : un tas de pieces et de tresor, pas une ressource.
+         - Magmaward Fuel : une relique ancienne qui ouvre ce qu'aucune lame
+           ne coupe, pas un carburant. */
+    "Gold Grit": {
+        displayName: "Gold Dust",
+        description: "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.",
+    },
+    "Magmaward Fuel": {
+        displayName: "Ancient Relic",
+        description: "An ancient Relic bearing the marks of time. It opens what no blade can cut, right where it's marked",
+    },
+    /* Armurerie et bateaux des PNJ. Les noms vivaient dans les appels
+       buyItem() de gameplay/NPCs : ils sont ici, une fois. */
+    "M1911": { displayName: "Flintlock", description: "A slow Flintlock to kill enemies from the distance!" },
+    "Boat": { displayName: "Normal Boat", description: "A classic boat made to travel all seas." },
+    "Obsidian Boat": { displayName: "Advanced Boat", description: "A stronger boat made to travel all seas." },
+    "Speedboat": { displayName: "Luxury Boat", description: "A super fast boat made to travel all seas." },
+    "Stone Dagger": { displayName: "Sand Dagger", description: "A dagger made of the rock of the desert." },
+    "Stone Sword": { displayName: "Advanced Sword", description: "The sword of a strong Pirates." },
+    "Stone Spear": { displayName: "Advanced Spear", description: "Just a sword for a normal people..." },
+    "Wood Spear": { displayName: "Basic Spear", description: "The spear of the Justice!" },
+};
+
+/* Le seul item dont le NOM depend de la team. */
+export const TEAM_ITEM_LOOKS = {
+    "Wood Sword": {
+        PIRATES: { displayName: "Basic Dagger", description: "The first weapon of every Pirates." },
+        DEFAULT: { displayName: "Basic Sword", description: "Just a sword for a normal people..." },
+    },
+};
+
+/* Nom + description d'un item pour CE joueur, ou null si l'item n'est pas
+   custom. Le nom d'un Wood Sword depend de la team du joueur. */
+export function itemLook(playerId, itemName) {
+    if (!itemName) return null;
+    const fixed = ITEM_LOOKS[itemName];
+    if (fixed) return fixed;
+    const byTeam = TEAM_ITEM_LOOKS[itemName];
+    if (!byTeam) return null;
+    let team = "DEFAULT";
+    try { team = getStat(playerId, "team", "DEFAULT") || "DEFAULT"; } catch (e) { team = "DEFAULT"; }
+    return byTeam[team] || byTeam.DEFAULT;
+}
+
+/* Nom affiche seul : c'est ce dont les messages d'achat ont besoin (voir
+   buyItem dans utils/data). */
+export function itemLabel(playerId, itemName) {
+    const look = itemLook(playerId, itemName);
+    return look ? look.displayName : null;
+}
+
+/* Pose TOUS les noms et descriptions de ce joueur. Appele au join, et apres
+   chaque changement de team. Renvoie le nombre d'items nommes. */
+export function applyItemLooks(playerId) {
+    if (!playerId) return 0;
+    let done = 0;
+    for (const itemName in ITEM_LOOKS) {
+        const look = ITEM_LOOKS[itemName];
+        try { api.setItemStat(playerId, itemName, "displayName", look.displayName); done++; } catch (e) {}
+        try { api.setItemStat(playerId, itemName, "description", look.description); } catch (e) {}
+    }
+    for (const itemName in TEAM_ITEM_LOOKS) {
+        const look = itemLook(playerId, itemName);
+        if (!look) continue;
+        try { api.setItemStat(playerId, itemName, "displayName", look.displayName); done++; } catch (e) {}
+        try { api.setItemStat(playerId, itemName, "description", look.description); } catch (e) {}
+    }
+    return done;
+}
+
+/* Les messages d'achat (utils/data) affichent le nom de la table ci-dessus
+   sans importer ce fichier : data -> customItem serait un cycle (customItem
+   lui prend FRUIT_TICKETS). C'est le meme principe que setTeamGuard. */
+try { setItemLabelLookup(itemLabel); } catch (e) {}
 
 /* ARMES À FEU */
 
@@ -219,22 +322,11 @@ export function itemJoin(playerId) {
         showProgressBar:false,
     })
     api.removeItemCraftingRecipes(playerId, null)
-    api.setItemStat(playerId, "M1911", "displayName", "Flintlock")
-    /* SABER QUEST : les deux butins de la quete. Ce sont de VRAIS items :
-       on ne renomme donc pas un bloc existant, on pose seulement le nom et
-       la description que le joueur doit lire.
-         - "Gold Grit" est un TAS DE PIECES / DE TRESOR vole par le Mob
-           Leader : la description doit se lire comme de l'or, pas comme
-           une ressource de construction.
-         - "Magmaward Fuel" n'est pas un carburant : c'est une RELIQUE
-           ancienne qui ouvre ce qu'aucune lame ne coupe. Le nom reste tel
-           quel (c'est l'item du jeu), la description dit ce qu'il est.
-       Les textes sont poses a chaque join, comme les autres items custom :
-       un item deja en banque les retrouve tout seul. */
-    api.setItemStat(playerId, "Gold Grit", "displayName", "Gold Dust")
-    api.setItemStat(playerId, "Gold Grit", "description", "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.")
-    api.setItemStat(playerId, "Magmaward Fuel", "displayName", "Ancient Relic")
-    api.setItemStat(playerId, "Magmaward Fuel", "description", "An ancient Relic bearing the marks of time. It opens what no blade can cut, right where it's marked")
+    /* TOUS LES NOMS ET DESCRIPTIONS, D'UN SEUL COUP : haki, butins de la Saber
+       Quest, armurerie et bateaux des PNJ (table ITEM_LOOKS ci-dessus). Un
+       item deja en banque, achete, ramasse ou rendu par un Code Block les
+       retrouve tout seul — rien n'est ecrit au moment du give. */
+    applyItemLooks(playerId)
     /* BONS DE REDUCTION DE LA MACHINE A FRUITS : cinq items PAR DEFAUT de
        Bloxd (Lottery Tickets), qu'on renomme et qu'on decrit. La liste vit
        dans utils/data (FRUIT_TICKETS), avec la reduction de chacun, parce que

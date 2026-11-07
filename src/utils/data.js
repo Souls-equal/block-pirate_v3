@@ -146,16 +146,29 @@ export function cancelConfirm(playerId) {
     confirmVisualClear(playerId);
 }
 
+/* Nom affiche d'un item, pour les messages d'achat. La table vit dans
+   gameplay/customItem (source unique) : l'importer ici creerait un cycle
+   customItem -> data (FRUIT_TICKETS, getStat). C'est donc un hook, comme
+   setTeamGuard dans utils/combat. */
+let itemLabelLookup = null;
+export function setItemLabelLookup(fn) {
+    itemLabelLookup = typeof fn === "function" ? fn : null;
+}
+
 export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
-    if (!attributes.customDisplayName) attributes.customDisplayName = item;
-    if (!attributes.customDescription) attributes.customDescription = "";
+    /* Les attributs ne portent PLUS le nom de l'item : il est pose une fois
+       pour toutes par gameplay/customItem (setItemStat au join). Ici on ne
+       garde que ce que l'appelant veut vraiment attacher a l'instance. */
+    const attrs = attributes && typeof attributes === "object" ? attributes : {};
     const money = getStat(playerId, "money", 0);
     if (money < price) {
         say(playerId,[{ icon: "fa-solid fa-coins", style:{color:C.MONEY} },{ str:" You don't have enough Coins: "+money+"/"+price,style:{color:C.DANGER} }]);
         return;
     }
 
-    const label = attributes.customDisplayName;
+    const label = attrs.customDisplayName
+        || (itemLabelLookup ? itemLabelLookup(playerId, item) : null)
+        || item;
     const key = "buy|" + item + "|" + amount + "|" + price;
     if (!confirmAction(playerId, key, [
         { icon: "fa-solid fa-cart-shopping", style: { color: C.MONEY } },
@@ -170,7 +183,10 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         cancelConfirm(playerId);
         return;
     }
-    try { api.giveItem(playerId, item, amount, attributes); } catch (e) {}
+    try {
+        if (Object.keys(attrs).length) api.giveItem(playerId, item, amount, attrs);
+        else api.giveItem(playerId, item, amount);
+    } catch (e) {}
     try { api.playSound(playerId, "CashRegister", 1, 1); } catch (e) {}
     say(playerId, [
         { icon: "fa-solid fa-cart-shopping", style: { color: C.SUCCESS } },
