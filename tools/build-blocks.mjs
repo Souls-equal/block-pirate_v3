@@ -157,9 +157,10 @@ function reuseBins(unitList, prev) {
       seen.add(u);
     }
     binUnits.sort((a, b) => a.order - b.order);
+    /* Pas de test de taille ici : `relocateOverflow` s'en charge juste après
+       (un module peut avoir grossi sans que le découpage doive changer). */
     const size =
       binUnits.reduce((sum, u) => sum + u.size, 0) + SEPARATOR.length * (binUnits.length - 1);
-    if (size > MAX + PACK_SLACK) return null; // la répartition ne tient plus : on repacke
     bins.push({ size, units: binUnits });
   }
   if (seen.size !== unitList.length) return null;
@@ -174,13 +175,43 @@ const previousManifestForPacking = (() => {
   }
 })();
 
+/* Un bloc réutilisé peut déborder parce que les espaces/`*1*` ajoutés ont
+   grossi les modules : on déplace alors le PLUS PETIT module indépendant de ce
+   bloc vers un bloc qui a de la place, au lieu de tout repacker. Les familles
+   (Control, Gravity) ne bougent jamais : elles sont indivisibles. */
+function fits(bin) {
+  return bin.size <= MAX + PACK_SLACK;
+}
+function binSize(bin) {
+  return bin.units.reduce((sum, u) => sum + u.size, 0) + SEPARATOR.length * (bin.units.length - 1);
+}
+function relocateOverflow(bins) {
+  for (const bin of bins) {
+    if (fits(bin)) continue;
+    const movable = bin.units
+      .filter((u) => u.items.length === 1)
+      .sort((a, b) => a.size - b.size);
+    for (const unit of movable) {
+      if (fits(bin)) break;
+      const target = bins
+        .filter((b) => b !== bin)
+        .map((b) => ({ bin: b, size: binSize({ units: [...b.units, unit] }) }))
+        .filter((c) => c.size <= MAX + PACK_SLACK)
+        .sort((a, b) => b.size - a.size)[0];
+      if (!target) continue;
+      bin.units = bin.units.filter((u) => u !== unit);
+      target.bin.units = [...target.bin.units, unit].sort((a, b) => a.order - b.order);
+      bin.size = binSize(bin);
+      target.bin.size = binSize(target.bin);
+    }
+  }
+  return bins.every(fits);
+}
+
 const baseUnits = units.filter((u) => /^0|^[12]/.test(u.items[0].file));
 const extraUnits = units.filter((u) => !/^0|^[12]/.test(u.items[0].file));
-const bins =
-  reuseBins(units, previousManifestForPacking) ?? [
-    ...packUnits(baseUnits),
-    ...packUnits(extraUnits),
-  ];
+const reused = reuseBins(units, previousManifestForPacking);
+const bins = reused && relocateOverflow(reused) ? reused : [...packUnits(baseUnits), ...packUnits(extraUnits)];
 
 // --------------------------------------------------------------- sortie -----
 fs.mkdirSync(OUT, { recursive: true });
@@ -291,11 +322,14 @@ lines.push(
   "Bloxd.io filtre le texte collé dans un Code Block. Vu en jeu : la séquence",
   "`(s.hi-s.lo)*b,f=` est arrivée sous la forme `(s.hi-s.lo)******=`, le bloc ne",
   "compilait plus (« Unexpected token ») et **tout le pack 2 était perdu**.",
-  "`uncensorBlockCode()` (dans `tools/pack-format.mjs`) espace donc",
-  "systématiquement les motifs à risque avant d'écrire les packs — `b,f` devient",
-  "`b , f`, `t.f` devient `t . f`, `b(f` devient `b( f`. Le code est identique à",
-  "l'espacement près, et `npm run check` **refuse** un pack qui contiendrait",
-  "encore un motif censurable.",
+  "Les **espaces ne suffisent pas** : le filtre recolle les lettres de part et",
+  "d'autre d'un opérateur (`s.lo)*b` se lit « slob »). La parade qui marche, et",
+  "que le joueur a trouvée à la main, est de casser la suite de lettres par un",
+  "chiffre : `uncensorBlockCode()` (dans `tools/pack-format.mjs`) écrit `*b` →",
+  "`*1*b` (multiplication par 1) et espace en plus les motifs historiques",
+  "(`b,f` → `b , f`). Jamais dans une chaîne, un gabarit, une regex ou un",
+  "commentaire. `npm run check` **refuse** un pack qui contiendrait encore un",
+  "motif censurable, et vérifie que le résultat des calculs est identique.",
   "",
   "Le découpage est stable d'un build à l'autre : un fruit ne change pas de pack,",
   "donc un pack déjà collé dans le monde ne doit être recopié que si son contenu",
