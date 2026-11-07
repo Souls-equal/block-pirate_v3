@@ -23,11 +23,17 @@ Dans ton World Code multi-fichiers sur **Bloxd.io**, tous tes autres fichiers (`
    - **`src/fruit/abilities.js`** *(153 binds d'habilités et dotation complète des 41 fruits par rareté : Common = 3, Uncommon = 4, Rare = 4, Legendary = 5, Mythical = 5)*
    - **`src/fruit/func-abilities.js`** *(pont BP3 lisible et autonome avec les 196 shims d'habilités)*
    - **`src/fruit/index.js`** *(priorité au nom de l'attaque `customDisplayName`, remboursement du cooldown si un bloc manque)*
-2. Dans le **monde** (les **7 Code Blocks** à `x=100000, y=100000, z=100002 … 100008`) :
-   - Si tu avais déjà collé `pack-01.js` … `pack-05.js` (`z=100002 … 100006`), leur code est resté **100 % identique** : tu peux simplement ajouter **`code-blocks/pack-06.js`** en `z=100007` et **`code-blocks/pack-07.js`** en `z=100008` (ou recoller les 7 packs `pack-01.js` … `pack-07.js` de `z=100002` à `z=100008`).
+2. Dans le **monde** (les **8 Code Blocks** à `x=100000, y=100000, z=100002 … 100009`) :
+   - Pour cette version du dôme Control (placement sûr + mobs contrôlés), seuls
+     **`pack-01.js`**, **`pack-02.js`**, **`pack-03.js`** et **`pack-05.js`** changent : recopie-les,
+     les quatre autres blocs sont identiques au bit près.
+   - L'empaquetage est un **best-fit** sur la taille des modules : un module qui grossit peut
+     déplacer du code d'un bloc à l'autre. Le tableau de
+     [`code-blocks/README.md`](code-blocks/README.md) dit donc toujours **quel** bloc recopier
+     (et l'ordre de collage est libre : le chargeur lit l'en-tête `BP3:<n>/<N>`).
    - Détail dans [`code-blocks/README.md`](code-blocks/README.md).
 3. `FA.logStatus()` dans le World Code doit répondre
-   `7 pack(s), 197 handlers, 0 manquant(s), 0 erreur(s)`.
+   `8 pack(s), 196 handlers, 0 manquant(s), 0 erreur(s)`.
 
 *(Si tu modifies les sources de `src/blocks/` plus tard : `npm install && npm run build:blocks && npm run check`.)*
 
@@ -1306,6 +1312,39 @@ Les **effets** (`Slowness`, `Weakness`…) ignorent totalement l'acteur : ils so
 pour un rang immunisé dans tous les cas, c'est le point le plus simple à tester
 (`eff(adminId, "Slowness", 3000, { inbuiltLevel: 3 })` ne fait rien).
 
+### Le dôme ne pose plus personne dans un mur
+
+Control Domain *repositionne* ses prisonniers sur un anneau en orbite, à 3,5–15,5 blocs du
+centre et 2 blocs au-dessus du sol. Rien n'empêchait ce point de tomber dans une colline,
+un arbre ou un mur de joueur : la victime était **téléportée dans le solide** et n'en
+ressortait plus, même après la fermeture du dôme. C'était le blocage le plus fréquent en jeu.
+Trois garde-fous, dans l'état partagé `250-control-state.js` (utilisé par les trois blocs
+Control) :
+
+| Fonction | Rôle |
+| --- | --- |
+| `ct_open(x, y, z)` | deux voxels libres (pieds + tête), testés par `solidVoxel` — la solidité réelle, pas le nom du bloc |
+| `ct_spot(p, rad)` | si le point voulu est plein, l'air **le plus proche** par couches de 1 à `rad` (le vertical coûte plus cher qu'un pas de côté) |
+| `ct_put(id, p, rad)` | `teleport()` sur ce point ; `null` si toute la zone est solide → **la cible ne bouge pas** |
+| `ct_unstick(id)` | sortie de secours au relâchement : si la cible est dans un bloc, elle remonte à l'air le plus proche |
+
+Deux conséquences voulues : on ne **crée** jamais l'enfermement (mieux vaut laisser une
+victime sur place que la planter dans la roche), et on le **répare** toujours à la
+libération — `ct_unstick` tourne quand le dôme se ferme, quand une cible en sort et quand
+le lanceur meurt. Le balayage `ct_spot` ne tourne **que** si le point d'orbite est occupé,
+et il est throttlé (1 s) quand la zone entière est solide : aucun coût dans le cas normal.
+Shambles utilise `ct_open` de la même façon pour sa traction — la cible s'arrête au ras du
+mur au lieu d'entrer dedans.
+
+### Le dôme tient aussi les mobs
+
+`ct_people()` ne listait que `api.getPlayerIds()` : le dôme ne contrôlait donc **rien** en
+PvE. Devenu `ct_victims()`, il ajoute les créatures d'**une seule** requête spatiale
+(`entitiesIn`) filtrée par `isMobAlive` — donc jamais un PNJ (marchands, quêteurs). Les
+mobs sont tenus comme les joueurs (orbite, `Slowness`, `Weakness`), sans `forceCameraDir`,
+qui n'a aucun sens pour une créature. Shambles et Control Slash passaient déjà par
+`entitiesIn` : leur contrôle des mobs n'a pas eu à changer.
+
 ---
 
 ## Refactorisation : un fichier par sujet, mais jamais un fichier par feature
@@ -1982,6 +2021,11 @@ plusieurs fichiers sont ignorés pour éviter le bruit.
 `check-blocks.mjs` rejoue le **vrai** `code-block-loader.js` avec une `api`
 simulée : scénario nominal, pack manquant et pack déplacé. Il échoue si un seul
 des 95 handlers (dont les 8 de Control/Gravity) n'est pas enregistré.
+
+Il rejoue aussi le **dôme sur une falaise**, tick par tick, avec un monde solide :
+aucun placement de victime dans un bloc, les mobs du dôme sont tenus, et une cible
+enfermée ressort à l'air le plus proche au relâchement. C'est ce test qui attrape
+le bug avant le joueur.
 
 ---
 

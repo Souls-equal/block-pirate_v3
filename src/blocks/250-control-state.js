@@ -13,6 +13,9 @@
       isAliveId: a,
       posOf: i,
       isSolid: l,
+      solidVoxel: sv,
+      isMobAlive: mo,
+      teleport: tp,
       eff: h,
     } = o,
     { box: u, point: f, create: _, move: M, remove: p, rotate: d, at: T } = n,
@@ -186,6 +189,73 @@
       a = Math.sqrt(s * s + c * c) || 1;
     (y(n, [s / a, 0, c / a], 24, 0.52), T(o.pos, B.ram, 0.9, 1.2, 22));
   }
+  /* ---- PLACEMENTS SURS --------------------------------------------------
+     Control Domain pose ses prisonniers en orbite avec setPosition. Rien
+     n'empeche un point d'orbite de tomber dans une colline, un arbre ou un
+     mur : la victime est alors ENFERMEE dans le bloc, et elle y reste apres la
+     fin du dome (impossible de bouger, il faut mourir pour s'en sortir).
+     Regle : on ne pose JAMAIS une cible dans un solide. Si le point voulu est
+     plein, on cherche l'air le plus proche autour ; si toute la zone est
+     solide, on ne bouge pas (rester sur place vaut mieux que finir au mur).
+     `ct_unstick` est la sortie de secours a la liberation. */
+  function ct_hard(t, o, n) {
+    try {
+      return !!sv(t, o, n);
+    } catch (e) {}
+    return !!l(t, o, n);
+  }
+  function ct_open(t, o, n) {
+    return !ct_hard(t, o, n) && !ct_hard(t, o + 1, n);
+  }
+  /* Position de pieds libre la plus proche de `p` (rayon en couches, le
+     vertical coute plus cher qu'un pas de cote). `null` = rien de libre. */
+  function ct_spot(p, rad) {
+    const R = rad === undefined ? 2 : rad,
+      bx = Math.floor(p[0]),
+      by = Math.floor(p[1]),
+      bz = Math.floor(p[2]);
+    if (ct_open(bx, by, bz)) return [p[0], p[1], p[2]];
+    for (let r = 1; r <= R; r++) {
+      let best = null,
+        bestD = 1e9;
+      for (let dx = -r; dx <= r; dx++)
+        for (let dy = -r; dy <= r; dy++)
+          for (let dz = -r; dz <= r; dz++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) !== r) continue;
+            const x = bx + dx,
+              y = by + dy,
+              z = bz + dz;
+            if (!ct_open(x, y, z)) continue;
+            const d = dx * dx + 2 * dy * dy + dz * dz;
+            if (d < bestD) {
+              bestD = d;
+              best = [x + 0.5, y + 0.04, z + 0.5];
+            }
+          }
+      if (best) return best;
+    }
+    return null;
+  }
+  /* Pose `id` pres de `p` sans jamais entrer dans un bloc. Rend le point
+     reellement utilise, ou null si rien n'est libre (la cible ne bouge pas). */
+  function ct_put(id, p, rad) {
+    if (!id || !p) return null;
+    const spot = ct_spot(p, rad);
+    if (!spot) return null;
+    return tp(id, spot[0], spot[1], spot[2]) === false ? null : spot;
+  }
+  /* Sortie de secours : si la cible est dans un bloc, on la remonte a l'air le
+     plus proche. Cas normal = 2 lectures de bloc, donc appelable a chaque
+     liberation sans cout. */
+  function ct_unstick(id) {
+    if (!id) return false;
+    const p = i(id);
+    if (!p) return false;
+    if (ct_open(Math.floor(p[0]), Math.floor(p[1]), Math.floor(p[2]))) return false;
+    const spot = ct_spot(p, 3);
+    if (!spot) return false;
+    return tp(id, spot[0], spot[1], spot[2]);
+  }
   Object.assign(C, {
     ctCtl: m,
     ctCd: g,
@@ -248,7 +318,7 @@
     },
     ct_mine: z,
     ct_at: q,
-    ct_people: function (t, o) {
+    ct_victims: function (t, o) {
       const n = [];
       let r = [];
       try {
@@ -256,6 +326,20 @@
       } catch (t) {}
       for (const e of r) {
         if (!a(e)) continue;
+        const r = i(e);
+        r && L(r, t) <= o && n.push(e);
+      }
+      /* Les mobs comptent aussi : un dome qui ne tient que les joueurs ne
+         controle rien en PvE. `O` (ct_in) fait UNE requete spatiale puis filtre
+         les vivants ; isMobAlive ecarte les PNJ (marchands, queteurs). */
+      let box = [];
+      try {
+        box = O(t, o);
+      } catch (t) {
+        box = [];
+      }
+      for (const e of box) {
+        if (n.indexOf(e) >= 0 || !mo(e)) continue;
         const r = i(e);
         r && L(r, t) <= o && n.push(e);
       }
@@ -328,6 +412,10 @@
         n
       );
     },
+    ct_open: ct_open,
+    ct_spot: ct_spot,
+    ct_put: ct_put,
+    ct_unstick: ct_unstick,
     ct_pick: U,
     ct_catch: G,
     ct_lift_ring: function (t) {

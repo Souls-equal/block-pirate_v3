@@ -1,6 +1,6 @@
 {
   "format": "BP3",
-  "generatedAt": "2026-10-30T20:53:42.467Z",
+  "generatedAt": "2026-11-07T21:36:06.710Z",
   "maxPackChars": 31500,
   "origin": {
     "x": 100000,
@@ -8,21 +8,22 @@
     "z": 100002
   },
   "sourceFiles": 36,
-  "sourceChars": 446269,
-  "packedChars": 226079,
-  "compression": "49 %",
+  "sourceChars": 451055,
+  "packedChars": 227334,
+  "compression": "50 %",
   "packCount": 8,
   "packs": [
     {
       "index": 1,
       "file": "pack-01.js",
       "z": 100002,
-      "chars": 28790,
-      "payloadChars": 28757,
-      "hash": "f7c3d06c",
-      "modules": 10,
+      "chars": 30767,
+      "payloadChars": 30734,
+      "hash": "29462870",
+      "modules": 11,
       "sources": [
         "010-spring.js",
+        "050-ice.js",
         "070-quakes.js",
         "080-light.js",
         "090-rocket.js",
@@ -38,32 +39,31 @@
       "index": 2,
       "file": "pack-02.js",
       "z": 100003,
-      "chars": 30860,
-      "payloadChars": 30827,
-      "hash": "f3f53389",
+      "chars": 31447,
+      "payloadChars": 31414,
+      "hash": "21530a95",
       "modules": 5,
       "sources": [
         "020-flame.js",
-        "100-blade.js",
-        "170-ghost.js",
-        "220-tiger-form.js",
-        "240-magma.js"
+        "250-control-state.js",
+        "251-control-domain.js",
+        "252-control-slash.js",
+        "253-control-shambles.js"
       ]
     },
     {
       "index": 3,
       "file": "pack-03.js",
       "z": 100004,
-      "chars": 31216,
-      "payloadChars": 31183,
-      "hash": "83b1786b",
-      "modules": 7,
+      "chars": 30251,
+      "payloadChars": 30218,
+      "hash": "d66a3c7a",
+      "modules": 6,
       "sources": [
         "030-lightning.js",
         "040-dark.js",
-        "050-ice.js",
         "140-smoke.js",
-        "200-song.js",
+        "170-ghost.js",
         "210-tiger-mark.js",
         "230-creation.js"
       ]
@@ -88,16 +88,16 @@
       "index": 5,
       "file": "pack-05.js",
       "z": 100006,
-      "chars": 31095,
-      "payloadChars": 31062,
-      "hash": "cec62c75",
+      "chars": 30751,
+      "payloadChars": 30718,
+      "hash": "e8bccef0",
       "modules": 5,
       "sources": [
+        "100-blade.js",
         "120-dought.js",
-        "250-control-state.js",
-        "251-control-domain.js",
-        "252-control-slash.js",
-        "253-control-shambles.js"
+        "200-song.js",
+        "220-tiger-form.js",
+        "240-magma.js"
       ]
     },
     {

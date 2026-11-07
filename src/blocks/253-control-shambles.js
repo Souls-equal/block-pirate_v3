@@ -81,6 +81,9 @@
   const CT =
     globalThis.__CT__ ||
     (globalThis.__CT__ = { ctl: {}, cd: {}, ang: {}, mesh: new Map(), blades: [] });
+  /* Placement sur (defini par 250-control-state.js, evalue juste avant dans le
+     meme pack). Repli neutre si le bloc d'etat est absent : on ne bloque rien. */
+  const ct_open = CT.ct_open || function () { return true; };
   const ctCtl = CT.ctl,
     ctCd = CT.cd,
     ctAng = CT.ang,
@@ -360,9 +363,15 @@
               const to = [d.pos[0] - p[0], d.pos[1] + 0.3 - p[1], d.pos[2] - p[2]];
               if (ct_dist(to, [0, 0, 0]) <= 0.6) continue;
               const n = ct_norm(to),
-                step = CT_D_PULL * CT_DT;
-              /* gardes : ni admin/owner immunise, ni joueur en bateau */
-              teleport(id, p[0] + n[0] * step, p[1] + n[1] * step, p[2] + n[2] * step);
+                step = CT_D_PULL * CT_DT,
+                nx = p[0] + n[0] * step,
+                ny = p[1] + n[1] * step,
+                nz = p[2] + n[2] * step;
+              /* gardes : ni admin/owner immunise, ni joueur en bateau. Et jamais
+                 dans un bloc : le pas est petit, la cible s'arrete au ras du mur
+                 au lieu d'entrer dedans. */
+              if (ct_open(Math.floor(nx), Math.floor(ny), Math.floor(nz)))
+                teleport(id, nx, ny, nz);
             }
             if (d.homing && st.active) {
               for (let i = 0; i < st.blocks.length; i++) {

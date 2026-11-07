@@ -14,6 +14,7 @@
       eff: a,
       posOf: _,
       isAliveId: f,
+      isPlayerAlive: isP,
       isSolid: l,
       teleport,
       forceCameraDir,
@@ -64,7 +65,9 @@
       ct_dist: z,
       ct_norm: W,
       ct_at: X,
-      ct_people: j,
+      ct_victims: j,
+      ct_put: pp,
+      ct_unstick: uu,
       ct_in: q,
       ct_free: G,
       ct_sweep: H,
@@ -91,7 +94,9 @@
       if (!n || (e && n !== e) || !n.active) return !1;
       for (const t of n.meshes) G(t);
       for (const t of n.blocks) G(t.mesh);
-      for (const t of n.trapped.keys()) $(t);
+      /* $(t) relache camera et effets, uu(t) ressort de l'air le plus proche
+         la cible qui aurait malgre tout fini dans un bloc. */
+      for (const t of n.trapped.keys()) ($(t), uu(t));
       return (
         n.trapped.clear(),
         (n.blocks = []),
@@ -160,9 +165,10 @@
                     a(n, "Slowness", 1600, { inbuiltLevel: 1 });
                     a(n, "Weakness", 1600, { inbuiltLevel: 1 });
                   }
-                  if (t.t % 3 === 0) {
+                  if (t.t % 3 === 0 && isP(n)) {
                     /* camera + deplacement = crowd control : un admin/owner
-                       immunise garde son regard ET ses pieds. */
+                       immunise garde son regard ET ses pieds. Un mob n'a pas de
+                       client a braquer : on ne lui envoie rien. */
                     forceCameraDir(
                       n,
                       W([t.center[0] - r[0], t.center[1] + 1.5 - r[1], t.center[2] - r[2]]),
@@ -172,9 +178,20 @@
                   const s = t.center[0] + o.r * Math.cos(o.a),
                     i = t.center[2] + o.r * Math.sin(o.a),
                     f = t.center[1] + 2 + 0.7 * Math.sin(2 * o.a);
-                  teleport(n, s, f, i);
+                  /* Jamais dans un bloc solide : une cible posee dans la
+                     colline y reste enfermee, meme apres la fin du dome. Si le
+                     point d'orbite est plein on prend l'air le plus proche, et
+                     si toute la zone est solide on la laisse sur place — sans
+                     re-scanner a chaque tick. */
+                  if (o.retry && t.t < o.retry) continue;
+                  const at = pp(n, [s, f, i], 2);
+                  if (!at) {
+                    o.retry = t.t + 20;
+                    continue;
+                  }
+                  o.retry = 0;
                   if (t.t % 2 === 0) {
-                    point([s, f, i], {
+                    point(at, {
                       tex: "soul_0",
                       count: 2,
                       life: [0.3, 0.6],
@@ -190,7 +207,7 @@
                   }
                 }
                 for (const n of Array.from(t.trapped.keys()))
-                  e.has(n) || ($(n), t.trapped.delete(n));
+                  e.has(n) || ($(n), uu(n), t.trapped.delete(n));
               })(t),
               t.t % w < 1 && Z(t),
               t.t % E < 1 && V(t),
