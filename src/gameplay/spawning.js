@@ -5,6 +5,7 @@ import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../util
 import { C, say, txt, bold, ic } from "../core/theme";
 import { forgetBossMob, rollMobLoot } from "./loot";
 import { playerIdForDbId } from "../utils/killAttribution";
+import { applyNameTag } from "../utils/lifeform";
 
 export const RANK_MULT = {
     1:{hp:1,dmg:1,gold:1,xp:.3},
@@ -274,17 +275,14 @@ function setMobNameTag(mobId, rank, level, name) {
             healthbar: { display: "always", foregroundColour: accent },
         border: { colour: accent, applyTo: "nametag", style: rank === 3 ? "double" : "solid" }
     };
-    try {
-        api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", rich);
-        return;
-    } catch (e) {}
+    /* Une seule porte de sortie (utils/lifeform) : le moteur refuse EN BLOC
+       un nameTag avec une seule valeur hors schema. */
+    if (applyNameTag(mobId, rich, true)) return;
     /* Repli minimal : un nom + une barre de vie, sans style exotique. */
-    try {
-        api.setTargetedPlayerSettingForEveryone(mobId, "nameTagInfo", {
-            content: [txt(String(name || "Mob"))],
-            healthbar: { display: "always" }
-        });
-    } catch (e) {}
+    applyNameTag(mobId, {
+        content: [txt(String(name || "Mob"))],
+        healthbar: { display: "always" }
+    }, true);
 }
 
 function resolveSummonOwnerForXp(playerId) {

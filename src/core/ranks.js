@@ -1,11 +1,21 @@
 /* Chaque rang porte des FLAGS booleens, lus par les gardes du jeu.
    Ajouter une immunite = une ligne ici, rien a toucher ailleurs.
 
-     byPassChatRestriction : lit tous les canaux de chat (pas un droit d'ecrire)
+     readsAllChannels      : recoit une COPIE de tous les canaux de chat
+                             (global, team, equipage). Lecture seule : ce
+                             droit n'ouvre aucune ecriture. Un staff parle
+                             dans ses propres canaux, comme tout le monde.
+     byPassChatRestriction : n'est pas soumis au filtre anti-majuscules.
+                             Ce n'est pas un droit de lecture.
      immuneToCrowdControl  : ne peut etre ni ralentie, ni root, ni pousse,
                              ni teleporte par la capacite de quelqu'un d'autre.
                              Son propre deplacement reste evidemment permis.
-                             Actif pour ADMIN et OWNER. */
+                             Actif pour ADMIN et OWNER.
+
+   Les deux flags de chat etaient confondus : `byPassChatRestriction` servait
+   a la LECTURE des canaux. Un rang qui n'a rien a voir avec la moderation
+   heritait donc de la lecture de tous les equipages. Ils sont separes ici, et
+   chaque nom dit ce qu'il fait. */
 export const PERMISSION_LEVELS = {
     NONE: 0,
     BASIC: 1,
@@ -22,6 +32,7 @@ export const RANKS = {
         color: "#aaaaaa",
         permissionLevel: PERMISSION_LEVELS.NONE,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
     OWNER: {
@@ -30,6 +41,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.OWNER,
         byPassChatRestriction: true,
+        readsAllChannels: true,
         immuneToCrowdControl: true,
     },
     ADMIN: {
@@ -38,6 +50,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.ADMIN,
         byPassChatRestriction: true,
+        readsAllChannels: true,
         immuneToCrowdControl: true,
     },
     DEV: {
@@ -46,6 +59,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.DEV,
         byPassChatRestriction: true,
+        readsAllChannels: true,
         immuneToCrowdControl: false,
     },
     MOD: {
@@ -54,6 +68,7 @@ export const RANKS = {
         color: "#ff9900",
         permissionLevel: PERMISSION_LEVELS.MOD,
         byPassChatRestriction: true,
+        readsAllChannels: true,
         immuneToCrowdControl: false,
     },
     TESTER: {
@@ -62,6 +77,7 @@ export const RANKS = {
         color: "#ff4444",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
     MOBLANDS: {
@@ -70,6 +86,7 @@ export const RANKS = {
         color: "#75dec5",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
     KNIGHTFALL: {
@@ -78,6 +95,7 @@ export const RANKS = {
         color: "#b08dfb",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
     VIP: {
@@ -86,6 +104,7 @@ export const RANKS = {
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
     YOUTUBER: {
@@ -94,6 +113,7 @@ export const RANKS = {
         color: "red",
         permissionLevel: PERMISSION_LEVELS.BASIC,
         byPassChatRestriction: false,
+        readsAllChannels: false,
         immuneToCrowdControl: false,
     },
 };
@@ -169,6 +189,12 @@ export function isMod(playerId) {
 
 export function canBypassChatRestriction(playerId) {
     return getRankDataForPlayer(playerId).byPassChatRestriction === true;
+}
+
+/* Droit de LECTURE de tous les canaux. Il ne donne jamais le droit d'ecrire
+   dans un canal dont on n'est pas membre (voir handleChat). */
+export function canReadAllChannels(playerId) {
+    return getRankDataForPlayer(playerId).readsAllChannels === true;
 }
 
 /* Crowd control : un admin/owner ne se fait ni deplacer, ni root, ni slow.

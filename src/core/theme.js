@@ -67,6 +67,11 @@ const ROLE_OF = {
     "#55aaff": "MARINE", "#6bb6ff": "MARINE", "#7dd3fc": "MARINE", "#38bdf8": "MARINE",
     "#1e90ff": "MARINE", "#2791ec": "MARINE", "#cef3ff": "MARINE", "#1e40af": "MARINE",
     "#5aa9ff": "MARINE", "#0ea5e9": "MARINE", "#2563eb": "MARINE",
+    /* Avertissements orange : meme famille que « #ff9900 » et « #ff6600 »,
+       deja traites comme du danger. Sans cette ligne, « orange » traversait
+       themeColor sans conversion : c'etait la SEULE couleur du jeu hors
+       palette. */
+    orange: "DANGER", darkorange: "DANGER",
     /* information / gris et blancs */
     white: "INFO", gray: "INFO", grey: "INFO", lightgray: "INFO", lightgrey: "INFO",
     silver: "INFO", gainsboro: "INFO", black: "INFO",
@@ -86,6 +91,24 @@ const HUE_ROLES = [
     ["XP", 182],
     ["MARINE", 205],
 ];
+
+/* Couleurs CSS nommees (les 16 de base + les plus courantes) : elles servent
+   seulement a retrouver une TEINTE, jamais a s'afficher. */
+const NAMED_COLOURS = {
+    white: "#ffffff", black: "#000000", gray: "#808080", grey: "#808080",
+    silver: "#c0c0c0", maroon: "#800000", red: "#ff0000", purple: "#800080",
+    fuchsia: "#ff00ff", magenta: "#ff00ff", green: "#008000", lime: "#00ff00",
+    olive: "#808000", yellow: "#ffff00", navy: "#000080", blue: "#0000ff",
+    teal: "#008080", aqua: "#00ffff", cyan: "#00ffff", orange: "#ffa500",
+    pink: "#ffc0cb", hotpink: "#ff69b4", violet: "#ee82ee", gold: "#ffd700",
+    coral: "#ff7f50", tomato: "#ff6347", crimson: "#dc143c", khaki: "#f0e68c",
+    lightgreen: "#90ee90", lightblue: "#add8e6", lightgray: "#d3d3d3",
+    lightgrey: "#d3d3d3", salmon: "#fa8072", beige: "#f5f5dc", ivory: "#fffff0",
+    lavender: "#e6e6fa", orchid: "#da70d6", plum: "#dda0dd", tan: "#d2b48c",
+    turquoise: "#40e0d0", azure: "#f0ffff", brown: "#a52a2a", indigo: "#4b0082",
+    springgreen: "#00ff7f", deepskyblue: "#00bfff", skyblue: "#87ceeb",
+    dodgerblue: "#1e90ff", royalblue: "#4169e1", gainsboro: "#dcdcdc",
+};
 
 function parseColor(value) {
     const s = String(value).trim().toLowerCase();
@@ -107,8 +130,11 @@ function parseColor(value) {
         }
         return null;
     }
-    const named = { white: "#ffffff", black: "#000000", gray: "#808080", grey: "#808080" };
-    if (named[s]) return parseColor(named[s]);
+    /* Couleurs CSS nommees : une teinte est indispensable. Une couleur nommee
+       que parseColor ne connait pas traverse themeColor sans conversion, donc
+       le jeu l'affiche telle quelle — hors palette. */
+    const named = NAMED_COLOURS[s];
+    if (named) return parseColor(named);
     return null;
 }
 

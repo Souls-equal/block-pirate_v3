@@ -2,10 +2,10 @@
 
 import { applyItemLooks, convertWeaponAttributes, scanAllItems, writeItem } from "../gameplay/customItem";
 import { deleteStat, getStat, setStat } from "../utils/data";
-import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
+import { getRankDataForPlayer, canBypassChatRestriction, canReadAllChannels } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
-import { isOnlinePlayer } from "../utils/lifeform";
+import { applyNameTag, isOnlinePlayer } from "../utils/lifeform";
 import { C, nfmt, say, shout, txt, bold, ic } from "./theme";
 
 /* Couleur de l'equipage : l'or, celui de sa pastille de chat et de son nom sur
@@ -153,23 +153,30 @@ setPlayerTeam = (playerId, teamId) => {
 
 /* NAME TAG */
 export function updateNameTag(playerId) {
-    const name = api.getEntityName(playerId);
+    /* `getEntityName` peut rendre undefined au tout premier tick d'un join :
+       `{ str: undefined }` faisait refuser TOUT le name tag par le moteur
+       (« Expected: valid nameTagInfo value »). Un nom de repli evite de
+       perdre la ligne entiere pour un pseudo pas encore lisible. */
+    let name = "";
+    try { name = api.getEntityName(playerId) || ""; } catch (e) { name = ""; }
+    name = String(name).trim() || "Player";
     const team = getTeamData(getPlayerTeam(playerId));
-    const crew = getCrewName(playerId) || "No Crew";
-    /* Une erreur d'API (joueur qui vient de partir) ne doit pas remonter et
-       casser la suite de onPlayerJoin. */
-    try {
-        api.setTargetedPlayerSettingForEveryone(playerId, "nameTagInfo", {
-            content: [txt(name, "white")],
-            subtitle: [
-                bold(team.prefix, team.color),
-                bold(" | ", "lightgray"),
-                bold(crew, CREW_COLOR),
-            ],
-            border: { colour: team.color, applyTo: "both", style: "glow" },
-            healthbar: {height:"19px", display:"always", backgroundColour:"gray" }
-        });
-    } catch (e) {}
+    const crew = getCrewName(playerId);
+    /* Name tag = identite : pseudo, puis team et equipage sur la 2e ligne.
+       Pas d'equipage = pas de « No Crew » gris : la ligne reste courte. */
+    const subtitle = [bold(team.prefix, team.color)];
+    if (crew) {
+        subtitle.push(bold(" | ", C.INFO));
+        subtitle.push(bold(String(crew), CREW_COLOR));
+    }
+    /* `applyNameTag` reconstruit l'objet selon le schema Bloxd et n'envoie
+       jamais une valeur refusee (voir utils/lifeform.js). */
+    applyNameTag(playerId, {
+        content: [txt(name, C.INFO)],
+        subtitle: subtitle,
+        border: { colour: team.color, applyTo: "both", style: "glow" },
+        healthbar: { height: "19px", display: "always", backgroundColour: "gray" },
+    });
 }
 
 /* CHAT CHANNEL UI */
@@ -496,7 +503,10 @@ export function handleChat(playerId, message, channel) {
         return false;
     }
 
-    message = normalizeCaps(message);
+    /* Le filtre anti-majuscules ne s'applique pas au staff : son annonce
+       garde sa casse. La regle vit dans le rang (`byPassChatRestriction`),
+       pas dans une exception ecrite ici. */
+    if (!canBypassChatRestriction(playerId)) message = normalizeCaps(message);
 
     const name = api.getEntityName(playerId);
     const team = getTeamData(getPlayerTeam(playerId));
@@ -522,9 +532,12 @@ export function handleChat(playerId, message, channel) {
             } catch (e) {}
         }
         if (tag) {
+            /* Copie en LECTURE SEULE : seuls les rangs qui ont le droit de
+               lire tous les canaux recoivent ce message, et ils ne peuvent
+               pas repondre dedans (voir le refus plus bas). */
             for (const id of all) {
                 if (done.has(id) || !online.has(id)) continue;
-                if (!canBypassChatRestriction(id)) continue;
+                if (!canReadAllChannels(id)) continue;
                 try {
                     say(id, [
                         txt("[" + tag + "] ", C.INFO),
@@ -581,7 +594,17 @@ export function handleChat(playerId, message, channel) {
     /* CREW */
     if (chan === CHAT_CHANNEL.CREW) {
         const crewName = getCrewName(playerId);
-        if (!crewName) return false;
+        /* Canal equipage sans equipage : on le DIT. Le silence faisait croire
+           a un message parti, et un staff qui n'est dans aucun equipage
+           n'obtient rien de plus : il peut LIRE les equipages, pas y parler. */
+        if (!crewName) {
+            say(playerId, [
+                ic("fa-solid fa-lock", C.INFO),
+                bold(" CHAT  ", C.INFO),
+                txt("Crew channel is read-only for you: join a crew to speak there.", C.INFO),
+            ]);
+            return false;
+        }
 
         syncCrewFromDB(playerId);
         const crew = CREWS[crewName];

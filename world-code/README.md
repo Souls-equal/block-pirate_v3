@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 369 014 caracteres** (72 % de la limite de 512 000 du World Code, -55 % par rapport aux sources lisibles).
+**32 fichiers, 372 355 caracteres** (73 % de la limite de 512 000 du World Code, -55 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -30,11 +30,11 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 
 | Fichier | Caracteres | Source lisible |
 | --- | --- | --- |
-| `core/admin.js` | 52 314 | 91 955 |
-| `core/ranks.js` | 2 473 | 5 269 |
-| `core/team.js` | 16 331 | 47 574 |
-| `core/theme.js` | 17 175 | 38 562 |
-| `core/UI.js` | 14 513 | 42 993 |
+| `core/admin.js` | 52 355 | 92 035 |
+| `core/ranks.js` | 2 745 | 6 499 |
+| `core/team.js` | 16 526 | 49 058 |
+| `core/theme.js` | 17 990 | 40 158 |
+| `core/UI.js` | 14 838 | 44 016 |
 | `fruit/abilities.js` | 38 498 | 54 051 |
 | `fruit/fruitData.js` | 5 685 | 8 871 |
 | `fruit/func-abilities.js` | 23 532 | 39 745 |
@@ -42,24 +42,24 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/codes.js` | 3 870 | 7 279 |
 | `gameplay/customItem.js` | 7 369 | 19 334 |
 | `gameplay/fightingStyles.js` | 19 842 | 43 045 |
-| `gameplay/loot.js` | 1 887 | 6 591 |
-| `gameplay/NPCs.js` | 7 590 | 18 968 |
+| `gameplay/loot.js` | 1 952 | 7 414 |
+| `gameplay/NPCs.js` | 7 561 | 18 986 |
 | `gameplay/quest.js` | 10 112 | 22 866 |
-| `gameplay/saber.js` | 28 963 | 79 623 |
-| `gameplay/spawning.js` | 6 084 | 14 733 |
+| `gameplay/saber.js` | 28 931 | 79 595 |
+| `gameplay/spawning.js` | 6 006 | 14 759 |
 | `gameplay/stamina.js` | 5 607 | 13 619 |
 | `gameplay/stats.js` | 5 381 | 12 896 |
 | `gameplay/tutorial.js` | 6 772 | 16 191 |
 | `gameplay/variations.js` | 6 376 | 20 732 |
 | `index.js` | 15 968 | 38 975 |
-| `utils/boss.js` | 7 100 | 16 491 |
+| `utils/boss.js` | 7 014 | 16 412 |
 | `utils/combat.js` | 15 290 | 46 717 |
 | `utils/data.js` | 6 530 | 18 087 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 5 347 | 13 658 |
 | `utils/killAttribution.js` | 2 138 | 6 816 |
 | `utils/killfeed.js` | 834 | 1 159 |
-| `utils/lifeform.js` | 4 392 | 8 666 |
+| `utils/lifeform.js` | 6 245 | 13 798 |
 | `utils/timer.ts` | 1 432 | 5 761 |
 | `utils/world.js` | 1 355 | 2 481 |
 

@@ -803,7 +803,16 @@ function runDomainOnCliff(actors, ticks) {
 }
 {
   const inWall = (q) => q[0] >= 10 && q[0] <= 12;
-  const a = runDomainOnCliff({ p1: [0, 64, 0], p2: [11, 64, 0], m1: [4, 64, 2] }, 60);
+  /* Un BOSS dans le dome : il subit les effets mais ne bouge JAMAIS. Sinon il
+     sort de son arene et sa poursuite casse (butin gratuit). Le World Code
+     publie la reponse dans `globalThis.__isBossMob` (gameplay/loot.js). */
+  globalThis.__isBossMob = (id) => id === "m2";
+  const a = runDomainOnCliff({ p1: [0, 64, 0], p2: [11, 64, 0], m1: [4, 64, 2], m2: [3, 64, 3] }, 60);
+  check(
+    a.teleports.filter((t) => t.id === "m2").length === 0,
+    "dôme : un boss a été déplacé par le dôme",
+  );
+  delete globalThis.__isBossMob;
   const held = a.teleports.filter((t) => t.id === "p2");
   check(held.length > 10, `dôme : la victime n'est pas tenue (${held.length} placements)`);
   check(
