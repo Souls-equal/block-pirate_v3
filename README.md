@@ -429,8 +429,11 @@ obligatoire fait tomber la barre de stamina dans le dernier cas, et la CI refuse
 ### Icônes : une liste blanche, sinon « ? »
 
 Bloxd n'affiche **pas d'erreur** pour une icône inconnue : il montre un **`?`**. La liste des
-noms acceptés est fermée (96 icônes du jeu + 209 Font Awesome + 11 marques), donc un nom
-inventé ne se voit qu'en jeu — jamais dans les logs.
+noms acceptés est fermée (**96 icônes du jeu + 214 Font Awesome + 11 marques**, d'après
+`ICONS.md` du dépôt `Bloxdy/code-api`), donc un nom inventé ne se voit qu'en jeu — jamais dans
+les logs. Ces trois listes sont recopiées dans `tools/check-icons.mjs` : la CI refuse tout écart
+avec le document officiel, dans **les deux sens** (un nom oublié = un `?`, un nom inventé =
+une icône qui n'existe pas).
 
 Tout passe donc par **`safeIcon()`** (`core/theme.js`), appelé par `format()` : c'est le point
 unique par lequel passent le chat, les textes de boutique, les descriptions d'items **et** les
@@ -440,15 +443,30 @@ Code Blocks (via le patch de l'API).
 | --- | --- |
 | `fa-solid fa-xmark` (dans `FA_NAMES`) | rendu tel quel |
 | `fa-solid fa-brands fa-discord` (dans `FA_BRANDS`) | rendu tel quel |
-| `Apple`, `Frozen`, `Compass`, `Boat`… (nom Bloxd : item, bloc, icône du jeu) | **intact** — ces noms ne sont pas validés, ils sont natifs |
+| `Invisible`, `Jump Boost`, `Trader Piggy`… (icône **du jeu**, dite ingame) | **intact**, casse exacte ; `"jump boost"` est remis en `Jump Boost` |
+| `Apple`, `Boat`, `Diamond Sword`… (nom d'item ou de bloc) | **intact** — non validable sans embarquer les 1 400 items, donc passé tel quel |
 | ancien nom (`fa-solid fa-broom`, `fa-gift`, `fa-trash`…) | remplacé par l'équivalent valide (`ICON_ALIAS`) |
 | mot nu (`globe`, `flag`) | corrigé (`BARE_ALIAS`) |
 | nom inconnu | **`fa-solid fa-circle-info`** (`ICON_FALLBACK`) — jamais de `?` |
 
 **Ajouter une icône** = ajouter son nom dans `FA_NAMES` (ou `FA_BRANDS`), sinon elle sera
-remplacée à l'affichage. `npm run check` lance **`tools/check-icons.mjs`**, qui relit la liste
-blanche et refuse toute icône du code absente : une faute de frappe casse la CI au lieu de
-produire un `?` en jeu. Le même script rend la sidebar avec une `api` simulée pour vérifier
+remplacée à l'affichage — et dans la liste officielle de `tools/check-icons.mjs`, sinon la CI
+refuse l'écart.
+
+`npm run check` lance **`tools/check-icons.mjs`**, qui :
+
+1. compare les trois listes du projet au document officiel (les deux sens) ;
+2. relit **tout littéral `fa-…` du code**, quel que soit le contexte — pas seulement
+   `icon:` et `ic(…)`, car beaucoup d'icônes partent de fonctions maison comme
+   `line("fa-solid fa-xmark", …)` et échappaient au contrôle ;
+3. vérifie la **casse** des icônes ingame (`invisible` au lieu de `Invisible`) ;
+4. charge le vrai `safeIcon()` et exige qu'il rende **l'icône elle-même** pour chaque icône
+   du projet — c'est ce qui a attrapé l'alias `fa-solid fa-trash-can-can` (inexistant), qui
+   transformait `trash` en icône de secours ;
+5. contrôle les icônes des **boutons du PC** (listes blanches, touches uniques, `id` traité).
+
+Trois mutations vérifient que ces garde-fous mordent : une icône inexistante, un nom retiré de
+la liste blanche et une icône ingame en minuscules font tous tomber la CI. Le même script rend la sidebar avec une `api` simulée pour vérifier
 les **barres** (forme, ratio, couleur CSS, teinte verte/bleue) et le **budget** : voir
 « Barres de progression » plus bas.
 

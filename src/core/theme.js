@@ -192,37 +192,62 @@ export function themeColor(value) {
 
    Ajouter une icone = ajouter son nom ici, sinon elle restera invisible. */
 
+/* Icônes **ingame** de Bloxd (96) : elles s'écrivent avec des majuscules et
+   des espaces (« Jump Boost »), donc elles ne peuvent pas passer par les
+   tableaux de Font Awesome. Elles sont préférées aux icônes Font Awesome
+   (docs Bloxd : « Prefer Bloxd-native icons »). */
+const INGAME_NAMES = (
+    "Damage|Damage Reduction|Speed|VoidJump|Fist|Frozen|Hydrated|Invisible|Jump Boost|" +
+    "Poisoned|Slowness|Weakness|Health Regen|Healing Pulse|Haste|Double Jump|" +
+    "Heat Resistance|Gliding|Boating|Obsidian Boating|Riding|Bunny Hop|FallDamage|" +
+    "Feather Falling|Thief|X-Ray Vision|Mining Yield|Brain Rot|Rested Damage|Rested Haste|" +
+    "Rested Speed|Rested Farming Yield|Rested Aura|Blindness|Pickpocketer|Lifesteal|" +
+    "Bounciness|Air Walk|Wall Climbing|Thorns|Poopy|Glowing|Night Vision|Irradiated|" +
+    "Draugr Knight Head|Draugr Warper Head|Magma Golem Head|Mystery Fish|Damage Enchantment|" +
+    "Critical Damage Enchantment|Attack Speed Enchantment|Protection Enchantment|" +
+    "Health Enchantment|Health Regen Enchantment|Stomp Damage Enchantment|" +
+    "Knockback Resist Enchantment|Arrow Speed Enchantment|Arrow Damage Enchantment|" +
+    "Quick Charge Enchantment|Break Speed Enchantment|Momentum Enchantment|" +
+    "Mining Yield Enchantment|Farming Yield Enchantment|Mining Aura Enchantment|" +
+    "Digging Aura Enchantment|Lumber Aura Enchantment|Farming Aura Enchantment|" +
+    "Vertical Knockback Enchantment|Horizontal Knockback Enchantment|" +
+    "Firecracker Cooldown Enchantment|Firecracker Boost Enchantment|" +
+    "Gliding Speed Enchantment|Self Yield|Friends|Riding Speed|Feed Aura|Double Poop|" +
+    "Mob Slayer|Rainbow Wool|Pack Leader|Max Health|Poison Claws|Mob Yield|Antlers Bonus|" +
+    "Health|HealthShield|Cross|Friendship|Dotted Friendship|Hunger|Empty Hunger|" +
+    "Pixelated Heart|Question Mark|Trader Black|Trader Blue|Trader Piggy"
+).split("|").filter(Boolean);
+
 const FA_NAMES = (
     "add angle-double-up angle-down angle-up angles-up arrow-left arrow-up " +
     "arrow-up-right-from-square arrows arrows-h arrows-left-right arrows-rotate " +
-    "arrows-up-down-left-right award backpack bars bee bell block-question bolt " +
-    "boot calendar caret-down caret-up cart-shopping check chess-knight chess-rook " +
+    "arrows-up-down-left-right award backpack bars bee bell block-question bolt boot " +
+    "calendar caret-down caret-right caret-up cart-shopping check chess-knight chess-rook " +
     "child-reaching circle-check circle-info circle-plus circle-question circle-xmark " +
-    "clock-rotate-left cog coins comment-dots commenting compress computer-mouse " +
-    "cookie copy crosshairs crown cube cubes cut dice dizzy door-closed door-open " +
-    "download edit ellipsis ellipsis-h exclamation exclamation-triangle expand " +
-    "external-link eye eye-slash face-diagonal-mouth face-dizzy face-raised-eyebrow " +
-    "face-smile face-worried feather-alt feather-pointed file-alt file-clipboard " +
-    "file-lines file-text film fire fist-raised flag folder-image gauge-high gear " +
-    "gem globe hammer hand-back-point-up hand-fist hand-holding-medical " +
-    "hand-point-left hand-wave hands-clapping hat-santa hat-witch heart " +
-    "heart-music-camera-bolt history hourglass hourglass-clock hourglass-empty house " +
-    "icons image image-slash info-circle joystick layer-group left-from-bracket " +
-    "lightbulb list list-squares location-check location-xmark lock lock-open " +
-    "magnifying-glass male map-marker-check map-marker-times map-marker-xmark minus " +
-    "minus-square mouse music music-slash navicon palette pants party-horn paste " +
-    "pause pen pen-field pen-to-square person person-arrow-down-to-line " +
-    "person-arrow-up-from-line person-falling-burst person-military-pointing " +
-    "planet-ringed play plus plus-circle power-off ranking-star recycle redo-alt " +
-    "refresh right-from-bracket rocket-launch rotate-forward rotate-right scissors " +
-    "search shield shield-alt shield-blank shield-halved shirt shoe shopping-cart " +
-    "sign-out-alt skull smile snowflake sparkle square-dashed square-minus star " +
-    "star-christmas store subtract swords sync t-shirt tachometer-alt " +
-    "tachometer-alt-fast terminal trash-alt trash-can triangle-exclamation trophy " +
-    "tshirt up-from-bracket upload user user-astronaut user-check user-clock " +
-    "user-friends user-group user-group-crown user-minus user-plus user-slash " +
-    "user-unlock users-crown video video-camera volume volume-down volume-low " +
-    "volume-medium volume-slash warning wifi wifi-3 wifi-strong wrench x xmark zap"
+    "clock-rotate-left cog coins comment-dots commenting compress computer-mouse cookie " +
+    "copy crosshairs crown cube cubes cut dice dizzy door-closed door-open download edit " +
+    "ellipsis ellipsis-h exclamation exclamation-triangle expand external-link eye " +
+    "eye-slash face-diagonal-mouth face-dizzy face-raised-eyebrow face-smile face-worried " +
+    "feather-alt feather-pointed file-alt file-clipboard file-lines file-text film fire " +
+    "fist-raised flag folder folder-image folder-open gauge-high gear gem globe hammer " +
+    "hand-back-point-up hand-fist hand-holding-medical hand-point-left hand-wave " +
+    "hands-clapping hat-santa hat-witch heart heart-music-camera-bolt history hourglass " +
+    "hourglass-clock hourglass-empty house icons image image-slash info-circle joystick " +
+    "layer-group left-from-bracket lightbulb list list-squares location-check " +
+    "location-xmark lock lock-open magnifying-glass male map-marker-check map-marker-times " +
+    "map-marker-xmark minus minus-square moon mouse music music-slash navicon palette pants " +
+    "party-horn paste pause pen pen-field pen-to-square person person-arrow-down-to-line " +
+    "person-arrow-up-from-line person-falling-burst person-military-pointing planet-ringed " +
+    "play plus plus-circle power-off ranking-star recycle redo-alt refresh " +
+    "right-from-bracket rocket-launch rotate-forward rotate-right scissors search shield " +
+    "shield-alt shield-blank shield-halved shirt shoe shopping-cart sign-out-alt skull " +
+    "smile snowflake sparkle square-dashed square-minus star star-christmas store subtract " +
+    "sun-bright swords sync t-shirt tachometer-alt tachometer-alt-fast terminal trash-alt " +
+    "trash-can triangle-exclamation trophy tshirt up-from-bracket upload user " +
+    "user-astronaut user-check user-clock user-friends user-group user-group-crown " +
+    "user-minus user-plus user-slash user-unlock users-crown video video-camera volume " +
+    "volume-down volume-low volume-medium volume-slash warning wifi wifi-3 wifi-strong " +
+    "wrench x xmark zap"
 ).split(" ");
 
 const FA_BRANDS = (
@@ -232,6 +257,8 @@ const FA_BRANDS = (
 
 const FA_SET = {};
 for (let i = 0; i < FA_NAMES.length; i++) FA_SET[FA_NAMES[i]] = 1;
+const INGAME_BY_LOWER = {};
+for (let i = 0; i < INGAME_NAMES.length; i++) INGAME_BY_LOWER[INGAME_NAMES[i].toLowerCase()] = INGAME_NAMES[i];
 const BRAND_SET = {};
 for (let i = 0; i < FA_BRANDS.length; i++) BRAND_SET[FA_BRANDS[i]] = 1;
 
@@ -251,7 +278,7 @@ const ICON_ALIAS = {
     ban: "fa-solid fa-circle-xmark",
     anchor: "Boat",
     unlock: "fa-solid fa-lock-open",
-    trash: "fa-solid fa-trash-can-can",
+    trash: "fa-solid fa-trash-can",
     users: "fa-solid fa-user-group",
     clock: "fa-solid fa-hourglass",
     compass: "fa-solid fa-map-marker-check",
@@ -282,8 +309,13 @@ export function safeIcon(name) {
     const raw = name.trim();
     if (!raw) return ICON_FALLBACK;
 
-    /* Icone native Bloxd (item, bloc, icone ingame) : on n'y touche pas. */
+    /* Icone native Bloxd (item, bloc, icone ingame) : on n'y touche pas, mais
+       on remet la casse exacte d'une icone ingame — « invisible » ou
+       « jump boost » s'afficheraient en « ? » alors que « Invisible » et
+       « Jump Boost » existent. */
     if (raw.indexOf("fa-") !== 0) {
+        const ingame = INGAME_BY_LOWER[raw.toLowerCase()];
+        if (ingame) return ingame;
         const bare = raw.indexOf(" ") === -1 && raw === raw.toLowerCase();
         if (bare) return BARE_ALIAS[raw] || ICON_FALLBACK;
         return raw;
