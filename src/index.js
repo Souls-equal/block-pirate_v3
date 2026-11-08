@@ -1,5 +1,5 @@
 import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, syncMuteIndex as syncMuteIndex, updateNameTag as m } from "./core/team";
-import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
+import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilitySlot as slotAbility, removeAbilityItems as dropAbilityItems, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync, setTutorialLineLookup as bpSetTutorialLine } from "./core/UI"; 
@@ -10,13 +10,13 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { clearConfirm as bpClearConfirm, reconcileSP as _, setPurchaseHook as bpSetPurchaseHook } from "./utils/data";
+import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
-import { setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
+import { pickTarget as bpPickTarget, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { STAMINA_CONFIG as tt, isDashing as isDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { STAMINA_CONFIG as tt, DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, ensureDashItem as ensureDash, handleDashItemClick as dashItemClick, hasDashItem as hasDash, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
-import { forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht } from "./utils/lifeform";
+import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
 import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
@@ -177,7 +177,93 @@ ct((t, r, a) => {
         _t("killCredit.forgetDamager", t);
     }
     dt(r);
-}), onPlayerJoin = t => {St(t) //sphere
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMMANDES : clavier sur PC, items sur mobile (demande 75)
+
+   Un joueur ne peut pas passer de PC a mobile sans quitter le monde : on lit
+   donc api.isMobile UNE fois, au join, et on ne relit plus.
+
+   PC     : 6 boutons personnalises (customButtons). Q = dash, puis une touche
+            par capacite de fruit (Z X C V F). Les items de capacites sont
+            RETIRES de l'inventaire : ils ne servent plus a rien et
+            encombraient 5 slots.
+   MOBILE : pas de clavier, donc pas de boutons. Les items de capacites
+            restent, et un item « Snowdash » sert de dash (son effet par
+            defaut est annule dans onPlayerAltAction, voir plus bas).
+
+   Les keycodes sont ceux du clavier QWERTY ; Bloxd remappe tout seul pour un
+   AZERTY (c'est la meme touche physique).
+   ══════════════════════════════════════════════════════════════════════════ */
+const CONTROLS = [
+    { id: "dash", icon: "zap", keycode: "KeyQ", description: "Dash" },
+    { id: "ability1", icon: "fire", keycode: "KeyZ", description: "Devil Fruit ability 1" },
+    { id: "ability2", icon: "snowflake", keycode: "KeyX", description: "Devil Fruit ability 2" },
+    { id: "ability3", icon: "crosshairs", keycode: "KeyC", description: "Devil Fruit ability 3" },
+    { id: "ability4", icon: "swords", keycode: "KeyV", description: "Devil Fruit ability 4" },
+    { id: "ability5", icon: "gem", keycode: "KeyF", description: "Devil Fruit ability 5" },
+];
+
+function setupControls(playerId) {
+    let mobile = false;
+    try { mobile = api.isMobile(playerId) === true; } catch (e) { mobile = false; }
+    setPlayerDevice(playerId, mobile);
+    if (mobile) {
+        /* Pas de clavier : on nettoie d'eventuels boutons laisses par une
+           session PC, et on s'assure que l'item de dash est la. */
+        try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
+        ensureDash(playerId);
+        return true;
+    }
+    try { api.setClientOption(playerId, "customButtons", CONTROLS); } catch (e) {}
+    /* PC : le dash est sur Q et les capacites sur les touches, donc plus d'item
+       de dash ni d'items de capacites. */
+    dropDash(playerId);
+    dropAbilityItems(playerId);
+    return true;
+}
+
+/* Ce qu'un CLIC aurait donne : le bloc vise, le bloc a cet endroit, et la
+   creature devant le joueur. Une touche ne fournit aucune de ces valeurs, on
+   les reconstitue donc ici, une fois, pour les cinq touches de capacite. */
+function clickPoint(playerId) {
+    let pos = null, info = null;
+    try { pos = api.getPosition(playerId); } catch (e) { pos = null; }
+    try { info = facingInfoOf(playerId); } catch (e) { info = null; }
+    const dir = (info && info.dir) || [0, 0, 1];
+    const cam = (info && info.camPos) || (pos ? [pos[0], pos[1] + 1.45, pos[2]] : [0, 64, 0]);
+    let hit = null;
+    try { hit = aimBlockOf(playerId); } catch (e) { hit = null; }
+    const x = hit ? hit[0] : cam[0] + dir[0] * 8;
+    const y = hit ? hit[1] : cam[1] + dir[1] * 8;
+    const z = hit ? hit[2] : cam[2] + dir[2] * 8;
+    let block = "Air";
+    try { block = api.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)) || "Air"; } catch (e) {}
+    let target = null;
+    try { target = bpPickTarget(playerId, cam, dir, 40, 0.6); } catch (e) { target = null; }
+    return { x: x, y: y, z: z, block: block, target: target };
+}
+
+/* Bouton personnalise presse (PC). Mobile n'en a pas : la garde sur l'appareil
+   est la pour qu'un bouton residuel ne declenche rien d'inattendu. */
+onPlayerPressedButton = (playerId, buttonId) => {
+    if (!playerId || !buttonId) return;
+    if (buttonId === "dash") {
+        try { ot(playerId); } catch (e) { _t("button.dash", e); }
+        return;
+    }
+    const m = /^ability([1-5])$/.exec(buttonId);
+    if (!m) return;
+    const aim = clickPoint(playerId);
+    try {
+        slotAbility(playerId, Number(m[1]) - 1, false, aim.x, aim.y, aim.z, aim.block, aim.target);
+    } catch (e) {
+        _t("button.ability", e);
+    }
+};
+
+onPlayerJoin = t => {St(t) //sphere
     if (qt(t)) return;
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
@@ -193,6 +279,9 @@ ct((t, r, a) => {
     Gt("crew", () => o(t)), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)),
     Gt("rank", () => G(t)), Gt("sp", () => _(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
+    /* Apres les capacites : sur PC, on retire justement leurs items, et on pose
+       les touches (ou l'item de dash sur mobile). */
+    Gt("controls", () => setupControls(t)),
     /* Dernier : la variation decide de la position d'arrivee (spawn du lobby,
        position sauvegardee dans la mer, ou arrivee en attente). */
     Gt("variation", () => variationJoin(t)),
@@ -200,6 +289,9 @@ ct((t, r, a) => {
        fois que le joueur est a sa place (spawn du lobby ou de la mer). */
     Gt("tutorial", () => tutorialJoin(t));
 }, onPlayerLeave = t => {
+    /* L'appareil et les essais de donne d'item de dash ne survivent pas a la
+       session : le prochain join relit api.isMobile. */
+    try { clearPlayerDevice(t), clearDash(t); } catch (e) {}
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
     /* Chaque sortie est isolee : avant, une exception dans la premiere
@@ -233,6 +325,11 @@ ct((t, r, a) => {
     /* Zone neutre du lobby : aucune capacite (armement, fruit, style de
        combat, clic d'attaque). Le dialogue PNJ reste possible. */
     if (idInSafeZone(t) && !(m && isNPCEntity(m))) return void safeZoneBlocked(t);
+    /* Item de dash (mobile) : un clic suffit, et il ne fait rien d'autre (pas
+       de coup de poing a travers). */
+    let heldDash = null;
+    try { heldDash = api.getHeldItem(t); } catch (e) { heldDash = null; }
+    if (heldDash && heldDash.name === DASH_ITEM_Name) return void dashItemClick(t, heldDash.name);
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
     if (m && isNPCEntity(m)) {
@@ -288,7 +385,21 @@ ct((t, r, a) => {
     } catch (e) {
         m = null;
     }
-    return !m || 1 === m.type || api.getHeldItem(t) || api.isPlayerCrouching(t) || ot(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
+    /* L'item de dash (mobile). « Snowdash » propulse deja le joueur : on annule
+       cet effet par defaut avec preventAction, et on fait NOTRE dash (cout en
+       stamina, animation, verrou anti-coup de poing). Sur PC cet item est
+       retire ; un item residuel ne doit pas propulser non plus. */
+    let held = null;
+    try { held = api.getHeldItem(t); } catch (e) { held = null; }
+    const heldItem = held && held.name;
+    if (heldItem === DASH_ITEM_Name) {
+        if (isMobilePlayer(t)) dashItemClick(t, heldItem);
+        else dropDash(t);
+        return "preventAction";
+    }
+    /* Plus de dash sur l'action secondaire : sur PC c'est Q, sur mobile c'est
+       l'item. tryDash n'est donc plus appele ici. */
+    return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r) => {
     if (A(r)) return "preventDamage";
     if (idInSafeZone(r)) return "preventDamage";

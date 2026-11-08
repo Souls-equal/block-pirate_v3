@@ -407,3 +407,24 @@ export function reconcileSP(playerId) {
 
     return diff;
 }
+
+/* APPAREIL DU JOUEUR --------------------------------------------------------
+   Lu UNE seule fois, au join (api.isMobile) : un joueur ne peut pas passer de
+   PC a mobile sans quitter le monde, donc inutile de relire a chaque tick. Ce
+   drapeau decide des COMMANDES (touches sur PC, items sur mobile) et rien
+   d'autre : il ne touche ni l'inventaire du joueur ni ses statistiques. */
+const devices = {};
+
+export function setDevice(playerId, mobile) {
+    if (!playerId) return false;
+    devices[playerId] = mobile === true;
+    return devices[playerId];
+}
+
+export function isMobilePlayer(playerId) {
+    return devices[playerId] === true;
+}
+
+export function clearDevice(playerId) {
+    delete devices[playerId];
+}
