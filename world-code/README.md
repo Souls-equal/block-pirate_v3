@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 362 847 caracteres** (71 % de la limite de 512 000 du World Code, -54 % par rapport aux sources lisibles).
+**32 fichiers, 365 148 caracteres** (71 % de la limite de 512 000 du World Code, -54 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -34,14 +34,14 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `core/ranks.js` | 2 457 | 5 245 |
 | `core/team.js` | 15 715 | 44 138 |
 | `core/theme.js` | 16 954 | 37 720 |
-| `core/UI.js` | 13 202 | 38 087 |
+| `core/UI.js` | 14 594 | 41 150 |
 | `fruit/abilities.js` | 38 498 | 54 051 |
 | `fruit/fruitData.js` | 5 685 | 8 871 |
 | `fruit/func-abilities.js` | 23 532 | 39 745 |
-| `fruit/index.js` | 22 177 | 41 897 |
+| `fruit/index.js` | 22 178 | 41 901 |
 | `gameplay/codes.js` | 3 861 | 6 479 |
-| `gameplay/customItem.js` | 6 922 | 18 242 |
-| `gameplay/fightingStyles.js` | 19 824 | 43 026 |
+| `gameplay/customItem.js` | 7 029 | 18 533 |
+| `gameplay/fightingStyles.js` | 19 825 | 43 029 |
 | `gameplay/loot.js` | 1 889 | 6 593 |
 | `gameplay/NPCs.js` | 7 656 | 18 764 |
 | `gameplay/quest.js` | 10 068 | 22 718 |
@@ -51,10 +51,10 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/stats.js` | 4 605 | 10 486 |
 | `gameplay/tutorial.js` | 6 744 | 15 953 |
 | `gameplay/variations.js` | 6 376 | 20 732 |
-| `index.js` | 15 640 | 37 413 |
+| `index.js` | 15 903 | 38 711 |
 | `utils/boss.js` | 7 135 | 16 382 |
 | `utils/combat.js` | 14 910 | 45 831 |
-| `utils/data.js` | 5 675 | 14 679 |
+| `utils/data.js` | 6 212 | 16 614 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 5 214 | 13 122 |
 | `utils/killAttribution.js` | 2 138 | 6 816 |

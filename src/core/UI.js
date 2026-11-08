@@ -1,6 +1,6 @@
 // UI.js
 
-import { addStat, confirmAction, getStat, setStat, xpToNext } from "../utils/data";
+import { addStat, applyControls, confirmAction, getControlMode, isMobilePlayer, setControlMode, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
@@ -400,6 +400,7 @@ const SETTING_HIDE_COLOR = "#FCA5A5";
 const SETTING_SHOW_COLOR = "#86EFAC";
 const SETTING_RESPAWN_COLOR = "#FFD166";
 const SETTING_PROTECT_COLOR = "#4ADE80";
+const SETTING_CONTROLS_COLOR = "#93C5FD";
 /* Valeur affichee dans une liste vide : l'API veut au moins une option, et un
    libelle entre parentheses ne peut pas etre confondu avec une ile. */
 const EMPTY_CHOICE = "(nothing left)";
@@ -626,6 +627,36 @@ function createSettingsItems(playerId) {
         });
     } catch (e) {}
 
+    /* Choix des commandes (demande 77). Le mobile n'a pas de clavier : on ne lui
+       propose rien, il reste en « items » sans pouvoir en sortir. */
+    if (!isMobilePlayer(playerId)) {
+        const byButtons = getControlMode(playerId) === "buttons";
+        try {
+            api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_controls", {
+                image: byButtons ? "Swap Orb" : "Snowdash",
+                imageColour: SETTING_CONTROLS_COLOR,
+                canBuy: true,
+                cost: 0,
+                sortPriority: 30,
+                customTitle: [bold(byButtons ? "Controls [BUTTONS]" : "Controls [ITEMS]", SETTING_CONTROLS_COLOR)],
+                buyButtonText: [txt(byButtons ? "Use items" : "Use buttons", SETTING_CONTROLS_COLOR)],
+                description: [
+                    ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
+                    byButtons
+                        ? " Keyboard: Swap Orb and Void Net in your hand open the keys."
+                        : " Items: one item per ability, dash on right click.",
+                    bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), "#4ADE80"),
+                    txt(byButtons
+                        ? " — Q dash; Z X C V F abilities; Z X style attacks."
+                        : " — click an ability item to use it; right click to dash.", "#94A3B8"),
+                    txt(byButtons
+                        ? "\nSwitch back if you prefer items."
+                        : "\nSwitch if you prefer the keyboard.", "#888888"),
+                ],
+            });
+        } catch (e) {}
+    }
+
     try {
         api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_respawn", {
             image: "Moonstone Orb",
@@ -757,6 +788,31 @@ function setIslandShown(playerId, name, want) {
     return true;
 }
 
+/* Bascule ITEMS <-> BUTTONS. Les items de l'ancien mode sont retires et ceux
+   du nouveau donnes immediatement (data.applyControls -> index.js) : le joueur
+   n'a pas a se deconnecter pour voir le changement. */
+function toggleControlMode(playerId) {
+    if (isMobilePlayer(playerId)) {
+        settingsSay(playerId, [
+            ic("fa-solid fa-circle-info", "#94A3B8"),
+            txt(" Touch screens always use items: your dash is the Dash item.", "#94A3B8"),
+        ]);
+        return;
+    }
+    const byButtons = getControlMode(playerId) === "buttons";
+    const mode = setControlMode(playerId, byButtons ? "items" : "buttons");
+    applyControls(playerId);
+    createSettingsItems(playerId);
+    const buttons = mode === "buttons";
+    settingsSay(playerId, [
+        ic(buttons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
+        bold(buttons ? " Keyboard controls." : " Item controls.", SETTING_CONTROLS_COLOR),
+        txt(buttons
+            ? " Hold the Swap Orb for fruit keys, the Void Net for Fighting Style keys. Q is your dash."
+            : " One item per ability, and right click to dash.", "#94A3B8"),
+    ]);
+}
+
 function togglePvPProtection(playerId) {
     const want = !pvpProtectionEnabled(playerId);
     settingSet(playerId, "pvpProt", want);
@@ -846,6 +902,7 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         }
         case "set_respawn": settingsRespawn(playerId); return true;
         case "set_protect": togglePvPProtection(playerId); return true;
+        case "set_controls": toggleControlMode(playerId); return true;
         case "set_info": createSettingsItems(playerId); return true;
         default: break;
     }

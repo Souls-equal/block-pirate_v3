@@ -40,6 +40,12 @@ export const ITEM_LOOKS = {
        Ce sont de VRAIS items Bloxd, on ne change que ce que le joueur lit.
        Le nom reste « Swap Orb » / « Void Net » dans le code : c'est par lui que
        fruit/index et fightingStyles les reconnaissent, jamais par l'affichage. */
+    /* Mobile : l'item de dash. Son nom Bloxd (« Snowdash ») ne dit rien au
+       joueur, et il est le SEUL moyen de dasher sur un ecran tactile. */
+    "Snowdash": {
+        displayName: "Dash",
+        description: "Click to dash forward. It costs stamina and cannot be dropped.",
+    },
     "Swap Orb": {
         displayName: "Devil Fruit Orb",
         description: "Hold it in your hand to use your Devil Fruit abilities. It cannot be dropped or thrown.",

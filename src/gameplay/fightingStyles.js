@@ -34,7 +34,7 @@ import {
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { eachItemSlot } from "./customItem";
-import { cancelConfirm, confirmAction, getTotalMoney, isMobilePlayer, payMoney } from "../utils/data";
+import { cancelConfirm, confirmAction, getTotalMoney, payMoney, useItemControls } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, say, txt, bold, ic } from "../core/theme";
 
@@ -69,7 +69,7 @@ export function removeVoidNet(playerId) {
 export function ensureVoidNet(playerId) {
     if (!playerId) return false;
     const styleName = getFightingStyle(playerId);
-    if (isMobilePlayer(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
+    if (useItemControls(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
     return giveVoidNet(playerId);
 }
 
@@ -817,7 +817,7 @@ export function giveFightingStyleItems(playerId, styleName) {
     removeFightingStyleItems(playerId, styleName);
     /* PC : un seul item en main. Les deux items de capacite disparaissent, le
        filet les remplace et ouvre les deux touches (voir index.js). */
-    if (!isMobilePlayer(playerId)) return giveVoidNet(playerId);
+    if (!useItemControls(playerId)) return giveVoidNet(playerId);
     for (let i = 0; i < style.abilities.length; i++) {
         const ab = style.abilities[i];
         if (hasAbilityItem(playerId, ab)) continue;
