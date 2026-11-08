@@ -696,7 +696,7 @@ onPlayerStartChargingItem = (t, itemName) => {
        detruit le projectile et on rend l'item — il ne doit jamais pouvoir
        s'utiliser ni disparaitre. */
     if (isCommandItemName(r)) {
-        try { api.killLifeform(a); } catch (e) {}
+        try { api.deleteEntity(a); } catch (e) {}
         try { if (r === SWAP_ORB_Name) ensureSwap(t); else ensureNet(t); } catch (e) {}
         return;
     }
