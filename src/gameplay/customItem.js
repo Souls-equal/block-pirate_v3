@@ -36,6 +36,18 @@ export const ITEM_LOOKS = {
         displayName: "Armament Haki",
         description: "Click to arm or release your Armament Haki. It cannot be dropped.",
     },
+    /* Les deux items qui remplacent les items de capacite sur PC (demande 76).
+       Ce sont de VRAIS items Bloxd, on ne change que ce que le joueur lit.
+       Le nom reste « Swap Orb » / « Void Net » dans le code : c'est par lui que
+       fruit/index et fightingStyles les reconnaissent, jamais par l'affichage. */
+    "Swap Orb": {
+        displayName: "Devil Fruit Orb",
+        description: "Hold it in your hand to use your Devil Fruit abilities. It cannot be dropped or thrown.",
+    },
+    "Void Net": {
+        displayName: "Fighting Style Net",
+        description: "Hold it in your hand to punch and to use your Fighting Style attacks. It cannot be dropped or thrown.",
+    },
     /* Saber Quest : le butin du Mob Leader et la relique du mur. Ce sont de
        VRAIS items du jeu, on ne fait que changer ce que le joueur lit.
          - Gold Grit : un tas de pieces et de tresor, pas une ressource.

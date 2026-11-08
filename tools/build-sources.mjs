@@ -97,13 +97,21 @@ for (const file of files) {
 
 /* Contrôles : le jeu appelle ces points d'entrée par leur nom et les Code
    Blocks lisent ces globals. S'ils disparaissent, tout le monde est muet. */
-const entry = fs.readFileSync(path.join(OUT, "index.js"), "utf8");
+/* Le fichier COMPILE a l'instant, pas celui du disque : `world-code/` peut etre
+   en retard (c'est justement ce que ce script sert a corriger), et un point
+   d'entree tout neuf ferait alors echouer toutes les executions. */
+const fresh = outputs.find((o) => o.rel === "index.js");
+const entry = fresh ? fresh.code : fs.readFileSync(path.join(OUT, "index.js"), "utf8");
 const ENTRY_POINTS = [
   "onPlayerClick", "onPlayerClickUp", "onPlayerJoin", "onPlayerLeave", "onRespawnRequest",
   "onPlayerChat", "onEntityDeleted", "onEntityCollision", "onWorldAttemptSpawnMob",
   "onWorldAttemptDespawnMob", "onPlayerDamagingOtherPlayer", "onPlayerDamagingMob",
   "onAttemptKillPlayer", "onPlayerKilledOtherPlayer", "onPlayerKilledMob", "onMobDamagingPlayer",
   "onPlayerDropItem", "onPlayerBoughtShopItem", "onPlayerUsedThrowable",
+  /* Ajoutes par la demande 76 : ils bloquent les actions des deux items de
+     commande. S'ils disparaissent, les items redeviennent lancables. */
+  "onPlayerAttemptAltAction", "onPlayerStartChargingItem", "onPlayerPressedButton",
+  "onPlayerSelectInventorySlot",
   "tick", "onClose",
 ];
 for (const name of ENTRY_POINTS) {
