@@ -643,7 +643,7 @@ function createSettingsItems(playerId) {
                 description: [
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
                     byButtons
-                        ? " Keyboard: Swap Orb and Void Net in your hand open the keys."
+                        ? " Keyboard: Fruit Abilitiy Item and Fighting Style Ability in your hand open the keys."
                         : " Items: one item per ability, dash on right click.",
                     bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), "#4ADE80"),
                     txt(byButtons
@@ -808,7 +808,7 @@ function toggleControlMode(playerId) {
         ic(buttons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
         bold(buttons ? " Keyboard controls." : " Item controls.", SETTING_CONTROLS_COLOR),
         txt(buttons
-            ? " Hold the Swap Orb for fruit keys, the Void Net for Fighting Style keys. Q is your dash."
+            ? " Hold the Fruit Abilities Item for fruit keys, the Fighting Style Capacities Item for Fighting Style keys. Q is your dash."
             : " One item per ability, and right click to dash.", "#94A3B8"),
     ]);
 }
