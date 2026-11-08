@@ -161,6 +161,8 @@ let checked = 0;
 const errors = [];
 /* Tous les litteraux Font Awesome rencontres : rejoues dans safeIcon plus bas. */
 const LITERALS = new Set();
+/* Nombre de capacites classees : affiche dans le bilan. */
+let ATTACK_TYPE_COUNT = 0;
 
 /* ==========================================================================
    0. Les trois listes du projet doivent etre EXACTEMENT les listes officielles
@@ -516,6 +518,61 @@ if (!controlsMatch) {
 }
 
 /* ==========================================================================
+   3b. Icones des capacites de fruit (types d'attaque)
+   ==========================================================================
+   Les touches du PC affichent l'icone du TYPE d'une capacite (projectile,
+   rayon, zone...), pas une icone par capacite : 16 dessins au lieu de 152.
+   Deux erreurs silencieuses a attraper :
+     - un nom hors liste blanche -> « ? » sur le bouton ;
+     - une capacite sans type -> l'icone de secours, sans le dire.
+   `customButtons` attend un nom NU (`sparkle`), pas `fa-solid fa-sparkle`. */
+{
+    const abilitiesSrc = readFileSync(join(ROOT, "src/fruit/abilities.js"), "utf8");
+    const typesRe = /const ATTACK_TYPES = \{([\s\S]*?)\n\};/;
+    const typesMatch = typesRe.exec(abilitiesSrc);
+    if (!typesMatch) {
+        errors.push("src/fruit/abilities.js : table ATTACK_TYPES introuvable");
+    } else {
+        const seenType = new Set();
+        const reType = /(\d+):\s*\{\s*fa:\s*"([^"]+)"/g;
+        let tm;
+        while ((tm = reType.exec(typesMatch[1]))) {
+            checked++;
+            seenType.add(Number(tm[1]));
+            if (tm[2].indexOf("fa-") === 0) errors.push("type " + tm[1] + " : icone \"" + tm[2] + "\" — customButtons attend un nom NU");
+            else if (!fa.has(tm[2])) errors.push("type " + tm[1] + " : icone \"" + tm[2] + "\" absente de la liste blanche (elle s'afficherait « ? »)");
+        }
+        for (let t = 1; t <= 16; t++) if (!seenType.has(t)) errors.push("type d'attaque " + t + " manquant dans ATTACK_TYPES");
+
+        /* Chaque capacite citee par un fruit doit avoir un type. */
+        const tableAt = abilitiesSrc.indexOf("const FRUIT_ABILITY_TABLE = {");
+        const tableEnd = abilitiesSrc.indexOf("\n};", tableAt);
+        const used = new Set();
+        const reIds = /"([A-Za-z_][A-Za-z_0-9]*)"/g;
+        let im;
+        const tableBody = abilitiesSrc.slice(tableAt, tableEnd);
+        const reList = /\[([^\]]*)\]/g;
+        while ((im = reList.exec(tableBody))) {
+            let nm;
+            const re = new RegExp(reIds.source, "g");
+            while ((nm = re.exec(im[1]))) used.add(nm[1]);
+        }
+        const typeAt = abilitiesSrc.indexOf("const ABILITY_TYPE = {");
+        const typeEnd = abilitiesSrc.indexOf("\n};", typeAt);
+        const typed = new Set();
+        const reTyped = /"([A-Za-z_][A-Za-z_0-9]*)":\s*\d+/g;
+        let tm2;
+        while ((tm2 = reTyped.exec(abilitiesSrc.slice(typeAt, typeEnd)))) typed.add(tm2[1]);
+        checked += used.size;
+        const missing = [...used].filter((id) => !typed.has(id));
+        if (missing.length) errors.push("capacites sans type d'attaque (" + missing.length + ") : " + missing.join(", "));
+        const extra = [...typed].filter((id) => !used.has(id));
+        if (extra.length) errors.push("types declares pour des capacites inutilisees : " + extra.join(", "));
+        ATTACK_TYPE_COUNT = typed.size;
+    }
+}
+
+/* ==========================================================================
    4. Ce que safeIcon renvoie VRAIMENT
    ==========================================================================
    Le tableau de bord des icones ne suffit pas : c'est `safeIcon()` qui decide
@@ -560,3 +617,4 @@ if (unique.length) {
 console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.length + " sidebars + barres), tout est valide.");
 console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");
 console.log("  Boutons PC : dash " + entries.dash.length + " | capacites " + entries.ability.length + " | style " + entries.style.length + " (icones, touches, ids).");
+console.log("  Capacites classees : " + ATTACK_TYPE_COUNT + " (16 types d'attaque, icones verifiees).");

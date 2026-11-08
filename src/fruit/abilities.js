@@ -553,6 +553,92 @@ const FRUIT_ABILITY_TABLE = {
     Dragon:   ["boroBreath", "dragonTwister", "draconicAscent", "meteorShower", "predatorMark"],
 };
 
+/* ==========================================================================
+   ICONES DES CAPACITES — un « type d'attaque » par capacite
+
+   Le joueur voit cinq touches sans les lire : l'icone doit dire ce que fait la
+   touche. Une icone par capacite serait 152 dessins a maintenir ; on classe
+   donc chaque capacite dans un des 16 types ci-dessous, et l'icone du type
+   s'affiche sur le bouton (voir index.js, buttonsFor).
+
+   Toutes les icones sont Font Awesome, deja dans la liste blanche
+   (`FA_NAMES` de core/theme.js) : `npm run check` refuse un nom absent, et
+   refuse aussi une capacite oubliee dans ABILITY_TYPE.
+   ========================================================================== */
+const ATTACK_TYPES = {
+    1: { fa: "arrow-up-right-from-square", label: "Projectile" },
+    2: { fa: "sparkle", label: "Beam" },
+    3: { fa: "fire", label: "Explosion" },
+    4: { fa: "square-dashed", label: "Ground zone" },
+    5: { fa: "person-falling-burst", label: "Rush" },
+    6: { fa: "hand-fist", label: "Melee" },
+    7: { fa: "hand-point-left", label: "Grab" },
+    8: { fa: "hand-holding-medical", label: "Healing" },
+    9: { fa: "shield-halved", label: "Shield" },
+    10: { fa: "boot", label: "Buff" },
+    11: { fa: "feather-alt", label: "Flight" },
+    12: { fa: "user-plus", label: "Summon" },
+    13: { fa: "skull", label: "Trap" },
+    14: { fa: "arrows-rotate", label: "Teleport" },
+    15: { fa: "crown", label: "Ultimate" },
+    16: { fa: "bee", label: "Debuff" },
+};
+
+const ABILITY_TYPE = {
+    "avalancheBoulder": 1, "brickBat": 1, "clawRip": 1, "controlSlash": 1,
+    "desertSpada": 1, "dissonantWave": 1, "elasticPunch": 1, "featherBarrage": 1,
+    "fingerPistol": 1, "fireFist": 1, "foxFireOrbs": 1, "fruitShot": 1,
+    "gatlingBarrage": 1, "gravityBarrage": 1, "hollowBurst": 1, "hydraSerpent": 1,
+    "iceSpears": 1, "magmaHound": 1, "padCannon": 1, "portalRift": 1,
+    "prometheusSun": 1, "rocketBarrage": 1, "rocketLaunch": 1, "stringSlash": 1,
+    "thornVolley": 1, "twisterSlash": 1, "warpBarrage": 1, "whiteBlow": 1,
+    "windBlade": 1,
+    "boroBreath": 2, "chainLightning": 2, "crimsonBeam": 2, "gastilleBeam": 2,
+    "growingRay": 2, "judgmentBeam": 2, "meroArrow": 2,
+    "anvilDrop": 3, "cataclysm": 3, "combustionNova": 3, "counterShock": 3,
+    "crescendoFinale": 3, "darkLiberation": 3, "encoreBeat": 3, "extinctionQuake": 3,
+    "flamePillar": 3, "geyserBurst": 3, "meteorShower": 3, "painPulse": 3,
+    "permafrostSlam": 3, "quakeBubble": 3, "raigoCloud": 3, "sacredJewel": 3,
+    "seaTilt": 3, "seismicStomp": 3, "shatterfrost": 3, "soulScream": 3,
+    "spikeField": 3, "thunderGodAura": 3, "thunderStrike": 3, "twilightBeams": 3,
+    "ursusShock": 3,
+    "blackHole": 4, "controlDomain": 4, "domainOfSpeed": 4, "fissureLine": 4,
+    "frostfall": 4, "glacialAge": 4, "gravityWell": 4, "lavaJet": 4,
+    "magmaRings": 4, "quicksandPit": 4, "slaveArrowRain": 4, "smokeFog": 4,
+    "unstoppableDonuts": 4,
+    "bladeDash": 5, "bombDash": 5, "diamondTackle": 5, "feralMaul": 5,
+    "mammothStampede": 5, "mochiBuzzsaw": 5, "perfumeFemur": 5, "phoenixTalon": 5,
+    "spikeRoll": 5, "springCannon": 5, "trexBite": 5, "venomRoad": 5,
+    "bladeStorm": 6, "gearWhip": 6, "goldenPalm": 6, "meteoricRampage": 6,
+    "overheatWhip": 6, "spinBlade": 6, "tailSwipe": 6, "tailsSweep": 6,
+    "tuskGore": 6,
+    "blizzardTornado": 7, "controlShambles": 7, "dragonTwister": 7, "gravityGrab": 7,
+    "sandstorm": 7, "sirenHypnosis": 7, "smokeShroud": 7, "tomatoTether": 7,
+    "voidVortex": 7,
+    "crystalReco": 8, "heartCharm": 8, "petalRefrain": 8, "rebirthNova": 8,
+    "soulPocus": 8,
+    "bastionWall": 9, "damage_reduc": 9, "dharmaSanctuary": 9, "prismReflect": 9,
+    "repelStep": 9,
+    "bounce": 10, "phasing": 10,
+    "blueFlameWings": 11, "draconicAscent": 11, "falconDive": 11, "heavenlyImpact": 11,
+    "jumpBeacon": 11, "propellerFlight": 11, "skyWalkThread": 11,
+    "arcaneTurret": 12, "manifestGolem": 12, "zeusBolt": 12,
+    "fullPunch": 13, "landmineField": 13, "shadowBox": 13, "spectralPrison": 13,
+    "voidAnchor": 13, "webSnare": 13,
+    "dimensionalGate": 14, "doppelmanSwap": 14, "gammaKnife": 14, "lightFlashStep": 14,
+    "mirageDash": 14, "portalStep": 14, "voltStep": 14,
+    "concreteWheel": 15, "gravityDevastation": 15, "nineTailsCataclysm": 15, "shadowsAsgard": 15,
+    "sovereignDominion": 15, "tigerForm": 15, "venomDemon": 15,
+    "abominableRoar": 16, "gasRobe": 16, "predatorMark": 16, "predatorRoar": 16,
+    "toxicCloud": 16, "trunkTrumpet": 16,
+};
+
+/* Icone (nom NU, celui qu'attend customButtons) d'une capacite. */
+export function abilityIconName(abilityId) {
+    const type = ATTACK_TYPES[ABILITY_TYPE[abilityId]];
+    return type ? type.fa : "crosshairs";
+}
+
 /* L'item réel d'un fruit vient de fruitData : une seule source de vérité pour
    le nom tenu en main, donc impossible de désynchroniser les deux tables. */
 const FRUIT_BLOCKS = {};
@@ -629,6 +715,10 @@ for (const fruitName in FRUIT_ABILITY_TABLE) {
             }
         }))
     };
+    /* Ce que le PC affichera dans les touches : une icone par capacite (celle
+       de son type) et son nom en description. Rempli en meme temps que les
+       `attackN`, donc impossible de desynchroniser les deux. */
+    entry.buttons = binds.map(b => ({ icon: abilityIconName(b.id), name: b.name }));
     for (let i = 0; i < binds.length; i++) {
         const bind = binds[i];
         const attack = {
@@ -669,6 +759,14 @@ for (const fruitName in FRUIT_ABILITY_TABLE) {
         }
     }
     FRUIT_ABILITIES[fruitName] = entry;
+}
+
+/* Boutons du PC pour un fruit : [{ icon, name }], au plus 5. Aucun fruit ou
+   fruit inconnu = liste vide, donc aucune touche. */
+export function fruitButtons(fruitName) {
+    const entry = fruitName ? FRUIT_ABILITIES[fruitName] : null;
+    if (!entry || !Array.isArray(entry.buttons)) return [];
+    return entry.buttons.slice(0, 5);
 }
 
 export function hasFruitAbilities(fruitName) {

@@ -1,6 +1,6 @@
 import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, syncMuteIndex as syncMuteIndex, updateNameTag as m } from "./core/team";
 import { activateFruit as l, clearFruitCallbacks as s, fruitAbilityCount as fruitAbilityCount, getFruit as n, handleAbilitySlot as slotAbility, removeAbilityItems as dropAbilityItems, ensureSwapOrb as ensureSwap, removeSwapOrb as dropSwap, SWAP_ORB as SWAP_ORB_Name, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
-import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
+import { abilityCollision as b, abilityJoin as P, abilityLeave as k, fruitButtons as fruitButtonInfo, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync, setTutorialLineLookup as bpSetTutorialLine } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
@@ -224,8 +224,18 @@ function buttonsFor(playerId) {
     const list = CONTROLS.dash.slice();
     const held = heldName(playerId);
     if (held === SWAP_ORB_Name) {
-        const count = fruitAbilityCount(playerId);
-        for (let i = 0; i < count && i < CONTROLS.ability.length; i++) list.push(CONTROLS.ability[i]);
+        /* Une touche par capacite REELLE du fruit, avec l'icone de son type
+           d'attaque (fruit/abilities, ATTACK_TYPES) et son nom en description :
+           le joueur lit « Rocket Salvo » sur le bouton, pas « Ability 2 ». */
+        const info = fruitButtonInfo(n(playerId)).slice(0, fruitAbilityCount(playerId));
+        for (let i = 0; i < info.length && i < CONTROLS.ability.length; i++) {
+            list.push({
+                id: "ability" + (i + 1),
+                icon: info[i].icon || CONTROLS.ability[i].icon,
+                keycode: CONTROLS.ability[i].keycode,
+                description: info[i].name || CONTROLS.ability[i].description,
+            });
+        }
     } else if (held === VOID_NET_Name) {
         for (let i = 0; i < CONTROLS.style.length; i++) list.push(CONTROLS.style[i]);
     }
