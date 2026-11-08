@@ -41,12 +41,12 @@ export const ITEM_LOOKS = {
        Le nom reste « Swap Orb » / « Void Net » dans le code : c'est par lui que
        fruit/index et fightingStyles les reconnaissent, jamais par l'affichage. */
     "Swap Orb": {
-        displayName: "Devil Fruit Orb",
-        description: "Hold it in your hand to use your Devil Fruit abilities. It cannot be dropped or thrown.",
+        displayName: "Devil Fruit Abilities",
+        description: "Hold it in your hand to use your Devil Fruit abilities. It cannot be dropped.",
     },
     "Void Net": {
-        displayName: "Fighting Style Net",
-        description: "Hold it in your hand to punch and to use your Fighting Style attacks. It cannot be dropped or thrown.",
+        displayName: "Fighting Style Capacities",
+        description: "Hold it in your hand to punch and to use your Fighting Style attacks. It cannot be dropped.",
     },
     /* Saber Quest : le butin du Mob Leader et la relique du mur. Ce sont de
        VRAIS items du jeu, on ne fait que changer ce que le joueur lit.
