@@ -1917,6 +1917,33 @@ nom inventé. C'est ce qui décide de la liste envoyée à `customButtons` :
 Uncommon/Rare, 5 pour un Légendaire/Mythique (`fruitAbilityCount()`, qui compte
 les `attackN` de `FRUIT_ABILITIES`). Un fruit sans capacité n'ouvre rien.
 
+### Les deux items de commande ne servent QU'À ouvrir des touches
+
+`Swap Orb` et `Void Net` ne doivent jamais rien faire d'autre : ni se lancer, ni
+se poser, ni se charger, ni se lâcher. Un lancer les consomme et prive le joueur
+de ses touches. Ils sont donc bloqués sur **tous** les points d'entrée que
+Bloxd propose, du plus tôt au plus tard :
+
+| Callback | Retour | Ce qu'il empêche |
+|---|---|---|
+| `onPlayerAttemptAltAction` | `preventAction` | clic droit, **avant** la prédiction du client |
+| `onPlayerAltAction` | `preventAction` | clic droit, après coup (ceinture et bretelles) |
+| `onPlayerStartChargingItem` | `preventCharge` | lancer long / item chargé |
+| `onPlayerDropItem` | `preventDrop` | lâcher au sol |
+| `onPlayerChangeBlock` | `preventChange` | pose de l'item comme bloc |
+| `onPlayerClick` / `onPlayerClickUp` | `return` | coup de poing ou capacité lancés par l'item |
+
+`onPlayerUsedThrowable` **ne peut pas refuser** un lancer (son retour n'est pas
+lu). Si un projectile part quand même, ce callback sert de filet : il détruit le
+projectile (`killLifeform`) et **rend l'item** s'il a été consommé. Un joueur ne
+peut donc ni perdre ni utiliser l'orb par accident.
+
+Leurs noms affichés vivent dans `ITEM_LOOKS` (`gameplay/customItem.js`), comme
+tous les autres : **Devil Fruit Orb** (« hold it to use your Devil Fruit
+abilities ») et **Fighting Style Net** (« hold it to punch and to use your
+Fighting Style attacks »). Le code, lui, continue de les reconnaître par leur nom
+d'item réel (`Swap Orb`, `Void Net`), jamais par l'affichage.
+
 ### Une icône par type d'attaque
 
 Le joueur voit cinq touches sans les lire : l'icône doit dire ce que fait la

@@ -254,6 +254,19 @@ function applyButtons(playerId) {
     try { api.setClientOption(playerId, "customButtons", list); } catch (e) { _t("buttons", e); }
 }
 
+/* Les deux items de commande (PC). Ils ne SERVENT a rien d'autre qu'a ouvrir
+   des touches : tout ce que le jeu ferait d'eux (lancer, poser, manger,
+   echanger, charger, lacher) est donc bloque. Sans ca, un clic droit lance la
+   « Devil Fruit Orb » et la consomme. */
+function isCommandItemName(name) {
+    return name === SWAP_ORB_Name || name === VOID_NET_Name;
+}
+
+function heldCommandItem(playerId) {
+    const name = heldName(playerId);
+    return isCommandItemName(name) ? name : null;
+}
+
 /* L'appareil ne change qu'en quittant le monde : on le lit UNE fois, au tout
    debut du join (avant le fruit, qui donne des items differents selon lui). */
 function setupDevice(playerId) {
@@ -416,6 +429,9 @@ onPlayerSelectInventorySlot = (t, slot) => {
     if (heldDash && heldDash.name === DASH_ITEM_Name) return void dashItemClick(t, heldDash.name);
     /* Void Net (PC) : en main, le clic EST le coup de poing du style. Le filet
        n'est pas un item de capacite, donc aucun clic ne part ailleurs. */
+    /* Devil Fruit Orb : un clic ne doit RIEN lancer. On sort ici, avant le
+       style et les capacites, pour qu'il ne serve qu'a ouvrir les touches. */
+    if (heldCommandItem(t) === SWAP_ORB_Name) return;
     if (fsHoldingNet(t)) {
         if (!isDash(t)) try {
             fsM1(t, m, !0);
@@ -468,9 +484,19 @@ onPlayerSelectInventorySlot = (t, slot) => {
         }
     }
 }, onPlayerClickUp = (t, r, a, i, e, o, m) => {
+    /* Relachement d'un clic charge : un item de commande ne declenche rien. */
+    if (heldCommandItem(t)) return;
     u(t, r, a, i, e, o, m), f(t, r, a, i, e, o, m);
 }, onPlayerJump = t => {
     Gt("jump", () => d(t));
+}, /* Refus AVANT que le client ne predise l'action (clic droit, lancer, poser).
+     onPlayerAltAction arrive apres ; les deux sont la pour que l'ordre des
+     callbacks de Bloxd ne puisse pas rouvrir la porte. */
+onPlayerAttemptAltAction = (t, r, a, i, e, o) => {
+    if (heldCommandItem(t)) return "preventAction";
+}, /* Items a chargement (lancer long) : jamais charges. */
+onPlayerStartChargingItem = (t, itemName) => {
+    if (isCommandItemName(itemName)) return "preventCharge";
 }, onPlayerAltAction = (t, r, a, i, e, o) => {
     if (o && isNPCEntity(o)) return Zt(t, o);
     let m = null;
@@ -491,6 +517,8 @@ onPlayerSelectInventorySlot = (t, slot) => {
         else dropDash(t);
         return "preventAction";
     }
+    /* Clic droit sur un item de commande : rien du tout. */
+    if (isCommandItemName(heldItem)) return "preventAction";
     /* Plus de dash sur l'action secondaire : sur PC c'est Q, sur mobile c'est
        l'item. tryDash n'est donc plus appele ici. */
     return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
@@ -625,7 +653,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     "EPICOO00000" !== i && "K4miNoK4mi" !== i && "Yanick2010" !== i && Gt("crew", () => r(t, a));
 }, onPlayerChangeBlock = (t, r, a, i, e, o, m, l, s) => {
     const n = api.getEntityName(t);
-    if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) || fsItemName(o) ? "preventChange" : void 0;
+    if ("K4miNoK4mi" !== n && "Yanick2010" !== n) return e.includes("Trap") || C(o) || fsItemName(o) || isCommandItemName(o) ? "preventChange" : void 0;
 }, onPlayerDropItem = (t, r, a, i, e, o, m) => {
     /* Seuls les items uniques sont bloqués : perdus, ils ne reviennent pas
        tout seuls. Tout le reste peut tomber, y compris un fruit ramassé
@@ -635,13 +663,24 @@ onPlayerSelectInventorySlot = (t, slot) => {
        hkPod : le pod du Haki, affiché "Armament Haki". Perdu, il laisserait un
        joueur qui CONNAÎT le haki sans aucun moyen de l'armer. */
     const l = "string" == typeof e ? e : e?.name || e?.type;
-    return l && (C(l) || fsItemName(l) || spLocked(l) || hkPod(l)) ? "preventDrop" : void 0;
+    /* Les deux items de commande en font partie : perdus, le joueur n'a plus ni
+       touches de capacite ni attaques de style. */
+    return l && (C(l) || fsItemName(l) || spLocked(l) || hkPod(l) || isCommandItemName(l)) ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
     q(t, r, a, i, e), Z(t, r, a, i, e), jt(t, r, a, i, e), Gt("settings", () => bpSettingsShop(t, r, a, i, e));
 }, onPlayerUsedThrowable = (t, r, a) => {
     if (idInSafeZone(t)) return void safeZoneBlocked(t);
+    /* Filet de securite : l'API ne permet pas de refuser un lancer (le retour
+       de ce callback n'est pas lu). Si un item de commande part quand meme, on
+       detruit le projectile et on rend l'item — il ne doit jamais pouvoir
+       s'utiliser ni disparaitre. */
+    if (isCommandItemName(r)) {
+        try { api.killLifeform(a); } catch (e) {}
+        try { if (r === SWAP_ORB_Name) ensureSwap(t); else ensureNet(t); } catch (e) {}
+        return;
+    }
     Gt("throwable", () => v(t, r, a));
 }, onPlayerThrowableHitTerrain = (t, r, a) => {
     Gt("throwable", () => I(t, r, a));
