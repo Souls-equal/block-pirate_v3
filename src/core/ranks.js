@@ -113,7 +113,8 @@ export const STAFF = {
     "BLOXD_IO_YT_ZAY":"TESTER",
     "DlRECTOR":"TESTER",
     "Arthur":"ADMIN",
-    "Chillguy45":"TESTER"
+    "Chillguy45":"TESTER",
+    "ka2uya":"TESTER"
 };
 
 const playerRankCache = {};

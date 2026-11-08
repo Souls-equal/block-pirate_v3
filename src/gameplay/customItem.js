@@ -48,8 +48,8 @@ export const ITEM_LOOKS = {
         description: "Click to dash forward. It costs stamina and cannot be dropped.",
     },
     "Swap Orb": {
-        displayName: "Devil Fruit Abilities",
-        description: "Hold it in your hand to use your Devil Fruit abilities. It cannot be dropped.",
+        displayName: "Fruit Abilities",
+        description: "Hold it in your hand to use the powers of your Devil Fruit. It cannot be dropped.",
     },
     "Void Net": {
         displayName: "Fighting Style Capacities",

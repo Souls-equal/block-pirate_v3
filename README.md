@@ -746,7 +746,7 @@ ici créerait le cycle `customItem → data`).
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
 | `Snowdash` | **Dash** | le dash du mobile |
-| `Swap Orb` | **Devil Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
+| `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
 | `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
 | `Magmaward Fuel` | **Ancient Relic** | butin de la Saber Quest |
