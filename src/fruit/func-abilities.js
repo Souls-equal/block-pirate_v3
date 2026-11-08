@@ -399,36 +399,59 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     }
   }
 
-  function collect() {
-    const byIndex = {};
-    const errors = [];
-    let total = 0;
-    let oldFormat = 0;
+  /* Lecture des blocs PAR PETITS LOTS, un lot par tick.
 
-    for (let slot = 0; slot < SCAN_SLOTS; slot++) {
-      const found = readSlot(slot);
+     Les 8 blocs pèsent ~31 000 caractères chacun. Tout lire dans le même tick
+     fait tenir d'un coup en mémoire jusqu'à SCAN_SLOTS textes de 31 000
+     caractères (un ancien bloc resté en place suffit à doubler la facture), et
+     le bac à sable de Bloxd est étroit : c'est le genre de pic qui ressort en
+     « InternalError: out of memory » au chargement du monde. On ne lit donc que
+     SLOTS_PER_LOAD cases par passage, et un bloc en double n'est pas retenu. */
+  const SLOTS_PER_LOAD = 3;
+
+  function newScan() {
+    return { cursor: 0, byIndex: {}, errors: [], total: 0, oldFormat: 0 };
+  }
+
+  function collectStep(st) {
+    const end = Math.min(SCAN_SLOTS, st.cursor + SLOTS_PER_LOAD);
+    for (; st.cursor < end; st.cursor++) {
+      const found = readSlot(st.cursor);
       if (!found) continue; // ne s'arrête pas au premier trou
       const b = parseBlock(found.text);
       if (!b) {
-        oldFormat++;
+        st.oldFormat++;
         continue;
       }
       if (b.index < 1 || b.index > SCAN_SLOTS) {
-        errors.push(`pack ${b.index} hors bande (z=${found.z})`);
+        st.errors.push(`pack ${b.index} hors bande (z=${found.z})`);
         continue;
       }
-      total = Math.max(total, b.total, b.index);
-      if (byIndex[b.index]) errors.push(`pack ${b.index} en double (z=${found.z})`);
-      if (!b.ok) {
-        errors.push(
-          b.censored
-            ? `pack ${b.index} (z=${found.z}) CENSURÉ par Bloxd.io ("*****" détecté)`
-            : `pack ${b.index} (z=${found.z}) TRONQUÉ ou modifié : ${b.payload.length}/${b.len} car. (${b.hash})`,
-        );
+      st.total = Math.max(st.total, b.total, b.index);
+      if (st.byIndex[b.index]) {
+        /* Le premier trouvé gagne ; le texte du doublon est abandonné ici pour
+           ne pas le garder en mémoire jusqu'à l'évaluation. */
+        st.errors.push(`pack ${b.index} en double (z=${found.z}) ignoré`);
+        continue;
       }
-      byIndex[b.index] = { ...b, z: found.z };
+      parseInto(st, b, found.z);
     }
+    return st.cursor >= SCAN_SLOTS;
+  }
 
+  function parseInto(st, b, z) {
+    if (!b.ok) {
+      st.errors.push(
+        b.censored
+          ? `pack ${b.index} (z=${z}) CENSURÉ par Bloxd.io ("*****" détecté)`
+          : `pack ${b.index} (z=${z}) TRONQUÉ ou modifié : ${b.payload.length}/${b.len} car. (${b.hash})`,
+      );
+    }
+    st.byIndex[b.index] = { ...b, z: z };
+  }
+
+  function finishScan(st) {
+    const { byIndex, total, errors, oldFormat } = st;
     if (!total) {
       errors.push(`aucun Code Block ${MAGIC} trouvé vers (${origin().join(", ")}).`);
       if (oldFormat) errors.push(`${oldFormat} ancien(s) bloc(s) ignoré(s).`);
@@ -443,6 +466,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
 
   function evalPack(pack) {
     const before = new Set(Object.keys(FA.r));
+    const chars = pack.payload.length; // le payload est relâché juste après
     const parts = pack.payload.split(MARKER);
     let ok = 0;
     for (let i = 0; i < parts.length; i++) {
@@ -455,13 +479,17 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         FA.errors.push(`pack ${pack.index} module ${i + 1} : ${e?.message || e}`);
       }
     }
+    /* Pas la LISTE des handlers de chaque pack (197 noms = 5 000 caractères) :
+       `status()` doit rester assez petit pour que Bloxd accepte de le renvoyer
+       (« InternalError: Result too large » sinon). Le total est déjà dans
+       `status().registered`, le détail se lit avec FA.logStatus(). */
     FA.packInfo.push({
       index: pack.index,
       z: pack.z,
       modules: parts.length,
       evaluated: ok,
-      chars: pack.payload.length,
-      handlers: Object.keys(FA.r).filter((k) => !before.has(k)),
+      chars: chars,
+      handlers: Object.keys(FA.r).filter((k) => !before.has(k)).length,
     });
   }
 
@@ -469,15 +497,24 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   let booted = false;
   let lastLoad = 0;
   let retries = 0;
+  /* Balayage en cours : il survit d'un tick à l'autre (cf. SLOTS_PER_LOAD). */
+  let scan = null;
 
   function load(force) {
     if (!alive() || loading) return;
     loading = true;
     try {
-      // Sondage du chunk ce tick : si la lecture synchro ci-dessous échoue
-      // (chunk froid), le retry du tick suivant lira un chunk déjà chargé.
-      warmup();
-      const { byIndex, total, errors } = collect();
+      // Sondage du chunk au début d'un balayage : si la lecture synchro
+      // échoue (chunk froid), le retry du tick suivant lira un chunk chargé.
+      if (!scan) warmup();
+      if (!scan) scan = newScan();
+      if (!collectStep(scan)) {
+        // Lot suivant au prochain tick : le pic mémoire reste borné.
+        schedule(() => alive() && load(false), 1);
+        return;
+      }
+      const { byIndex, total, errors } = finishScan(scan);
+      scan = null;
       FA.errors = errors.slice();
       for (const e of FA.errors) say("[FA] " + e);
 
@@ -496,6 +533,10 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         FA.packInfo = [];
         FA.errors = errors.slice();
         for (const pack of packs) if (alive()) evalPack(pack);
+        /* Les payloads ne servent plus : on les relâche (8 x ~31 000
+           caractères) pour rendre la mémoire au bac à sable. */
+        for (const pack of packs) pack.payload = "";
+        for (const k in byIndex) byIndex[k].payload = "";
         FA.sourceHash = cacheKey;
       }
 
@@ -551,6 +592,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         // Les 2 premiers essais sont rapprochés (2 ticks) pour profiter du
         // warmup de ce tick ; ensuite on repasse à 10 ticks pour ne pas spammer.
         const delay = retries <= 2 ? 2 : 10;
+        scan = null; // un chunk froid a pu rendre des cases illisibles : on relit
         schedule(() => alive() && load(false), delay);
       } else if (FA.ready) {
         retries = 0;
@@ -578,7 +620,18 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     return true;
   }
 
-  function status() {
+  /* `status()` doit être PETIT : Bloxd refuse de renvoyer un objet trop gros
+     (« InternalError: Result too large »), et un diagnostic qu'on ne peut pas
+     lire ne sert à rien. On garde donc des compteurs, le détail des manquants
+     est plafonné — `status(true)` le donne en entier pour un test hors jeu — et
+     les longues listes s'affichent par `logStatus()`, qui passe par api.log. */
+  const MAX_NAMES = 12;
+  const MAX_ERRORS = 5;
+  const MAX_CHARS = 90;
+  const cut = (s) => (String(s).length > MAX_CHARS ? String(s).slice(0, MAX_CHARS - 1) + "~" : String(s));
+
+  function status(detail) {
+    const missing = expected.filter((n) => typeof FA.r[n] !== "function");
     return {
       generation,
       alive: alive(),
@@ -586,12 +639,15 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       origin: origin().join(", "),
       packCount: FA.packInfo.length,
       release: FA.release,
-      stale: FA.stale.slice(),
-      packs: FA.packInfo,
+      /* Le z suffit à retrouver le bloc à recoller : on ne renvoie que lui
+         (la chaîne `release` ferait doublon avec `status().release`). */
+      stale: FA.stale.slice(0, 4).map((s) => ({ index: s.index, z: s.z })),
       registered: Object.keys(FA.r).length,
       expected: expected.length,
-      missing: expected.filter((n) => typeof FA.r[n] !== "function"),
-      errors: FA.errors.slice(),
+      missingCount: missing.length,
+      missing: detail ? missing : missing.slice(0, MAX_NAMES),
+      errors: FA.errors.slice(0, MAX_ERRORS).map(cut),
+      errorCount: FA.errors.length,
       sourceHash: FA.sourceHash,
     };
   }

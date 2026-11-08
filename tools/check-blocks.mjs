@@ -260,7 +260,12 @@ function makeApi(map, logs) {
       log: (m) => logs.push(String(m)),
       now: () => Date.now(),
       getBlock: (x, y, z) => (map.has(z) ? "Code Block" : "Air"),
-      getBlockData: (x, y, z) => ({ persisted: { shared: { text: map.get(z) } } }),
+      getBlockData: (x, y, z) => {
+        const t = clock.now();
+        readStats.perTick[t] = (readStats.perTick[t] || 0) + 1;
+        readStats.total++;
+        return { persisted: { shared: { text: map.get(z) } } };
+      },
       getEntityType: () => "Player",
       getHealth: () => 20,
       getPlayerIds: () => ["p1", "p2"],
@@ -269,6 +274,57 @@ function makeApi(map, logs) {
     { get: (t, k) => (k in t ? t[k] : noop) },
   );
 }
+/* Horloge À FIL: le chargeur lit les blocs par petits lots (SLOTS_PER_LOAD,
+   cf. func-abilities.js) et se rappelle au tick suivant. Un `setTimeout`
+   noop ne le laisserait donc jamais finir : on tient une vraie file et on la
+   vide dans `runScenario`. */
+function makeClock() {
+  let time = 0;
+  const queue = [];
+  return {
+    queue,
+    now: () => time,
+    setTimeout(fn, ticks) {
+      const entry = { at: time + Math.max(0, ticks | 0), fn };
+      queue.push(entry);
+      return { stop: () => { const i = queue.indexOf(entry); if (i >= 0) queue.splice(i, 1); } };
+    },
+    step(n = 1) {
+      for (let i = 0; i < n; i++) {
+        time++;
+        const due = queue.filter((e) => e.at <= time);
+        for (const e of due) {
+          const j = queue.indexOf(e);
+          if (j >= 0) queue.splice(j, 1);
+          try { e.fn(); } catch (_) {}
+        }
+      }
+    },
+    /* Vide la file jusqu'à ce que le chargeur soit pret (ou max ticks). */
+    drain(isDone, max = 400) {
+      let n = 0;
+      while (queue.length && n++ < max) {
+        this.step(1);
+        if (isDone && isDone()) break;
+      }
+      return n;
+    },
+  };
+}
+
+const clock = makeClock();
+
+/* Combien de blocs on LIT vraiment (getBlockData), et a quel tick : c'est la
+   mesure du pic memoire du chargement. `warmup()` ne compte pas (il ne lit que
+   le TYPE des cases, une chaine vide). */
+const readStats = { total: 0, perTick: {} };
+let STATUS_SIZE = 0;
+let STATUS_SIZE_BROKEN = 0;
+function resetReads() {
+  readStats.total = 0;
+  readStats.perTick = {};
+}
+
 function makeHelpers(api) {
   return new Proxy(
     {
@@ -298,7 +354,7 @@ function makeHelpers(api) {
       run: noop,
       sleep: () => ({}),
       setInterval: () => ({ stop: noop }),
-      setTimeout: () => ({ stop: noop }),
+      setTimeout: (fn, ticks) => clock.setTimeout(fn, ticks),
     },
     { get: (t, k) => (k in t ? t[k] : noop) },
   );
@@ -321,6 +377,7 @@ const { createBlockLoader } = await import(
 );
 
 function runScenario(map, label, tune = () => {}) {
+  resetReads();
   for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"])
     delete globalThis[k];
   const logs = [];
@@ -334,7 +391,15 @@ function runScenario(map, label, tune = () => {}) {
     log: (m) => logs.push(String(m)),
   });
   loader.boot();
-  return { status: loader.status(), logs, loader, api };
+  const ticks = clock.drain(() => loader.status().ready || clock.queue.length === 0);
+  /* Les timers des packs (capacites programmees) ne doivent pas deborder sur
+     le scenario suivant : on repart d'une file vide, mais on GARDE l'horloge
+     pour que ses ticks s'additionnent d'un scenario a l'autre. */
+  clock.queue.length = 0;
+  const status = loader.status();
+  status.ticks = ticks;
+  status.reads = 0;
+  return { status, logs, loader, api, ticks };
 }
 
 const base = runScenario(texts, "tous les packs", (helpers) => {
@@ -349,6 +414,55 @@ check(base.status.ready === true, `chargeur non prêt : ${JSON.stringify(base.st
 check(base.status.packCount === manifest.packCount, `packs chargés ${base.status.packCount}`);
 check(base.status.missing.length === 0, `handlers manquants : ${base.status.missing.join(", ")}`);
 check(base.status.errors.length === 0, `erreurs : ${base.status.errors.join(" | ")}`);
+
+// --- Chargement borné : ce qui évite « InternalError: out of memory » -------
+// Les blocs pèsent ~31 000 caractères chacun. Si le chargeur lisait les 24
+// cases d'un coup, il tiendrait jusqu'à 750 000 caractères en mémoire dans un
+// seul tick, et le bac à sable de Bloxd rend la main par une erreur mémoire.
+// Il lit donc SLOTS_PER_LOAD cases par tick : on vérifie la borne ici.
+const SLOTS_PER_LOAD = 3;
+const readsPerTick = Object.values(readStats.perTick);
+const peakReads = readsPerTick.length ? Math.max(...readsPerTick) : 0;
+check(
+  peakReads <= SLOTS_PER_LOAD,
+  `le chargeur lit ${peakReads} blocs dans le même tick (max ${SLOTS_PER_LOAD})`,
+);
+check(
+  readStats.total === manifest.packCount,
+  `${readStats.total} lectures de blocs pour ${manifest.packCount} packs (un bloc lu une seule fois)`,
+);
+check(base.status.ticks > 1, `chargement en un seul tick : le découpage ne sert à rien`);
+
+// Le diagnostic doit être RENVOYABLE par le moteur : au-delà de ~1 200
+// caractères, Bloxd répond « InternalError: Result too large » et le joueur ne
+// peut plus rien nous dire de son état.
+const statusSize = JSON.stringify(base.status).length;
+STATUS_SIZE = statusSize;
+check(statusSize <= 1200, `FA.status() pèse ${statusSize} caractères : le moteur refusera de le renvoyer`);
+check(
+  typeof base.status.packs === "undefined",
+  "FA.status() renvoie encore le détail complet des packs",
+);
+check(
+  globalThis.FA.packInfo.every((p) => typeof p.handlers === "number"),
+  "FA.packInfo garde la liste des handlers de chaque pack (5 000 caractères inutiles)",
+);
+const payloadKept = globalThis.FA.packInfo.reduce((n, p) => n + (p.payload ? p.payload.length : 0), 0);
+check(payloadKept === 0, `${payloadKept} caractères de payload encore retenus après évaluation`);
+
+// --- Un ancien bloc resté en place à côté des nouveaux ----------------------
+// Cas réel : le joueur recolle les 8 blocs sans enlever les précédents. Le
+// doublon doit être signalé, NON retenu et NON réévalué.
+const dupMap = new Map(texts);
+const DUP_Z = manifest.origin.z + 20;
+dupMap.set(DUP_Z, texts.get(manifest.origin.z));
+const dup = runScenario(dupMap, "bloc en double");
+check(dup.status.packCount === manifest.packCount, `doublon compté comme pack : ${dup.status.packCount}`);
+check(
+  dup.logs.some((l) => /en double/.test(l) && /ignor/.test(l)),
+  `doublon non signalé (logs : ${dup.logs.join(" | ")})`,
+);
+check(dup.status.missing.length === 0, `handlers perdus à cause du doublon : ${dup.status.missing.join(", ")}`);
 
 const FRUIT_HANDLERS = HANDLER_NAMES.filter((n) => /^onPlayerClick|^onPlayerLeave|^onCancel/.test(n));
 for (const name of FRUIT_HANDLERS) {
@@ -380,6 +494,12 @@ const stalePacks = new Map(texts);
   stalePacks.set(STALE_Z, makeBlock(b.index, b.total, payload, "deadbeef"));
 }
 const stale = runScenario(stalePacks, "un bloc d'une autre version");
+/* Le pire cas : 4 handlers manquants + 1 bloc périmé + des erreurs. C'est
+   CELUI-LÀ qui doit rester renvoyable — un status() court en marche normale ne
+   prouve rien. */
+const staleSize = JSON.stringify(stale.status).length;
+check(staleSize <= 1200, `FA.status() en panne pèse ${staleSize} caractères (moteur : « Result too large »)`);
+STATUS_SIZE_BROKEN = staleSize;
 check(
   stale.status.stale.length === 1 && stale.status.stale[0].z === STALE_Z,
   `bloc d'une autre version non détecté : ${JSON.stringify(stale.status.stale)}`,
@@ -575,7 +695,7 @@ for (const typeKnown of [false, true]) {
   check(env.probes() >= 16, `[${label}] warmup absent à la création (${env.probes()} sondes)`);
   coldLoader.boot();
   check(coldLoader.status().ready === false, `[${label}] prêt à tort sur chunk froid`);
-  env.step(6);
+  env.step(20); // 24 cases lues par lots de 3, plus le boot
   const s = coldLoader.status();
   check(s.ready === true, `[${label}] jamais prêt après chargement : ${JSON.stringify(s.errors)}`);
   check(s.packCount === manifest.packCount, `[${label}] ${s.packCount}/${manifest.packCount} packs`);
@@ -583,6 +703,10 @@ for (const typeKnown of [false, true]) {
   coldResults.push(`${label}: prêt=${s.ready} (${env.probes()} sondes)`);
 }
 
+console.log(
+  `FA.status() : ${STATUS_SIZE} car. (${STATUS_SIZE_BROKEN} en panne ; le moteur ` +
+    `refuse les gros objets), au plus ${SLOTS_PER_LOAD} blocs lus par tick.`,
+);
 console.log(
   `${manifest.packCount} packs, ${manifest.packedChars} car., ` +
     `${HANDLER_NAMES.length} handlers vérifiés (dont ${FRUIT_HANDLERS.length} Control/Gravity).`,
