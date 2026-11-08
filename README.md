@@ -1917,6 +1917,29 @@ nom inventé. C'est ce qui décide de la liste envoyée à `customButtons` :
 Uncommon/Rare, 5 pour un Légendaire/Mythique (`fruitAbilityCount()`, qui compte
 les `attackN` de `FRUIT_ABILITIES`). Un fruit sans capacité n'ouvre rien.
 
+### Une icône par type d'attaque
+
+Le joueur voit cinq touches sans les lire : l'icône doit dire ce que fait la
+touche. Une icône par capacité serait 152 dessins à maintenir, donc chaque
+capacité est classée dans **un des 16 types** ci-dessous (`ATTACK_TYPES` et
+`ABILITY_TYPE` dans `fruit/abilities.js`), et le bouton porte l'icône de son
+type **et le nom de la capacité** en description.
+
+| # | Type | Icône | # | Type | Icône |
+|---|---|---|---|---|---|
+| 1 | Projectile | `arrow-up-right-from-square` | 9 | Bouclier | `shield-halved` |
+| 2 | Rayon | `sparkle` | 10 | Buff | `boot` |
+| 3 | Explosion | `fire` | 11 | Vol | `feather-alt` |
+| 4 | Zone au sol | `square-dashed` | 12 | Invocation | `user-plus` |
+| 5 | Élan | `person-falling-burst` | 13 | Piège | `skull` |
+| 6 | Corps à corps | `hand-fist` | 14 | Téléportation | `arrows-rotate` |
+| 7 | Saisie | `hand-point-left` | 15 | Ultime | `crown` |
+| 8 | Soin | `hand-holding-medical` | 16 | Malus | `bee` |
+
+Classer une nouvelle capacité = lui donner un type dans `ABILITY_TYPE`. Sans
+type, `abilityIconName()` renvoie l'icône de secours — et `npm run check` refuse
+la capacité non classée, comme il refuse une icône absente de la liste blanche.
+
 Les `keycode` envoyés sont ceux d'un clavier QWERTY (`KeyQ`, `KeyZ`…) : Bloxd
 les remappe seul sur un AZERTY, c'est la même touche physique. `ability` et
 `style` partagent `Z`/`X` **à dessein** : une seule main à la fois, donc les
