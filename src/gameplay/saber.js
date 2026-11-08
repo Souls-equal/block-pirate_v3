@@ -75,12 +75,11 @@ const ITEM_CUP = "Bucket";
 
 const ITEM_CUP_FULL = "Water Bucket";
 
+/* Nom affiche de la Cup pleine : il vit dans ITEM_LOOKS (gameplay/customItem),
+   cle "Water Bucket", avec sa description. On ne le repete donc plus ici, et
+   surtout on ne le passe plus au give : un item renomme a la main perd son nom
+   des qu'il change de case (drop, reprise, Code Block). */
 const CUP_FULL = "Cup of Water";
-
-const CUP_FULL_ATTRS = {
-    customDisplayName: CUP_FULL,
-    customDescription: "A cup full of fresh water. Someone must be thirsty.",
-};
 
 /* Gold Grit et Magmaward Fuel sont de VRAIS items du jeu (ajoutes
    recemment) : on les donne par leur nom, sans renommage ni attributs. */
@@ -840,10 +839,7 @@ function burnCurtain(playerId) {
    mort, filtre d'inventaire). Ce n'est PAS le chemin normal du remplissage. */
 function giveFullCup(playerId) {
     try {
-        api.giveItem(playerId, ITEM_CUP_FULL, 1, {
-            customDisplayName: CUP_FULL_ATTRS.customDisplayName,
-            customDescription: CUP_FULL_ATTRS.customDescription,
-        });
+        api.giveItem(playerId, ITEM_CUP_FULL, 1);
         return true;
     } catch (e) { return false; }
 }
@@ -907,10 +903,9 @@ function fillCup(playerId) {
        rend la pile restante (jamais dupliquee : le slot est d'abord reecrit). */
     const holder = slotsOf(playerId, ITEM_CUP)[0];
     const rest = Math.max(0, (holder.amount | 0) - 1);
-    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1, {
-        customDisplayName: CUP_FULL_ATTRS.customDisplayName,
-        customDescription: CUP_FULL_ATTRS.customDescription,
-    });
+    /* Aucun attribut de nom : l'item reste "Water Bucket", et c'est
+       ITEM_LOOKS qui l'affiche "Cup of Water" pour tout le monde. */
+    const ok = writeItem(playerId, holder.where, holder.slot, ITEM_CUP_FULL, 1);
     if (!ok) {
         say(playerId, line("fa-solid fa-xmark", C.DANGER, "Your Cup will not stay in your hands. Try again."));
         return true;

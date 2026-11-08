@@ -163,6 +163,8 @@ const errors = [];
 const LITERALS = new Set();
 /* Nombre de capacites classees : affiche dans le bilan. */
 let ATTACK_TYPE_COUNT = 0;
+/* Nombre de noms d'items declares : affiche dans le bilan. */
+let ITEM_LOOKS_COUNT = 0;
 
 /* ==========================================================================
    0. Les trois listes du projet doivent etre EXACTEMENT les listes officielles
@@ -573,6 +575,61 @@ if (!controlsMatch) {
 }
 
 /* ==========================================================================
+   3c. Noms et descriptions des items : une seule source, jamais au give
+   ==========================================================================
+   Regle du projet (demande 63) : TOUT nom et TOUTE description d'item vivent
+   dans ITEM_LOOKS (gameplay/customItem.js), poses au join par setItemStat. Un
+   nom passe au moment du give (customDisplayName) se perd des que l'item change
+   de case, et le joueur retombe sur le nom brut de Bloxd
+   (« White Seeking Paintball Explosive Item »).
+
+   Trois choses sont donc verifiees :
+     - chaque entree a un nom ET une description non vides ;
+     - le nom affiche n'est jamais le nom d'item du code (« Swap Orb ») ;
+     - aucun item de ITEM_LOOKS n'est renomme au give quelque part dans src/. */
+{
+    const itemSrc = readFileSync(join(ROOT, "src/gameplay/customItem.js"), "utf8");
+    const looksAt = itemSrc.indexOf("export const ITEM_LOOKS = {");
+    const looksEnd = itemSrc.indexOf("\n};", looksAt);
+    if (looksAt < 0) {
+        errors.push("customItem.js : table ITEM_LOOKS introuvable");
+    } else {
+        const looks = new Set();
+        const reEntry = /"([^"]+)"\s*:\s*\{([^{}]*)\}/g;
+        let em;
+        const body = itemSrc.slice(looksAt, looksEnd);
+        while ((em = reEntry.exec(body))) {
+            const key = em[1];
+            const entry = em[2];
+            looks.add(key);
+            checked++;
+            const shown = /displayName:\s*"([^"]*)"/.exec(entry);
+            const desc = /description:\s*"([^"]*)"/.exec(entry);
+            if (!shown || !shown[1].trim()) errors.push("ITEM_LOOKS \"" + key + "\" : nom affiche vide");
+            else if (shown[1] === key) errors.push("ITEM_LOOKS \"" + key + "\" : le nom affiche est le nom du code");
+            if (!desc || !desc[1].trim()) errors.push("ITEM_LOOKS \"" + key + "\" : description vide");
+        }
+        ITEM_LOOKS_COUNT = looks.size;
+
+        /* Aucun renommage au give sur un item qui a deja son nom dans la table :
+           giveItem(pid, "Swap Orb", n, { customDisplayName: … }) est interdit. */
+        const CALLS = /\b(giveItem|createItemDrop|writeItem|buyItem)\(\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?"([^"]+)"/g;
+        for (const file of files) {
+            const src = readFileSync(file, "utf8");
+            const where = relative(ROOT, file);
+            let m;
+            while ((m = CALLS.exec(src))) {
+                if (!looks.has(m[2])) continue;
+                const window = src.slice(m.index, m.index + 400);
+                if (window.indexOf("customDisplayName") === -1 && window.indexOf("customDescription") === -1) continue;
+                checked++;
+                errors.push(where + " : \"" + m[2] + "\" est renomme au give — son nom et sa description doivent venir de ITEM_LOOKS (customItem.js)");
+            }
+        }
+    }
+}
+
+/* ==========================================================================
    4. Ce que safeIcon renvoie VRAIMENT
    ==========================================================================
    Le tableau de bord des icones ne suffit pas : c'est `safeIcon()` qui decide
@@ -618,3 +675,4 @@ console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.
 console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");
 console.log("  Boutons PC : dash " + entries.dash.length + " | capacites " + entries.ability.length + " | style " + entries.style.length + " (icones, touches, ids).");
 console.log("  Capacites classees : " + ATTACK_TYPE_COUNT + " (16 types d'attaque, icones verifiees).");
+console.log("  Noms d'items : " + ITEM_LOOKS_COUNT + " (nom + description, aucun renommage au give).");

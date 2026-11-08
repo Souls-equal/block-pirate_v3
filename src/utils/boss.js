@@ -21,7 +21,7 @@ const CFG = {
   GUARD_FIRST: 80,
   GUARD_EVERY: 900,
   LOOT_ITEM: "Black Carpet",
-  LOOT_NAME: "Haki fragment",
+  LOOT_NAME: "Haki Fragment",
 };
 
 // state
@@ -209,9 +209,9 @@ function isOurs(id) {
 
 function dropHaki(at) {
   if (!at) return;
-  api.createItemDrop(at[0], at[1], at[2], CFG.LOOT_ITEM, 1, false, {
-    customDisplayName: CFG.LOOT_NAME,
-  });
+  /* Le nom affiche vient de ITEM_LOOKS ("Black Carpet" -> "Haki Fragment") :
+     rien a passer ici, sinon le nom se perd des que l'item change de case. */
+  api.createItemDrop(at[0], at[1], at[2], CFG.LOOT_ITEM, 1, false);
 }
 
 function stopLoops() {

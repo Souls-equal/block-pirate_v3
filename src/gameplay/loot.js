@@ -45,7 +45,7 @@ const LOOT_EXTRA = [
     /* Le fragment de haki de Garp : il en lache deja un a coup sur, celui-ci
        est un extra. Il se revend au Haki Buyer, donc il ne reste jamais mort
        dans un inventaire. */
-    { item: "Black Carpet", label: "Haki fragment", weight: 10, ranks: [3], boss: "GARP" },
+    { item: "Black Carpet", label: "Haki Fragment", weight: 10, ranks: [3], boss: "GARP" },
 ];
 
 /* Les trois boss de la quete, par leur nom exact. */
