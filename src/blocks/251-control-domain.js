@@ -78,6 +78,18 @@
       ct_clouds: V,
       ct_dust: Z,
     } = r;
+    /* Un BOSS (marque par le World Code dans gameplay/loot.js) subit les
+       effets du dome mais n'est JAMAIS deplace : l'orbite le sortait de son
+       arene et cassait sa poursuite — le combat devenait une distribution
+       gratuite de butin. Les mobs ordinaires sont toujours aspires. */
+    function bossCible(id) {
+      try {
+        return !!(globalThis.__isBossMob && globalThis.__isBossMob(id));
+      } catch (e) {
+        return false;
+      }
+    }
+
     function $(t) {
       try {
         c.setClientOption(t, "forcedCameraDirection", null);
@@ -147,6 +159,8 @@
                       hold: 1,
                       until: t.t + 40,
                       nextEff: 0,
+                      /* Ancre : un boss garde ses pieds, tout le reste non. */
+                      ancre: bossCible(n),
                     };
                     t.trapped.set(n, o);
                   } else if (o.hold && t.t >= o.until) {
@@ -165,6 +179,9 @@
                     a(n, "Slowness", 1600, { inbuiltLevel: 1 });
                     a(n, "Weakness", 1600, { inbuiltLevel: 1 });
                   }
+                  /* Boss ancre : rien d'autre. Pas de camera (il n'en a pas),
+                     pas d'orbite, pas de teleportation. */
+                  if (o.ancre) continue;
                   if (t.t % 3 === 0 && isP(n)) {
                     /* camera + deplacement = crowd control : un admin/owner
                        immunise garde son regard ET ses pieds. Un mob n'a pas de

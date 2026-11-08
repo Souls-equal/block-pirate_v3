@@ -1,0 +1,528 @@
+#!/usr/bin/env node
+// tools/check-rules.mjs
+//
+// Les REGLES DU JEU qui ne se voient ni a la compilation ni dans une capture
+// d'ecran. On les rejoue sur le vrai code, avec une `api` simulee :
+//
+//   1. NAME TAGS. Bloxd refuse EN BLOC un `nameTagInfo` qui contient une seule
+//      valeur hors schema (« Expected: valid nameTagInfo value ») : le joueur
+//      garde son ancien nom, ou aucun. On verifie que le nettoyage jette bien
+//      tout ce qui n'est pas au schema — null, cle inventee, nom undefined,
+//      icone dans une partie de texte — et que les objets construits par le
+//      jeu passent tous.
+//   2. PRIME ET ANTI-FARM. Une cible trop faible (40 niveaux d'ecart) ne perd
+//      JAMAIS d'argent, le tueur ne touche que ~5 % en prime, et la meme paire
+//      ne paie qu'une fois par fenetre.
+//   3. CHAT EN LECTURE SEULE. Un rang qui lit tous les canaux recoit une copie
+//      des messages d'equipage et ne peut PAS y ecrire.
+//   4. UNE COULEUR PAR ROLE. Tout litteral de couleur du projet doit ressortir
+//      de `themeColor()` sur la palette (ou sur les couleurs d'objets).
+//   5. ZERO EMOJI. Aucun caractere pictographique dans les sources : un emoji
+//      s'affiche en carre vide ou casse la mise en page du chat.
+//
+// Lance par `npm run check`. `tools/` n'est PAS du World Code : ces fichiers ne
+// partent jamais vers Bloxd (la limite des 64 fichiers ne les concerne pas).
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { buildSync } from "esbuild";
+
+const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
+const SRC = join(ROOT, "src");
+const errors = [];
+let checked = 0;
+const check = (cond, msg) => {
+    checked++;
+    if (!cond) errors.push(msg);
+};
+
+/* ==========================================================================
+   0. OUTILS COMMUNS
+   ========================================================================== */
+
+function sourceFiles(dir) {
+    const out = [];
+    for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) out.push(...sourceFiles(path));
+        else if (path.endsWith(".js")) out.push(path);
+    }
+    return out;
+}
+const FILES = sourceFiles(SRC);
+const rel = (path) => relative(ROOT, path).replace(/\\/g, "/");
+
+/* Noms assignes sans declaration dans src/ (mode sloppy de Bloxd) : hors de
+   Bloxd il faut les poser, sinon l'import du bundle leve un ReferenceError. */
+const SLOPPY_GLOBALS = [
+    "chooseTeam", "continueJourney", "doPeriodicSave", "enterSea", "resetPlayer",
+    "setPlayerTeam", "skipTutorial", "spawnMobLeader", "spawnNPC", "spawnQuestMob",
+    "startBoss", "startTutorial", "withEffectSource",
+];
+
+const sent = [];
+const db = {};
+function installApi(extra) {
+    for (const n of SLOPPY_GLOBALS) globalThis[n] = () => false;
+    globalThis.api = new Proxy(
+        {
+            now: () => Date.now(),
+            log: () => {},
+            sendMessage: (pid, msg) => sent.push({ pid, msg }),
+            broadcastMessage: (msg) => sent.push({ pid: "*", msg }),
+            getPlayerDbValue: (pid, key) => (db[pid] && key in db[pid] ? db[pid][key] : null),
+            setPlayerDbValue: (pid, key, value) => {
+                db[pid] = db[pid] || {};
+                db[pid][key] = value;
+            },
+            deletePlayerDbValue: (pid, key) => {
+                if (db[pid]) delete db[pid][key];
+            },
+            getPlayerIds: () => Object.keys(db),
+            getEntityType: (id) => (String(id).charAt(0) === "p" ? "Player" : "Mob"),
+            getEntityName: (id) => String(id),
+            getHealth: () => 20,
+            getMaxHealth: () => 20,
+            getPosition: () => [0, 64, 0],
+            getItemSlot: () => null,
+            getMoonstoneChestItems: () => [],
+            playSound: () => {},
+            setClientOption: () => {},
+            createShopItem: () => {},
+            createShopItemForPlayer: () => {},
+            updateShopItemForPlayer: () => {},
+            ...extra,
+        },
+        { get: (t, k) => (k in t ? t[k] : () => undefined) },
+    );
+}
+
+/* Corps d'un appel : de la parenthese ouvrante a la fermante correspondante,
+   chaines comprises. */
+function callBody(text, openIndex) {
+    let depth = 1;
+    let i = openIndex + 1;
+    while (i < text.length && depth > 0) {
+        const ch = text[i];
+        if (ch === '"' || ch === "'" || ch === "`") {
+            const quote = ch;
+            i++;
+            while (i < text.length && text[i] !== quote) {
+                if (text[i] === "\\") i++;
+                i++;
+            }
+        } else if (ch === "(" || ch === "[" || ch === "{") depth++;
+        else if (ch === ")" || ch === "]" || ch === "}") depth--;
+        i++;
+    }
+    return text.slice(openIndex + 1, i - 1);
+}
+
+/* Bundle ES des modules du jeu, importe comme un vrai module. */
+function loadModules(entry, extraExports) {
+    const built = buildSync({
+        stdin: {
+            contents:
+                `export * from ${JSON.stringify(join(SRC, entry))};` +
+                (extraExports ? extraExports.map((p) => `\nexport * from ${JSON.stringify(join(SRC, p))};`).join("") : ""),
+            resolveDir: ROOT,
+            loader: "js",
+        },
+        bundle: true,
+        write: false,
+        format: "esm",
+        platform: "browser",
+        target: "es2020",
+        logLevel: "silent",
+    });
+    const url = "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64");
+    return import(url);
+}
+
+/* ==========================================================================
+   1. NAME TAGS — SCHEMA BLOXD
+   ==========================================================================
+   Schema officiel (ENTITY_SETTINGS.md) :
+     { backgroundColor?, content?, subtitle?, subtitleBackgroundColor?,
+       minLighting?, healthbar?{display,height,backgroundColour,foregroundColour},
+       border?{colour,style,width,applyTo} }
+   Tout ce qui n'est pas la est refuse, et le name tag entier avec. */
+
+const NAMETAG_SCHEMA = ["backgroundColor", "content", "subtitle", "subtitleBackgroundColor", "minLighting", "healthbar", "border"];
+const HEALTHBAR_SCHEMA = ["display", "height", "backgroundColour", "foregroundColour"];
+const BORDER_SCHEMA = ["colour", "style", "width", "applyTo"];
+
+function nameTagProblems(info, label) {
+    const bad = [];
+    if (!info || typeof info !== "object" || Array.isArray(info)) return [`${label} : pas un objet`];
+    for (const key of Object.keys(info)) {
+        if (NAMETAG_SCHEMA.indexOf(key) < 0) bad.push(`${label} : cle inconnue « ${key} »`);
+    }
+    for (const key of ["content", "subtitle"]) {
+        if (!(key in info)) continue;
+        const parts = info[key];
+        if (!Array.isArray(parts)) { bad.push(`${label} : ${key} n'est pas un tableau`); continue; }
+        for (const part of parts) {
+            if (!part || typeof part !== "object") { bad.push(`${label} : ${key} contient autre chose qu'un segment`); continue; }
+            if (typeof part.str !== "string") bad.push(`${label} : ${key} contient un segment sans texte`);
+            /* Les icones sont reservees au chat : un name tag ne doit pas en
+               contenir, sinon le moteur refuse l'objet. */
+            if ("icon" in part) bad.push(`${label} : ${key} contient une icone`);
+            if (part.style !== undefined && (typeof part.style !== "object" || part.style === null))
+                bad.push(`${label} : ${key} a un style invalide`);
+        }
+    }
+    if (info.healthbar !== undefined) {
+        const bar = info.healthbar;
+        if (!bar || typeof bar !== "object" || Array.isArray(bar)) bad.push(`${label} : healthbar invalide`);
+        else {
+            for (const key of Object.keys(bar)) {
+                if (HEALTHBAR_SCHEMA.indexOf(key) < 0) bad.push(`${label} : healthbar.${key} inconnu`);
+            }
+            if ("display" in bar && ["always", "never", "onDamage"].indexOf(bar.display) < 0)
+                bad.push(`${label} : healthbar.display « ${bar.display} » refuse`);
+        }
+    }
+    if (info.border !== undefined) {
+        const border = info.border;
+        if (!border || typeof border !== "object" || Array.isArray(border)) bad.push(`${label} : border invalide (null interdit)`);
+        else {
+            for (const key of Object.keys(border)) {
+                if (BORDER_SCHEMA.indexOf(key) < 0) bad.push(`${label} : border.${key} inconnu`);
+            }
+            if (typeof border.colour !== "string") bad.push(`${label} : border.colour manquant`);
+        }
+    }
+    return bad;
+}
+
+const installed = await (async () => {
+    installApi();
+    return loadModules("core/team.js", ["utils/lifeform.js", "core/ranks.js"]);
+})();
+
+{
+    const { sanitizeNameTag, nameTagInfo, applyNameTag } = installed;
+
+    /* a) Le nettoyage jette tout ce qui n'est pas au schema. */
+    const hostile = sanitizeNameTag({
+        content: [{ str: undefined }, { str: "Vrai nom", style: { color: "red" } }, { icon: "fa-solid fa-skull" }],
+        border: null,
+        healthbar: { display: "sometimes", height: "huge", backgroundColour: "url(x)" },
+        name: "cle inventee",
+        fontSize: 12,
+    });
+    check(hostile !== null, "nameTag : un objet ou seul le texte est valide est rejete en entier");
+    if (hostile) for (const problem of nameTagProblems(hostile, "nameTag nettoye")) errors.push(problem);
+    if (hostile) {
+        check(hostile.content.length === 1, "nameTag : les segments sans texte ou a icone sont conserves");
+        check(!("border" in hostile), "nameTag : border:null est conserve");
+        check(!("name" in hostile), "nameTag : une cle inventee est conservee");
+        check(!("height" in (hostile.healthbar || {})), "nameTag : une hauteur invalide est conservee");
+    }
+
+    /* b) Un name tag sans contenu ni sous-titre n'est pas construit : le
+          moteur refuserait l'objet (et l'entite garderait le precedent). */
+    check(sanitizeNameTag({ healthbar: { display: "never" } }) === null, "nameTag : un objet sans texte est envoye quand meme");
+    check(sanitizeNameTag({ content: [] }) !== null, "nameTag : content vide (vanish) doit rester possible");
+
+    /* c) Les objets fabriques par le jeu passent le schema. */
+    check(nameTagProblems(sanitizeNameTag(nameTagInfo("GARP", "the Marine Protector", "#ff0000", "#22130a", null, "700")), "boss").length === 0,
+        "nameTag : le name tag d'un boss ne passe pas le schema");
+
+    /* d) applyNameTag envoie, et n'envoie jamais un objet vide. */
+    const applied = [];
+    const baseApi = globalThis.api;
+    globalThis.api = new Proxy(
+        { setTargetedPlayerSettingForEveryone: (id, key, value) => applied.push({ id, key, value }) },
+        { get: (t, k) => (k in t ? t[k] : () => undefined) },
+    );
+    check(applyNameTag("m1", { content: [{ str: "GARP" }] }) === true, "nameTag : applyNameTag n'envoie pas un objet valide");
+    check(applyNameTag("m1", { border: { colour: "red" } }) === false, "nameTag : applyNameTag envoie un objet sans texte");
+    check(applied.length === 1 && applied[0].key === "nameTagInfo", "nameTag : mauvais nom de reglage envoye");
+    globalThis.api = baseApi;
+
+    /* e) Aucun fichier ne construit un name tag a la main : tout passe par
+          sanitizeNameTag / applyNameTag / nameTagInfo. */
+    for (const file of FILES) {
+        const name = rel(file);
+        /* `utils/lifeform.js` EST le nettoyage : c'est lui qui appelle l'API. */
+        if (name === "src/utils/lifeform.js") continue;
+        const text = readFileSync(file, "utf8");
+        const re = /(setTargetedPlayerSettingForEveryone|setOtherEntitySetting)\s*\(/g;
+        let m;
+        while ((m = re.exec(text))) {
+            const body = callBody(text, m.index + m[0].length - 1);
+            if (body.indexOf("nameTagInfo") === -1) continue;
+            check(
+                /sanitizeNameTag\s*\(/.test(body),
+                `${name} : name tag envoye sans passer par sanitizeNameTag`,
+            );
+        }
+    }
+}
+
+/* b bis) LE NAME TAG DU JOIN, TEL QU'IL PART VRAIMENT.
+   C'est le chemin qui posait le probleme : `api.getEntityName` peut rendre
+   undefined au tout premier tick, et le moteur refusait alors le name tag
+   entier. On rejoue trois cas : nom normal, nom absent, equipage present. */
+{
+    const { updateNameTag } = installed;
+    const sentTags = [];
+    const baseApi = globalThis.api;
+    for (const key of Object.keys(db)) delete db[key];
+    db.p1 = { team: "PIRATES", "crew:name": "Straw Hats", lvl: 12 };
+    db.p2 = { team: "NONE", lvl: 3 };
+    const makeApi = (names) =>
+        new Proxy(
+            {
+                now: () => Date.now(),
+                log: () => {},
+                getPlayerDbValue: (pid, key) => (db[pid] && key in db[pid] ? db[pid][key] : null),
+                setPlayerDbValue: () => {},
+                getPlayerIds: () => Object.keys(db),
+                getEntityType: () => "Player",
+                getEntityName: (id) => names[id],
+                setTargetedPlayerSettingForEveryone: (id, key, value) => sentTags.push({ id, key, value }),
+            },
+            { get: (t, k) => (k in t ? t[k] : () => undefined) },
+        );
+
+    /* a) nom lisible + equipage */
+    globalThis.api = makeApi({ p1: "Luffy", p2: undefined });
+    sentTags.length = 0;
+    updateNameTag("p1");
+    check(sentTags.length === 1, "name tag : updateNameTag n'envoie rien au join");
+    if (sentTags.length) {
+        for (const problem of nameTagProblems(sentTags[0].value, "join")) errors.push(problem);
+        const text = JSON.stringify(sentTags[0].value);
+        check(text.indexOf("Luffy") >= 0, "name tag : le pseudo n'est pas dans le name tag");
+        check(text.indexOf("Straw Hats") >= 0, "name tag : l'equipage n'est pas dans le name tag");
+    }
+
+    /* b) nom illisible (undefined) : le name tag doit quand meme partir */
+    sentTags.length = 0;
+    updateNameTag("p2");
+    check(sentTags.length === 1, "name tag : un nom illisible au join bloque tout le name tag");
+    if (sentTags.length) {
+        for (const problem of nameTagProblems(sentTags[0].value, "join sans nom")) errors.push(problem);
+        check(typeof sentTags[0].value.content[0].str === "string", "name tag : texte undefined envoye au moteur");
+    }
+    globalThis.api = baseApi;
+}
+
+/* ==========================================================================
+   2. PRIME : ANTI-FARM ET MONTANTS
+   ========================================================================== */
+
+{
+    const { handleBountyKill, getBounty, setBounty } = installed;
+    const money = (pid) => Number(db[pid].money || 0) || 0;
+    const reset = () => {
+        for (const key of Object.keys(db)) delete db[key];
+        sent.length = 0;
+    };
+
+    const player = (pid, { lvl = 1, money = 0, team = "PIRATES", bounty = 0 }) => {
+        db[pid] = { lvl: lvl, money: money, team: team, bounty: bounty };
+    };
+    const canKill = (a, b) => { handleBountyKill(a, b); };
+
+    /* a) 40 niveaux d'ecart : la victime ne perd RIEN, le tueur gagne ~5 %. */
+    reset();
+    player("big", { lvl: 120, money: 0 });
+    player("small", { lvl: 20, money: 4000 });
+    canKill("big", "small");
+    check(money("small") === 4000, `prime : une cible trop faible a perdu ${4000 - money("small")} Coins`);
+    check(getBounty("big") === 200, `prime : 5 % attendus (200), obtenu ${getBounty("big")}`);
+    check(money("big") === 0, "prime : de l'argent frais a ete donne au tueur (il doit aller en prime)");
+
+    /* b) Meme paire dans la fenetre : plus rien. */
+    const before = getBounty("big");
+    canKill("big", "small");
+    check(getBounty("big") === before, "prime : la meme paire repaie dans la fenetre");
+
+    /* c) 39 niveaux d'ecart : vol normal (10 %, plafond 1000). */
+    reset();
+    player("k", { lvl: 60, money: 0 });
+    player("v", { lvl: 21, money: 4000 });
+    canKill("k", "v");
+    check(money("k") === 400, `prime : vol attendu 400 (10 % de 4000), obtenu ${money("k")}`);
+    check(money("v") === 3600, `prime : la victime devait perdre 400, perdu ${4000 - money("v")}`);
+
+    /* d) Le plafond de vol tient bon. */
+    reset();
+    player("k2", { lvl: 60, money: 0 });
+    player("v2", { lvl: 55, money: 500000 });
+    canKill("k2", "v2");
+    check(money("k2") === 1000, `prime : plafond de vol 1000 attendu, obtenu ${money("k2")}`);
+
+    /* e) Un Marine encaisse la prime, plafonne, et une seule fois par paire. */
+    reset();
+    player("marine", { lvl: 80, team: "MARINES", money: 0 });
+    player("pirate", { lvl: 80, team: "PIRATES", money: 0, bounty: 50000 });
+    canKill("marine", "pirate");
+    check(money("marine") === 10000, `prime : encaissement plafonne 10000 attendu, obtenu ${money("marine")}`);
+    check(getBounty("pirate") === 0, "prime : la prime du pirate devrait repartir a 0");
+    const collected = money("marine");
+    setBounty("pirate", 50000);
+    canKill("marine", "pirate");
+    check(money("marine") === collected, "prime : la meme paire de marine encaisse deux fois");
+
+    /* f) Marine contre Marine : rien du tout. */
+    reset();
+    player("m1", { lvl: 50, team: "MARINES", money: 1000 });
+    player("m2", { lvl: 50, team: "MARINES", money: 1000, bounty: 500 });
+    canKill("m1", "m2");
+    check(money("m1") === 1000 && getBounty("m2") === 500, "prime : un marine a gagne quelque chose sur un marine");
+
+    /* g) Le tueur ne peut pas etre sa propre victime. */
+    reset();
+    player("self", { lvl: 50, money: 1000, bounty: 0 });
+    canKill("self", "self");
+    check(money("self") === 1000, "prime : un joueur s'est tue lui-meme pour de l'argent");
+}
+
+/* ==========================================================================
+   3. CHAT : LECTURE SEULE POUR LE STAFF
+   ========================================================================== */
+
+{
+    const { handleChat } = installed;
+    for (const key of Object.keys(db)) delete db[key];
+    sent.length = 0;
+
+    /* p1 = OWNER (lit tout), p2 = pirate dans un equipage, p3 = marine. */
+    db.p1 = { lvl: 50, team: "PIRATES" };
+    db.p2 = { lvl: 50, team: "PIRATES", "crew:name": "Straw Hats", "crew:role": "CAPTAIN" };
+    db.p3 = { lvl: 50, team: "MARINES", "crew:name": "Marines Elite", "crew:role": "CAPTAIN" };
+
+    const officials = { p1: "K4miNoK4mi", p2: "Pirate", p3: "Marine" };
+    globalThis.api = new Proxy(
+        {
+            now: () => Date.now(),
+            log: () => {},
+            sendMessage: (pid, msg) => sent.push({ pid, msg }),
+            broadcastMessage: (msg) => sent.push({ pid: "*", msg }),
+            getPlayerDbValue: (pid, key) => (db[pid] && key in db[pid] ? db[pid][key] : null),
+            setPlayerDbValue: (pid, key, value) => {
+                db[pid] = db[pid] || {};
+                db[pid][key] = value;
+            },
+            getPlayerIds: () => Object.keys(db),
+            getEntityType: () => "Player",
+            getEntityName: (id) => officials[id] || String(id),
+        },
+        { get: (t, k) => (k in t ? t[k] : () => undefined) },
+    );
+
+    const textOf = (msg) => (Array.isArray(msg) ? msg.map((s) => (s && s.str) || "").join("") : String(msg || ""));
+
+    /* a) Un equipier parle a son equipage : seuls les membres le recoivent. */
+    sent.length = 0;
+    handleChat("p2", "all hands on deck", "CREW");
+    const toP2 = sent.filter((e) => e.pid === "p2");
+    const toP3 = sent.filter((e) => e.pid === "p3");
+    check(toP2.length >= 1 && /all hands on deck/.test(textOf(toP2[0].msg)), "chat : un equipier ne recoit pas son propre message d'equipage");
+    check(toP3.length === 0, "chat : un message d'equipage est parti vers un autre equipage");
+
+    /* b) Le staff recoit une COPIE (prefixee par le canal). */
+    const copy = sent.filter((e) => e.pid === "p1");
+    check(copy.length === 1, `chat : le staff recoit ${copy.length} copie(s) au lieu d'une`);
+    if (copy.length) check(/\[Crew Straw Hats\]/.test(textOf(copy[0].msg)), "chat : la copie du staff n'indique pas le canal");
+
+    /* c) Le staff n'ecrit PAS dans un equipage dont il n'est pas membre. */
+    sent.length = 0;
+    handleChat("p1", "obey me", "CREW");
+    const leaked = sent.filter((e) => /obey me/.test(textOf(e.msg)));
+    check(leaked.length === 0, "chat : le staff a ecrit dans un equipage dont il n'est pas membre");
+    const refusal = sent.filter((e) => e.pid === "p1").map((e) => textOf(e.msg)).join(" ");
+    check(/read-only/i.test(refusal), "chat : le refus d'ecriture en equipage n'est pas explique au staff");
+
+    /* d) Un canal inconnu ne fait jamais tomber le message dans le global. */
+    sent.length = 0;
+    handleChat("p2", "channel test", "SOMETHING_ELSE");
+    const globalLeak = sent.filter((e) => e.pid === "p3");
+    check(globalLeak.length === 0, "chat : un canal inconnu est retombe dans le global");
+}
+
+/* ==========================================================================
+   4. UNE COULEUR PAR ROLE  +  5. ZERO EMOJI
+   ========================================================================== */
+
+{
+    const theme = readFileSync(join(SRC, "core/theme.js"), "utf8");
+    const bundle = await (async () => {
+        const built = buildSync({
+            stdin: { contents: `export * from ${JSON.stringify(join(SRC, "core/theme.js"))};`, resolveDir: ROOT, loader: "js" },
+            bundle: true, write: false, format: "esm", platform: "browser", target: "es2020", logLevel: "silent",
+        });
+        return import("data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64"));
+    })();
+    const palette = new Set(Object.values(bundle.C));
+    for (const key in bundle.ITEM_COLOR) palette.add(bundle.ITEM_COLOR[key]);
+
+    /* Les noms de couleurs connus du theme : un mot du texte n'est teste que
+       s'il fait partie de ce vocabulaire (« green » dans une phrase reste une
+       phrase ; « green » comme couleur doit finir sur la palette). */
+    for (const file of FILES) {
+        const text = readFileSync(file, "utf8");
+        const name = rel(file);
+        if (name === "src/core/theme.js") continue;
+
+        /* Couleurs : deux familles, et pas une de plus.
+             - tout litteral hexadeximal (c'est forcement une couleur) ;
+             - la couleur passee a txt()/bold()/ic() en 2e argument, aux cles
+               de style `color` / `colour` (name tag, bordures, barres).
+           Un mot ordinaire du texte (« green » dans une phrase) n'est jamais
+           teste : seules les POSITIONS de couleur le sont. */
+        const values = new Set();
+        for (const m of text.matchAll(/"(#[0-9a-fA-F]{3,8})"/g)) values.add(m[1]);
+        for (const m of text.matchAll(/'(#[0-9a-fA-F]{3,8})'/g)) values.add(m[1]);
+        /* Le 2e argument d'un txt()/bold()/ic() : une chaine SIMPLE. Les
+           chaines multi-lignes (concatenees) sont sautees. */
+        const callColour = /\b(?:txt|bold|ic)\s*\(\s*"(?:[^"\\\n]|\\.)*"\s*,\s*("([^"\n]{1,24})"|'([^'\n]{1,24})')/g;
+        for (const m of text.matchAll(callColour)) values.add(m[2] !== undefined ? m[2] : m[3]);
+        const keyColour = /\b(?:color|colour|foregroundColour|backgroundColour|subtitleBackgroundColor|backgroundColor)\s*:\s*("([^"\n]{1,24})"|'([^'\n]{1,24})')/g;
+        for (const m of text.matchAll(keyColour)) values.add(m[2] !== undefined ? m[2] : m[3]);
+        for (const value of values) {
+            const v = String(value).trim();
+            if (!v) continue;
+            const out = bundle.themeColor(v);
+            if (!palette.has(out)) {
+                errors.push(`${name} : couleur hors palette « ${v} » (themeColor ne la ramene pas a un role)`);
+            }
+        }
+    }
+
+    /* Emoji : on sort la table ICON de theme.js (c'est le dictionnaire de
+       conversion, pas un texte affiche) avant de scanner. */
+    const EMOJI = /\p{Extended_Pictographic}|[\u{1F000}-\u{1FAFF}]|\uFE0F/u;
+    for (const file of FILES) {
+        const name = rel(file);
+        let text = readFileSync(file, "utf8");
+        if (name === "src/core/theme.js") {
+            const start = text.indexOf("export const ICON = {");
+            if (start >= 0) text = text.slice(0, start) + text.slice(text.indexOf("};", start) + 2);
+        }
+        const lines = text.split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+            const m = EMOJI.exec(lines[i]);
+            if (m) errors.push(`${name}:${i + 1} : emoji « ${m[0]} » (utiliser une icone Bloxd)`);
+        }
+    }
+}
+
+/* ==========================================================================
+   BILAN
+   ========================================================================== */
+
+if (errors.length) {
+    console.error(`Regles du jeu (${errors.length} probleme(s)) :`);
+    for (const e of errors.slice(0, 40)) console.error("  - " + e);
+    if (errors.length > 40) console.error(`  … et ${errors.length - 40} autre(s)`);
+    process.exit(1);
+}
+console.log(
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, palette, zero emoji).`,
+);

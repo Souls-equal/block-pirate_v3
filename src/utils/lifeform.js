@@ -220,6 +220,113 @@ export function aliveNow(id) {
     try { return !!api.isAlive(id); } catch (e) { return false; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   NAME TAGS — UNE SEULE PORTE DE SORTIE
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le moteur ne dit pas ce qui cloche dans un nameTag : il repond
+   « Expected: valid nameTagInfo value » et n'applique RIEN — l'entite garde
+   son ancien nom, ou aucun. Une seule valeur fautive suffit, et elle se
+   glissait facilement :
+
+     - `border: null` (le schema accepte un objet ou l'absence, pas null) ;
+     - `{ str: undefined }` quand le nom du joueur n'est pas encore lisible au
+       join (`api.getEntityName` peut rendre undefined) ;
+     - une cle inventee (`fontSize`, `name`, `colour`...) ;
+     - une icone dans une partie de texte : les icones sont reservees au chat.
+
+   `sanitizeNameTag()` reconstruit donc l'objet CLE PAR CLE a partir du seul
+   schema documente (ENTITY_SETTINGS.md) et jette tout le reste. Il ne devine
+   pas : une valeur douteuse disparait, le reste est envoye. */
+
+const HEALTHBAR_DISPLAY = ["always", "never", "onDamage"];
+const BORDER_STYLE = ["solid", "glow", "double"];
+const BORDER_APPLY = ["both", "nametag", "healthbar"];
+
+/* Taille acceptee par Bloxd : un nombre, ou une chaine en px/em/rem. */
+function isFontSize(value) {
+    if (typeof value === "number") return isFinite(value);
+    return typeof value === "string" && /^\d+(\.\d+)?(px|em|rem)$/.test(value);
+}
+
+/* Une couleur de name tag doit etre du CSS simple (hex ou nom) : les fonctions
+   CSS (url(), gradient, var()) sont refusees par le moteur. */
+function isNameTagColour(value) {
+    return typeof value === "string" && /^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(value.trim());
+}
+
+/* Une partie de texte valide : `str` est une CHAINE (jamais undefined). Les
+   icones sont ecartees : interdites dans un name tag. */
+function cleanTagParts(value) {
+    if (!Array.isArray(value)) return null;
+    const out = [];
+    for (let i = 0; i < value.length; i++) {
+        const part = value[i];
+        if (!part || typeof part !== "object") continue;
+        if (typeof part.str !== "string") continue;
+        const style = part.style && typeof part.style === "object" ? part.style : null;
+        out.push(style ? { str: part.str, style: style } : { str: part.str });
+    }
+    return out;
+}
+
+export function sanitizeNameTag(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const out = {};
+
+    /* content / subtitle : un tableau vide est CONSERVE. C'est ainsi qu'on
+       efface un nom (vanish) ; le supprimer laisserait le pseudo visible. */
+    const content = cleanTagParts(raw.content);
+    if (content) out.content = content;
+    const subtitle = cleanTagParts(raw.subtitle);
+    if (subtitle) out.subtitle = subtitle;
+
+    if (isNameTagColour(raw.backgroundColor)) out.backgroundColor = raw.backgroundColor.trim();
+    if (isNameTagColour(raw.subtitleBackgroundColor)) out.subtitleBackgroundColor = raw.subtitleBackgroundColor.trim();
+    if (typeof raw.minLighting === "number" && isFinite(raw.minLighting)) out.minLighting = raw.minLighting;
+
+    const hb = raw.healthbar;
+    if (hb && typeof hb === "object" && !Array.isArray(hb)) {
+        const bar = {};
+        if (HEALTHBAR_DISPLAY.indexOf(hb.display) >= 0) bar.display = hb.display;
+        if (isFontSize(hb.height)) bar.height = hb.height;
+        if (isNameTagColour(hb.backgroundColour)) bar.backgroundColour = hb.backgroundColour.trim();
+        /* foregroundColour accepte aussi un degrade (tableau de paliers) : on
+           n'y touche pas, on le laisse tel quel s'il est present. */
+        if (hb.foregroundColour !== undefined && hb.foregroundColour !== null) bar.foregroundColour = hb.foregroundColour;
+        if (Object.keys(bar).length) out.healthbar = bar;
+    }
+
+    const border = raw.border;
+    if (border && typeof border === "object" && !Array.isArray(border) && isNameTagColour(border.colour)) {
+        const b = { colour: border.colour.trim() };
+        if (BORDER_STYLE.indexOf(border.style) >= 0) b.style = border.style;
+        if (BORDER_APPLY.indexOf(border.applyTo) >= 0) b.applyTo = border.applyTo;
+        if (isFontSize(border.width)) b.width = border.width;
+        out.border = b;
+    }
+
+    /* Ni contenu ni sous-titre : rien a afficher, on n'envoie pas un objet vide
+       (le moteur le refuserait). */
+    if (!("content" in out) && !("subtitle" in out)) return null;
+    return out;
+}
+
+/* Applique un name tag en une seule fois : nettoyage + envoi protege. Renvoie
+   true si l'objet a ete construit ET envoye. Tous les appels passent ici. */
+export function applyNameTag(entityId, raw, forEveryone) {
+    if (!entityId) return false;
+    const info = sanitizeNameTag(raw);
+    if (!info) return false;
+    try {
+        if (forEveryone) api.setTargetedPlayerSettingForEveryone(entityId, "nameTagInfo", info, true);
+        else api.setTargetedPlayerSettingForEveryone(entityId, "nameTagInfo", info);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 /* nameTagInfo d'un mob ou d'un boss. boss.js et saber.js construisaient le
    meme objet avec deux fonds et deux graisses differents : ce qui changeait
    est un parametre (fond, bordure, graisse), le reste est ecrit une fois. */

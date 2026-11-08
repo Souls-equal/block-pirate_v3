@@ -48,7 +48,7 @@ import { C, say, txt, bold, ic } from "../core/theme";
 import { deleteStat, getStat, setStat } from "../utils/data";
 import { nowMs, setInterval as every } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
-import { aliveNow, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safePosition } from "../utils/lifeform";
+import { aliveNow, applyNameTag, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safePosition } from "../utils/lifeform";
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
 import { heldItemName, scanAllItems, writeItem } from "./customItem";
 import { markBossMob } from "./loot";
@@ -1690,7 +1690,7 @@ function enrage() {
     try {
         api.setMobSetting(saber.id, "baseRunningSpeed", SABER.SPEED * 1.25);
         api.setMobSetting(saber.id, "baseWalkingSpeed", SABER.SPEED);
-        api.setTargetedPlayerSettingForEveryone(saber.id, "nameTagInfo",
+        applyNameTag(saber.id,
             nameTagInfo(SABER.NAME + " [ENRAGED]", SABER.TITLE, "#FF4D4D", "#22130a"), true);
     } catch (e) {}
     const p = safePosition(saber.id);

@@ -415,6 +415,14 @@ Deux économies qui ne se voient pas : les séparateurs `"\n\n"` n'ont **pas de
 style** (une couleur sur des sauts de ligne coûte 29 caractères pour rien), et le
 bloc « Stat Points » n'apparaît que s'il y a des points à dépenser.
 
+Une ligne **identité** (priorité 5) affiche l'équipe et l'équipage : drapeau
+dans la couleur de l'équipe (`Pirates` / `Marines`), puis l'équipage en or.
+Rien n'est affiché **avant** le choix de l'équipe : « No Team » ne dirait rien
+et coûterait de la place. `UI.js` importait déjà `team.js` (`getCrewName`) :
+ajouter `getTeamData`/`getPlayerTeam` n'ajoute donc aucune arête au cycle
+`UI ⇄ team` qui existe depuis le début (les deux fonctions sont déclarées, donc
+lisibles à l'appel, pas à l'initialisation du module).
+
 `npm run check` rend la **vraie** sidebar (trois joueurs simulés : nu, chargé avec
 objectif de tutoriel, et nouveau joueur avec tutoriel **et** quête) et vérifie :
 taille ≤ 1 200, **deux `ProgressBar` dans chaque cas** (jamais une seule), ratio
@@ -425,6 +433,29 @@ bloc de quête toujours présents.
 Mesuré : **1 088** car. (joueur nu), **1 189** (chargé + tutoriel), **1 096**
 (nouveau joueur + tutoriel + quête). Vérifié par mutation : rendre le titre
 obligatoire fait tomber la barre de stamina dans le dernier cas, et la CI refuse.
+
+### Name tags : une seule porte de sortie
+
+Un `nameTagInfo` hors schéma n'est **pas** corrigé par Bloxd : le moteur répond
+`Expected: valid nameTagInfo value` et n'applique **rien** — l'entité garde son
+ancien nom, ou aucun. Une seule valeur fautive suffit :
+
+| Ce qui arrivait | Pourquoi c'est refusé |
+| --- | --- |
+| `{ str: undefined }` au join (`getEntityName` pas encore lisible) | une partie de texte doit être une **chaîne** |
+| `border: null` (vanish) | le schéma accepte un objet **ou l'absence**, pas `null` |
+| `{ icon: … }` dans un name tag | les icônes sont réservées au chat |
+| une clé inventée (`fontSize`, `name`, `colour`…) | le schéma est fermé |
+
+Tout passe donc par **`sanitizeNameTag()`** / **`applyNameTag()`**
+(`src/utils/lifeform.js`) : l'objet est reconstruit **clé par clé** à partir du
+seul schéma documenté (`ENTITY_SETTINGS.md`), le reste est jeté. Les
+`content`/`subtitle` **vides sont conservés** : c'est ainsi qu'on efface un nom
+(vanish) ; les supprimer laisserait le pseudo visible.
+
+`npm run check` (via `tools/check-rules.mjs`) rejoue le cas du join : nom
+lisible, nom `undefined`, avec et sans équipage, et refuse tout `nameTagInfo`
+écrit à la main hors de cette porte.
 
 ### Icônes : une liste blanche, sinon « ? »
 
@@ -466,7 +497,18 @@ refuse l'écart.
 5. contrôle les icônes des **boutons du PC** (listes blanches, touches uniques, `id` traité).
 
 Trois mutations vérifient que ces garde-fous mordent : une icône inexistante, un nom retiré de
-la liste blanche et une icône ingame en minuscules font tous tomber la CI. Le même script rend la sidebar avec une `api` simulée pour vérifier
+la liste blanche et une icône ingame en minuscules font tous tomber la CI.
+
+Et **`tools/check-rules.mjs`** couvre ce qui ne se voit pas dans une capture : name tags
+(schéma Bloxd), prime anti-farm, chat en lecture seule, **une couleur par rôle** et
+**zéro emoji**. Les couleurs sont lues aux *positions* de couleur (`txt`/`bold`/`ic` en 2e
+argument, `color:`/`colour:`), pas dans les phrases, puis passées au vrai `themeColor()` :
+une teinte qui n'atterrit pas sur la palette fait échouer la CI. C'est ce contrôle qui a
+trouvé `"orange"` — la seule couleur du jeu hors palette, parce que `parseColor()` ne
+connaissait que blanc/noir/gris. `NAMED_COLOURS` couvre maintenant les 16 couleurs CSS de
+base et les plus courantes, et `orange` est explicitement du **danger** (comme `#ff9900`).
+
+Le même script rend la sidebar avec une `api` simulée pour vérifier
 les **barres** (forme, ratio, couleur CSS, teinte verte/bleue) et le **budget** : voir
 « Barres de progression » plus bas.
 
@@ -649,6 +691,34 @@ Les mutes **expirés** sont nettoyés au passage (plus de nom fantôme qui affic
 qui répond « already muted » à la sanction suivante). Si un nom reste dans l'index sans
 enregistrement (db lobby perdue, joueur hors ligne), le tableau l'affiche avec
 `(no record — use Unmute by Name)` au lieu de le faire disparaître.
+
+---
+
+## Chat : le staff lit tout, mais n'écrit que chez lui
+
+Trois canaux : **Global** (`G`), **Team** (le drapeau de l'équipe) et **Crew**
+(l'équipage, seulement si on en a un).
+
+Un rang qui a **`readsAllChannels`** (`ranks.js`, MOD/DEV/ADMIN/OWNER) reçoit une
+**copie** de chaque message d'équipe et d'équipage, préfixée par son canal
+(`[Crew Straw Hats] …`). C'est de la **lecture seule** :
+
+* il ne peut pas écrire dans un équipage dont il n'est pas membre — le canal
+  n'existe même pas chez lui, et `handleChat` répond
+  « Crew channel is read-only for you » au lieu de laisser croire que le message
+  est parti ;
+* parler en Global, dans sa Team ou dans son Crew reste normal : le droit de
+  lecture n'élargit jamais l'écriture.
+
+Les deux flags étaient **confondus** : c'est `byPassChatRestriction` (qui sert au
+filtre anti-majuscules) qui donnait la lecture de tous les canaux. Un rang sans
+rapport avec la modération héritait donc de la lecture des équipages. Ils sont
+séparés, et `byPassChatRestriction` ne fait plus que ce que son nom dit : le
+staff n'est pas mis en minuscules par le filtre anti-caps.
+
+`npm run check` vérifie les quatre règles sur une vraie simulation : un membre
+reçoit son message, un autre équipage **non**, le staff reçoit une copie
+préfixée, et un staff ne peut pas écrire dans un équipage étranger.
 
 ---
 
@@ -1061,6 +1131,11 @@ Résultat : la boucle « je tue mon alt → mon Marine me tue » ne crée **plus
 par simulation sur 50 kills : total des comptes inchangé), alors qu'un vrai joueur garde la
 totalité de la prime anti-farm la première fois qu'il abat un petit joueur, et un Marine garde
 sa prime la première fois qu'il abat un pirate.
+
+Cette règle est rejouée à chaque `npm run check` (`tools/check-rules.mjs`) sur le **vrai**
+`handleBountyKill` : 40 niveaux d'écart (victime intacte, 5 % en prime), 39 niveaux (vol de
+10 %), plafond de vol, encaissement Marine plafonné **et une seule fois par paire**, Marine
+contre Marine, et auto-kill.
 
 ---
 
@@ -1502,6 +1577,21 @@ le lanceur meurt. Le balayage `ct_spot` ne tourne **que** si le point d'orbite e
 et il est throttlé (1 s) quand la zone entière est solide : aucun coût dans le cas normal.
 Shambles utilise `ct_open` de la même façon pour sa traction — la cible s'arrête au ras du
 mur au lieu d'entrer dedans.
+
+### Un boss dans le dôme : ralenti, jamais déplacé
+
+Le dôme aspire les créatures ordinaires dans son orbite. Pour un **boss**, c'était un
+cadeau : sorti de son arène, il ne pouvait plus poursuivre personne, et il suffisait de
+poser le dôme pour le tuer sans riposte (le butin tombait quand même).
+
+`gameplay/loot.js` — le seul fichier qui marque les boss (`markBossMob`) — publie donc
+`globalThis.__isBossMob(id)`. Le bloc Control Domain marque la cible `ancre` : elle subit
+**`Slowness` et `Weakness`** comme les autres, mais elle ne reçoit **ni caméra, ni orbite,
+ni téléportation**. Le boss reste dans son arène et continue de frapper.
+
+Vérifié par régression dans `npm run check` : un boss placé dans le dôme est ralenti et
+reçoit **zéro** placement ; sans la règle, le test échoue (`dôme : un boss a été déplacé
+par le dôme`).
 
 ### Le dôme tient aussi les mobs
 

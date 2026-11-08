@@ -7,7 +7,7 @@ import { getPlayerTeam, getTeamData } from "../core/team";
 import { C, say, txt, bold, ic } from "../core/theme";
 import { rollFruit } from "../fruit/index";
 import { markAggro } from "../fruit/func-abilities";
-import { safeEntityName, safeEntityType } from "../utils/lifeform";
+import { applyNameTag, safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
 import { saberOldMan, saberRichMan, saberShanks } from "./saber";
 import { clearItem, scanAllItems } from "./customItem";
@@ -423,20 +423,13 @@ function nearestPlayer(pos) {
 }
 
 function dressUpNPC(NPC, name) {
-    api.setTargetedPlayerSettingForEveryone(NPC, "nameTagInfo", {
-        subtitle: [
-            bold("Click on the NPC!", "lightgray"),
-            txt("", "gray"),
-            txt("", "#00bfff")
-        ],
-        healthbar: {
-            display: "never"
-        },
-        border: {
-            colour: "#666666",
-            applyTo: "nametag",
-            style: "solid"
-        }
+    /* Nom du PNJ en `content` : sans lui, un mob sans nom garde son nom
+       d'item (« Draugr Zombie »). Le sous-titre ne sert qu'a l'invite. */
+    applyNameTag(NPC, {
+        content: [bold(String(name || "NPC"), C.INFO)],
+        subtitle: [bold("Click on the NPC!", C.INFO)],
+        healthbar: { display: "never" },
+        border: { colour: "#666666", applyTo: "nametag", style: "solid" },
     });
 }
 

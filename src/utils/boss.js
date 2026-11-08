@@ -2,7 +2,7 @@
 import { setTimeout, setInterval, sleep, run, nowMs } from "./timer";
 import { say, txt } from "../core/theme";
 import { markBossMob } from "../gameplay/loot";
-import { aliveNow, dist2, nameTagInfo, posOf } from "./lifeform";
+import { aliveNow, applyNameTag, dist2, nameTagInfo, posOf } from "./lifeform";
 
 // config
 
@@ -159,8 +159,7 @@ export function setupBossMob(id, cfg) {
     if (cfg.knockback === 0) api.setMobSetting(id, "knockbackReceivedMultiplier", 0);
     if (cfg.scale !== undefined) api.setLifeformScale(id, cfg.scale);
     if (cfg.colour) {
-      api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo",
-        nameTagInfo(cfg.name, cfg.title, cfg.colour, cfg.background, null, cfg.weight), true);
+      applyNameTag(id, nameTagInfo(cfg.name, cfg.title, cfg.colour, cfg.background, null, cfg.weight), true);
     }
     if (cfg.target) api.setMobAiState(id, "chasing", { targetId: cfg.target });
   } catch (e) {}
@@ -339,7 +338,7 @@ function* summonGuards() {
       name: CFG.GUARD_NAME,
       attackDamage: CFG.GUARD_DMG,
     });
-    api.setTargetedPlayerSettingForEveryone(id, "nameTagInfo", nameTagInfo(CFG.GUARD_NAME, null, "#ff9d4d", null, "#7ec8ff"), true);
+    applyNameTag(id, nameTagInfo(CFG.GUARD_NAME, null, "#ff9d4d", null, "#7ec8ff"), true);
     const target = nearestPlayer(p);
     if (target) api.setMobAiState(id, "chasing", { targetId: target });
     boss.guards.push(id);

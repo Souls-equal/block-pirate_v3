@@ -325,7 +325,10 @@ function hueOf(hex) {
 
 const SIDEBAR_SIZES = [];
 const POOR = {};
-const RICH = { money: 1234567, lvl: 87, xp: 4321, sp: 12, team: "PIRATE" };
+const RICH = {
+    money: 1234567, lvl: 87, xp: 4321, sp: 12,
+    team: "PIRATES", "crew:name": "Straw Hat Crew", "crew:role": "CAPTAIN",
+};
 /* Le pire cas RÉEL : un nouveau joueur, donc objectif de tutoriel ET première
    quête en cours. C'est exactement celui qui a le moins de place et le plus
    besoin de voir sa stamina. */

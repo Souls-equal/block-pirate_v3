@@ -2,7 +2,7 @@
 
 import { addStat, applyControls, confirmAction, getControlMode, isMobilePlayer, setControlMode, getStat, setStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
-import { getCrewName } from "./team";
+import { getCrewName, getPlayerTeam, getTeamData } from "./team";
 import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
@@ -186,6 +186,27 @@ function drawSidebar(playerId){
             ic("fa-solid fa-star", C.SUCCESS),
             txt(" Stat Points " + sp + "\n", C.SUCCESS),
         ], true, 4);
+    }
+
+    /* Equipe et equipage : la seule ligne qui dit AUJOURD'HUI a qui on parle.
+       Sans elle, un joueur devait ouvrir le chat ou lire son name tag pour
+       savoir s'il etait Pirate ou Marine. Rien n'est affiche avant le choix de
+       l'equipe (« No Team » ne dit rien et coute de la place). */
+    const teamData = getTeamData(getPlayerTeam(playerId));
+    const crewName = getCrewName(playerId);
+    if (teamData.id !== "NONE" || crewName) {
+        const identity = [];
+        if (teamData.id !== "NONE") {
+            identity.push(ic("fa-solid fa-flag", teamData.color));
+            identity.push(txt(" " + teamData.name, teamData.color));
+        }
+        if (crewName) {
+            if (identity.length) identity.push(txt("  ", C.INFO));
+            identity.push(ic("fa-solid fa-user-group", C.MONEY));
+            identity.push(txt(" " + short(crewName, 14), C.MONEY));
+        }
+        identity.push(txt("\n"));
+        block(identity, true, 5);
     }
 
     /* Equipement en dernier : il ne change qu'a l'achat, et il peut disparaitre
