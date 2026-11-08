@@ -359,7 +359,7 @@ function onBossDeath(playerId) {
   if (playerId) chat(CFG.LOOT_NAME, "#ffd166", playerId);
   cleanup();
   setTimeout(()=>{
-      chat("You will be teleported in 5 seconds...", "lime", playerId)
+      chat("You are teleported back to the sea.", "lime", playerId)
       api.setPosition(playerId, 2441, -915, 533)
   },100)
 }
