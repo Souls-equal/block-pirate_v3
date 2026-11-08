@@ -57,11 +57,13 @@ const TEAM_WEAPON_TIER = {
 
 /* Anciens noms affiches : un item achete avant la centralisation porte encore
    son nom dans ses attributs. On le reconnait pour le convertir quand meme, et
-   le nom est alors repris par la table de customItem. */
+   le nom est alors repris par la table de customItem. Cette liste ne contient
+   QUE des noms qui ne sont plus produits par les tables : un nom encore actif
+   ("Basic Sword") n'a rien a y faire, sinon chaque changement de team
+   reecrirait l'item pour rien. */
 const LEGACY_TEAM_WEAPON = {
     "Basic Dagger": "BASIC",
     "Basic Spear": "BASIC",
-    "Basic Sword": "BASIC",
     "Advanced Sword": "ADVANCED",
     "Flintlock": "ADVANCED",
     "Advanced Spear": "ADVANCED",
@@ -101,9 +103,9 @@ function replaceTeamWeapons(playerId, newTeam) {
         }
     });
 
-    /* Les noms suivent l'item : le nouveau et l'ancien sont renommes (le Wood
-       Sword d'un pirate s'appelle "Basic Dagger", celui d'un joueur sans team
-       "Basic Sword"). */
+    /* Les noms suivent l'item ET la team : le Wood Sword d'un pirate s'appelle
+       "Basic Sword", celui d'un joueur sans team "Rusty Sword" (voir
+       TEAM_ITEM_LOOKS). Rien a reecrire a la main : la table s'en charge. */
     if (replacedCount) applyItemLooks(playerId);
 
     return replacedCount;

@@ -731,8 +731,10 @@ Désormais les deux tables vivent dans **`src/gameplay/customItem.js`**, et null
 * **au join** (`itemJoin`) — les items déjà possédés (inventaire, Moonstone Chest, butin,
   récompense de quête) sont donc corrigés **sans re-give** ;
 * **au changement de team** (`replaceTeamWeapons`, `src/core/team.js`) — le `Wood Sword`
-  devient « Basic Dagger » chez les Pirates et « Basic Sword » sinon. `LEGACY_TEAM_WEAPON`
-  reconnaît les anciens noms pour convertir une arme déjà portée.
+  devient « Basic Sword » chez les Pirates et « Rusty Sword » sinon. `LEGACY_TEAM_WEAPON`
+  reconnaît les **anciens** noms (« Basic Dagger ») pour convertir une arme déjà portée ; il
+  ne contient jamais un nom encore produit par une table, sinon chaque changement de team
+  réécrirait l'item pour rien.
 
 `buyItem` (`src/utils/data.js`) ne pose plus aucun nom : il ne transmet que les attributs
 réellement demandés par l'appelant (`api.giveItem` est appelé **sans 4e argument** s'il n'y en
@@ -743,17 +745,33 @@ ici créerait le cycle `customItem → data`).
 | Item technique | Nom affiché | Description |
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
+| `Snowdash` | **Dash** | le dash du mobile |
+| `Swap Orb` | **Devil Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
+| `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
 | `Magmaward Fuel` | **Ancient Relic** | butin de la Saber Quest |
+| `Black Carpet` | **Haki Fragment** | butin du boss, se revend au Haki Buyer |
+| `Water Bucket` | **Cup of Water** | la Cup pleine de la Saber Quest |
 | `M1911` | **Flintlock** | armurerie, arme avancée des Marines |
 | `Boat` / `Obsidian Boat` / `Speedboat` | **Normal Boat** / **Advanced Boat** / **Luxury Boat** | chantier naval |
 | `Stone Dagger` / `Stone Sword` / `Stone Spear` | **Sand Dagger** / **Advanced Sword** / **Advanced Spear** | armurerie |
 | `Wood Spear` | **Basic Spear** | armurerie |
-| `Wood Sword` | **Basic Dagger** (Pirates) / **Basic Sword** (autres) | arme de team |
+| `Wood Sword` | **Basic Sword** (Pirates) / **Rusty Sword** (autres) | arme de team |
 
-**Règle** : un renommage ne s'écrit **jamais** dans un `giveItem` / `buyItem`. On ajoute une
-ligne à `ITEM_LOOKS` (ou `TEAM_ITEM_LOOKS`), c'est tout — le nom technique reste celui du jeu,
-sinon les `getInventoryItemAmount` et les `removeItemName` cassent.
+**Règle** : un renommage ne s'écrit **jamais** dans un `giveItem` / `buyItem` / `createItemDrop`.
+On ajoute une ligne à `ITEM_LOOKS` (ou `TEAM_ITEM_LOOKS`), c'est tout — le nom technique reste
+celui du jeu, sinon les `getInventoryItemAmount` et les `removeItemName` cassent.
+
+Trois conséquences, toutes vérifiées par `npm run check` (section « Noms d'items ») :
+
+* chaque entrée porte **un nom et une description** non vides ;
+* le nom affiché n'est **jamais** le nom technique (`"Swap Orb"` n'affiche pas « Swap Orb ») ;
+* aucun item déclaré dans `ITEM_LOOKS` n'est renommé au moment du give.
+
+Seule exception assumée : les items des **capacités** (fruits et styles de combat). Un même
+`Paintball Explosive Item` porte une capacité différente selon le fruit du joueur, donc son nom
+ne peut pas vivre dans une table statique — il est posé au give, par capacité (`src/fruit/abilities.js`,
+`src/gameplay/fightingStyles.js`).
 
 ---
 

@@ -36,12 +36,13 @@ export const ITEM_LOOKS = {
         displayName: "Armament Haki",
         description: "Click to arm or release your Armament Haki. It cannot be dropped.",
     },
-    /* Les deux items qui remplacent les items de capacite sur PC (demande 76).
-       Ce sont de VRAIS items Bloxd, on ne change que ce que le joueur lit.
-       Le nom reste « Swap Orb » / « Void Net » dans le code : c'est par lui que
-       fruit/index et fightingStyles les reconnaissent, jamais par l'affichage. */
-    /* Mobile : l'item de dash. Son nom Bloxd (« Snowdash ») ne dit rien au
-       joueur, et il est le SEUL moyen de dasher sur un ecran tactile. */
+
+    /* COMMANDES (demandes 76 et 77). Trois items dont le nom Bloxd ne dit rien
+       au joueur. Le code les reconnait par leur nom d'item ("Snowdash",
+       "Swap Orb", "Void Net") et JAMAIS par ce qui est ecrit ici : renommer
+       une entree ne casse donc aucun test ni aucun choix de commande.
+         - Snowdash : le dash du mobile, seul moyen de dasher a l'ecran ;
+         - Swap Orb / Void Net : ouvrent les touches du mode « boutons ». */
     "Snowdash": {
         displayName: "Dash",
         description: "Click to dash forward. It costs stamina and cannot be dropped.",
@@ -54,11 +55,14 @@ export const ITEM_LOOKS = {
         displayName: "Fighting Style Capacities",
         description: "Hold it in your hand to punch and to use your Fighting Style attacks. It cannot be dropped.",
     },
-    /* Saber Quest : le butin du Mob Leader et la relique du mur. Ce sont de
-       VRAIS items du jeu, on ne fait que changer ce que le joueur lit.
+
+    /* Saber Quest : le butin du Mob Leader, la relique du mur et la Cup. Ce sont
+       de VRAIS items du jeu, on ne fait que changer ce que le joueur lit.
          - Gold Grit : un tas de pieces et de tresor, pas une ressource.
-         - Magmaward Fuel : une relique ancienne qui ouvre ce qu'aucune lame
-           ne coupe, pas un carburant. */
+         - Magmaward Fuel : une relique ancienne qui ouvre ce qu'aucune lame ne
+           coupe, pas un carburant.
+         - Black Carpet : la toile que lache le boss, pas une moquette.
+         - Water Bucket : la Cup pleine de la quete. */
     "Gold Grit": {
         displayName: "Gold Dust",
         description: "A heap of stolen coins and treasure, all that the Mob Leader could carry. The Rich Man wants it back.",
@@ -67,23 +71,35 @@ export const ITEM_LOOKS = {
         displayName: "Ancient Relic",
         description: "An ancient Relic bearing the marks of time. It opens what no blade can cut, right where it's marked",
     },
-    /* Armurerie et bateaux des PNJ. Les noms vivaient dans les appels
-       buyItem() de gameplay/NPCs : ils sont ici, une fois. */
-    "M1911": { displayName: "Flintlock", description: "A slow Flintlock to kill enemies from the distance!" },
-    "Boat": { displayName: "Normal Boat", description: "A classic boat made to travel all seas." },
-    "Obsidian Boat": { displayName: "Advanced Boat", description: "A stronger boat made to travel all seas." },
-    "Speedboat": { displayName: "Luxury Boat", description: "A super fast boat made to travel all seas." },
-    "Stone Dagger": { displayName: "Sand Dagger", description: "A dagger made of the rock of the desert." },
-    "Stone Sword": { displayName: "Advanced Sword", description: "The sword of a strong Pirates." },
-    "Stone Spear": { displayName: "Advanced Spear", description: "Just a sword for a normal people..." },
-    "Wood Spear": { displayName: "Basic Spear", description: "The spear of the Justice!" },
+    "Black Carpet": {
+        displayName: "Haki Fragment",
+        description: "A shard of Armament Haki, torn from a boss. Pick it up to grow stronger.",
+    },
+    "Water Bucket": {
+        displayName: "Cup of Water",
+        description: "A cup full of fresh water. Someone must be thirsty.",
+    },
+
+    /* Armurerie et bateaux des PNJ. Trois familles, une par marchand :
+       les bateaux, les lames du desert et les armes des deux camps. Le nom
+       lu par le joueur ne dit jamais de quel item Bloxd il s'agit. */
+    "Boat": { displayName: "Normal Boat", description: "A classic boat, made to sail every sea." },
+    "Obsidian Boat": { displayName: "Advanced Boat", description: "A sturdier boat, made to sail every sea." },
+    "Speedboat": { displayName: "Luxury Boat", description: "The fastest boat of the three, made to sail every sea." },
+    "Stone Dagger": { displayName: "Sand Dagger", description: "A short blade cut from the rock of the desert." },
+    "Stone Sword": { displayName: "Advanced Sword", description: "The blade of a Pirate who has already drawn blood." },
+    "Stone Spear": { displayName: "Advanced Spear", description: "A long spear for a fighter with no side to swear to." },
+    "Wood Spear": { displayName: "Basic Spear", description: "The first spear every Marine is handed." },
+    "M1911": { displayName: "Flintlock", description: "A slow hand cannon that hits hard from a distance." },
 };
 
-/* Le seul item dont le NOM depend de la team. */
+/* Le seul item dont le NOM depend de la team : la premiere arme, que le
+   First Weapon Dealer ne vend pas au meme prix a un Pirate et a un joueur
+   sans camp. Le nom suit ce que le joueur est, pas ce que l'item est. */
 export const TEAM_ITEM_LOOKS = {
     "Wood Sword": {
-        PIRATES: { displayName: "Basic Dagger", description: "The first weapon of every Pirates." },
-        DEFAULT: { displayName: "Basic Sword", description: "Just a sword for a normal people..." },
+        PIRATES: { displayName: "Basic Sword", description: "The first sword every Pirate is handed." },
+        DEFAULT: { displayName: "Rusty Sword", description: "A rusted sword, the first blade of a fighter with no side to swear to." },
     },
 };
 
