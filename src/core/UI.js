@@ -643,7 +643,7 @@ function createSettingsItems(playerId) {
                 description: [
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
                     byButtons
-                        ? " Keyboard: Fruit Abilitiy Item and Fighting Style Ability in your hand open the keys."
+                        ? " Keyboard: Fruit Abilities Item and Fighting Style Capacities Item in your hand open the keys."
                         : " Items: one item per ability, dash on right click.",
                     bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), "#4ADE80"),
                     txt(byButtons
