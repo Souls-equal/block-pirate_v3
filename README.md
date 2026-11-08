@@ -1873,6 +1873,49 @@ même préfixe de famille (`control-`, `gravity-`) et ajoute la famille dans
 
 ---
 
+## Commandes : clavier sur PC, items sur mobile
+
+Un joueur ne passe pas de PC à mobile sans quitter le monde : l'appareil est lu
+**une seule fois, au join** (`api.isMobile`) et retenu dans `src/utils/data.js`
+(`setDevice` / `isMobilePlayer` / `clearDevice`, oublié au départ). Il n'y a donc
+ni surveillance continue, ni choix laissé au joueur.
+
+| | Dash | Capacités de fruit |
+|---|---|---|
+| **PC** | touche `Q` | touches `Z` `X` `C` `V` `F` = capacités 1→5 |
+| **Mobile** | item **`Snowdash`** (un clic) | les items de capacités, inchangés |
+
+Sur PC, six `customButtons` sont posés au join (`CONTROLS` dans `src/index.js`)
+et les **items de capacités sont retirés** : ils ne servaient qu'à cliquer et
+encombraient cinq slots. Sur mobile, `customButtons` est vidé (au cas où une
+session PC aurait laissé des boutons) et l'item de dash est donné.
+
+Les `keycode` envoyés sont ceux d'un clavier QWERTY (`KeyQ`, `KeyZ`…) : Bloxd
+les remappe seul sur un AZERTY, c'est la même touche physique.
+
+Trois détails qui comptent :
+
+1. **`Snowdash` garde son effet par défaut ?** Non : son clic (`onPlayerClick`)
+   comme son action secondaire (`onPlayerAltAction`) renvoie `preventAction` et
+   appelle **notre** `tryDash` — coût en stamina, animation, verrou anti-coup de
+   poing. C'est le même dash que sur PC, pas le propulseur de Bloxd.
+2. **Une touche ne fournit aucun point de visée.** `clickPoint()` reconstitue ce
+   qu'un clic aurait donné (`x, y, z`, nom du bloc, créature devant le joueur)
+   depuis `getPosition`, `getPlayerFacingInfo().dir/camPos`, `targetBlock()` et
+   `pickTarget(…, 40, 0.6)`, puis appelle `handleAbilitySlot(id, n)` — le même
+   dispatcher que le clic.
+3. **Inventaire plein.** Bloxd ne le signale pas : `ensureDashItem` donne l'item
+   puis **vérifie** sa présence. S'il n'est pas là, le joueur est prévenu **une
+   fois** (« free a slot… ») et un réessai repart toutes les 5 s pendant 5 min ;
+   la chaîne est arrêtée au départ du joueur (`clearDashState`).
+
+`npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
+liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une
+touche unique et valide, un `id` traité par `onPlayerPressedButton`. Une icône
+inconnue ne casse rien : elle s'afficherait « ? », d'où la vérification.
+
+---
+
 ## Fruits : nouveaux items (poissons) et migration des inventaires
 
 Les fruits ne sont plus des blocs mais des **poissons**. Seul `itemName` a changé :

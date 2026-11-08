@@ -1,6 +1,7 @@
 // stamina.js
 
-import { setInterval } from "../utils/timer";
+import { setInterval, setTimeout } from "../utils/timer";
+import { say, txt } from "../core/theme";
 
 /* PARAMÈTRES — modifiez tout ici */
 export const STAMINA_CONFIG = {
@@ -297,4 +298,91 @@ function dashAnim(playerId) {
         });
     } catch (e) {}
 }
-
+
+/* ── DASH : une touche sur PC, un item sur mobile (demande 75) ───────────────
+   PC     : bouton personnalise « dash » (api.setClientOption customButtons,
+            KeyQ) -> onPlayerPressedButton -> tryDash.
+   MOBILE : l'item Bloxd « Snowdash » propulse deja le joueur vers l'avant. On
+            garde NOTRE dash (cout en stamina, animation, verrou anti-coup de
+            poing) et on annule l'effet par defaut de l'item en renvoyant
+            « preventAction » depuis onPlayerAltAction (voir index.js).
+   L'item n'est jamais nomme au moment du give : son nom et sa description
+   viennent de ITEM_LOOKS, dans gameplay/customItem.js (regle de la demande 63). */
+
+export const DASH_ITEM = "Snowdash";
+
+const DASH_RETRY_TICKS = 100; // ~5 s
+const DASH_RETRY_MAX = 60;    // ~5 min
+const dashGrant = {};
+
+export function dashItemAmount(playerId) {
+    let n = 0;
+    try { n = api.getInventoryItemAmount(playerId, DASH_ITEM); } catch (e) { n = 0; }
+    return typeof n === "number" && n > 0 ? n : 0;
+}
+
+export function hasDashItem(playerId) {
+    return dashItemAmount(playerId) > 0;
+}
+
+/* Bloxd ne signale pas un inventaire plein : on verifie donc la presence. */
+function giveDashItem(playerId) {
+    try { api.giveItem(playerId, DASH_ITEM, 1); } catch (e) { return false; }
+    return hasDashItem(playerId);
+}
+
+export function removeDashItem(playerId) {
+    const n = dashItemAmount(playerId);
+    if (!n) return false;
+    try { api.removeItemName(playerId, DASH_ITEM, n); } catch (e) { return false; }
+    return true;
+}
+
+/* Donne l'item de dash, et REESSAIE tant que l'inventaire est plein : le joueur
+   est prevenu UNE fois, on ne le harcele pas, et on s'arrete au bout de
+   DASH_RETRY_MAX essais (ou si le joueur est parti : le give echoue). */
+export function ensureDashItem(playerId, attempt) {
+    if (!playerId) return false;
+    if (hasDashItem(playerId)) { delete dashGrant[playerId]; return true; }
+    if (giveDashItem(playerId)) { delete dashGrant[playerId]; return true; }
+    const st = dashGrant[playerId] || (dashGrant[playerId] = { told: false });
+    if (!st.told) {
+        st.told = true;
+        try {
+            say(playerId, [
+                txt("[", "#94a3b8"),
+                txt("!", "#ef4444", { fontWeight: "700" }),
+                txt("] ", "#94a3b8"),
+                txt("Your inventory is full: free a slot and you will get your ", "#cbd5e1"),
+                txt("Dash", "#7dd3fc", { fontWeight: "700" }),
+                txt(" item.", "#cbd5e1"),
+            ]);
+        } catch (e) {}
+    }
+    if ((attempt || 0) >= DASH_RETRY_MAX) { delete dashGrant[playerId]; return false; }
+    /* On garde de quoi arreter la chaine : sans cela, un joueur qui quitte
+       pendant les essais continuerait d'etre sonde pendant cinq minutes. */
+    try {
+        st.timer = setTimeout(() => ensureDashItem(playerId, (attempt || 0) + 1), DASH_RETRY_TICKS);
+    } catch (e) {
+        st.timer = null;
+    }
+    return false;
+}
+
+/* Utilisation de l'item de dash (mobile). Renvoie true s'il s'agit bien de lui,
+   pour que l'appelant arrete de traiter le clic. */
+export function handleDashItemClick(playerId, itemName) {
+    if (itemName !== DASH_ITEM) return false;
+    if (!hasDashItem(playerId)) { ensureDashItem(playerId); return true; }
+    tryDash(playerId);
+    return true;
+}
+
+export function clearDashState(playerId) {
+    const st = dashGrant[playerId];
+    if (st && st.timer) {
+        try { st.timer.stop(); } catch (e) {}
+    }
+    delete dashGrant[playerId];
+}

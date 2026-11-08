@@ -1,6 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout, txt, ic } from "../core/theme";
-import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket } from "../utils/data";
+import { bestFruitTicket, confirmAction, fruitRollPrice, isMobilePlayer, spendFruitTicket } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -509,7 +509,10 @@ function N(t, e, o) {
   h.set(t, e);
   const r = n[e];
   if (r) {
-    if ((k(t), r.giveditems)) for (const e of r.giveditems) I(t, e, r);
+    /* PC : les capacites sont sur Z/X/C/V/F (voir index.js, customButtons), donc
+       AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
+       encombrer les 5 slots. Mobile : les items restent, c'est son seul moyen. */
+    if ((k(t), r.giveditems && !isMobilePlayer(t))) for (const e of r.giveditems) I(t, e, r);
     try {
       restoreFightingStyle(t);
     } catch (t) {}
@@ -578,10 +581,18 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
       o = Date.now();
     return ((!v[e] || o - v[e] > 1e4) && ((v[e] = o), m(t), u.name), !1);
   }
+  return runAbility(t, y, o, r, i, c, a, l);
+}
+
+/* Lance une capacite : c'est le chemin COMMUN du clic sur l'item (mobile) et de
+   la touche du clavier (PC). Tout ce qui n'est pas l'identification de la
+   capacite vit ici : cooldown, message « Ability is ready », son, animation du
+   clic, et l'appel lui-meme. */
+function runAbility(t, y, o, r, i, c, a, l) {
   try {
     if (l && "NPC" === api.getEntityType(l)) return !1;
-  } catch (t) {
-    f("dispatch.getEntityType", t);
+  } catch (e) {
+    f("dispatch.getEntityType", e);
   }
   const d = t + ":" + (y.name || y.clicked),
     F = y.cooldown || 900,
@@ -639,6 +650,25 @@ export function handleAbilityItemClick(t, o, r, i, c, a, l) {
     (f("dispatch.onClick", t, C), g.delete(d));
   }
   return (W[d] || (W[d] = 1), !0);
+}
+/* Retire TOUS les items de capacites de l'inventaire (tous fruits confondus,
+   au cas ou l'ancien fruit en ait laisse). Ne touche pas aux items de Fighting
+   Style : ils ne sont pas des capacites de fruit. */
+export function removeAbilityItems(t) {
+  k(t);
+}
+
+/* Touche du clavier (PC) : la capacite numero `slot` (0 a 4) du fruit porte,
+   SANS item dans l'inventaire. Le reste (cooldown, son, message) est identique
+   au clic : une seule implementation, donc aucun risque de divergence. */
+export function handleAbilitySlot(t, slot, o, r, i, c, a, l) {
+  const s = h.get(t);
+  if (!s) return !1;
+  const p = n[s];
+  if (!p) return !1;
+  const y = p["attack" + (slot + 1)];
+  if (!y) return !1;
+  return runAbility(t, y, o, r, i, c, a, l);
 }
 export function handleAbilityItemRelease(t, e, o, r, i, c, a) {
   const l = b[t];
@@ -717,7 +747,7 @@ export function restorePlayerFruit(t) {
     }
     if (missing) {
       k(t);
-      if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
+      if (r.giveditems && !isMobilePlayer(t)) for (const item of r.giveditems) I(t, item, r);
       try {
         restoreFightingStyle(t);
       } catch (t) {}

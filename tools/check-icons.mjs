@@ -72,9 +72,17 @@ const files = [];
 
 let checked = 0;
 const errors = [];
+/* Les boutons personnalises (customButtons) sont le SEUL endroit ou une icone
+   s'ecrit en nom nu (« zap ») : c'est ce que l'API attend. Ce bloc est donc
+   retire du scan generique et verifie a part, plus bas (section 3). */
+const CONTROLS_RE = /const CONTROLS = \[([\s\S]*?)\n\];/;
+const controlsSource = readFileSync(join(ROOT, "src/index.js"), "utf8");
+const controlsBlock = CONTROLS_RE.exec(controlsSource);
+
 for (const file of files) {
-    const source = readFileSync(file, "utf8");
+    let source = readFileSync(file, "utf8");
     const where = relative(ROOT, file);
+    if (controlsBlock && where === "src/index.js") source = source.replace(controlsBlock[0], "");
     let m;
     /* Deux ecritures pour la meme chose : le litteral historique
        `icon: "fa-solid fa-x"` et la fabrique `ic("fa-solid fa-x", couleur)`
@@ -286,6 +294,67 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
     }
 }
 
+/* ==========================================================================
+   3. Boutons personnalises (customButtons) : clavier du PC
+   ==========================================================================
+   Trois choses cassent silencieusement un bouton :
+     - un `icon` absent de la liste blanche -> un « ? » a l'ecran (pas d'erreur) ;
+     - un `keycode` hors de la liste autorisee par Bloxd -> le bouton ne se
+       declenche jamais ;
+     - un `id` que `onPlayerPressedButton` ne traite pas -> un bouton mort.
+   Et deux boutons sur la meme touche : le second est inutilisable. */
+const KEYCODE_OK = /^(Key[A-Z]|Digit[0-9]|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Space)$/;
+const EXPECTED_IDS = ["dash", "ability1", "ability2", "ability3", "ability4", "ability5"];
+
+if (!controlsBlock) {
+    errors.push("src/index.js : bloc CONTROLS introuvable (boutons du PC)");
+} else {
+    const entries = [];
+    const reEntry = /\{[^{}]*\}/g;
+    let em;
+    while ((em = reEntry.exec(controlsBlock[1]))) {
+        const raw = em[0];
+        const id = /id:\s*"([^"]*)"/.exec(raw);
+        const icon = /icon:\s*"([^"]*)"/.exec(raw);
+        const keycode = /keycode:\s*"([^"]*)"/.exec(raw);
+        const description = /description:\s*"([^"]*)"/.exec(raw);
+        if (!id || !icon || !keycode) {
+            errors.push("src/index.js : bouton incomplet (" + raw.replace(/\s+/g, " ") + ")");
+            continue;
+        }
+        entries.push({ id: id[1], icon: icon[1], keycode: keycode[1], description: description ? description[1] : "" });
+    }
+    checked += entries.length;
+    if (entries.length !== EXPECTED_IDS.length)
+        errors.push("src/index.js : " + entries.length + " boutons au lieu de " + EXPECTED_IDS.length);
+    for (let i = 0; i < EXPECTED_IDS.length; i++) {
+        if (!entries.some((e) => e.id === EXPECTED_IDS[i]))
+            errors.push("src/index.js : bouton \"" + EXPECTED_IDS[i] + "\" absent");
+    }
+    const keySeen = {};
+    for (const e of entries) {
+        if (e.icon.indexOf("fa-") === 0) {
+            errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" — customButtons attend un nom NU (sans \"fa-solid\")");
+        } else if (!fa.has(e.icon)) {
+            errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" absente de la liste blanche (elle s'afficherait « ? »)");
+        }
+        if (!KEYCODE_OK.test(e.keycode))
+            errors.push("bouton " + e.id + " : keycode \"" + e.keycode + "\" refuse par Bloxd");
+        if (keySeen[e.keycode]) errors.push("bouton " + e.id + " : touche " + e.keycode + " deja prise par " + keySeen[e.keycode]);
+        keySeen[e.keycode] = e.id;
+        if (!e.description.trim()) errors.push("bouton " + e.id + " : description vide");
+    }
+    /* Chaque id doit etre traite par le handler, sinon le bouton ne fait rien. */
+    const handlerAt = controlsSource.indexOf("onPlayerPressedButton");
+    const handler = handlerAt >= 0 ? controlsSource.slice(handlerAt, handlerAt + 700) : "";
+    if (handlerAt < 0) errors.push("src/index.js : onPlayerPressedButton introuvable");
+    else {
+        if (handler.indexOf('"dash"') === -1) errors.push("onPlayerPressedButton ne traite pas le bouton \"dash\"");
+        if (!/ability\(\[1-5\]\)|ability\(\d/.test(handler))
+            errors.push("onPlayerPressedButton ne traite pas les boutons ability1..5");
+    }
+}
+
 if (errors.length) {
     console.error("Textes invalides (" + errors.length + ") :");
     for (const e of errors) console.error("  - " + e);
@@ -293,3 +362,4 @@ if (errors.length) {
 }
 console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.length + " sidebars + barres), tout est valide.");
 console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");
+console.log("  Boutons PC : " + EXPECTED_IDS.join(", ") + " (icones, touches uniques, ids traites).");
