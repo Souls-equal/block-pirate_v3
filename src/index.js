@@ -1,5 +1,5 @@
 import { canDamage as t, crewCommands as r, handleBountyKill as bKill, handleChat as a, reconcileTeamWeapons as i, setSafeZoneCheck as setSafeZoneCheck, setupChatChannels as e, syncCrewFromDB as o, syncMuteIndex as syncMuteIndex, updateNameTag as m } from "./core/team";
-import { activateFruit as l, clearFruitCallbacks as s, getFruit as n, handleAbilitySlot as slotAbility, removeAbilityItems as dropAbilityItems, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
+import { activateFruit as l, clearFruitCallbacks as s, fruitAbilityCount as fruitAbilityCount, getFruit as n, handleAbilitySlot as slotAbility, removeAbilityItems as dropAbilityItems, ensureSwapOrb as ensureSwap, removeSwapOrb as dropSwap, SWAP_ORB as SWAP_ORB_Name, handleAbilityItemClick as p, handleAbilityItemRelease as f, handleFruitClickUp as u, handleFruitItemClick as c, handleFruitJoin as y, handleFruitJump as d, onPlayerDeathFruit as df, restorePlayerFruit as g } from "./fruit/index";
 import { abilityCollision as b, abilityJoin as P, abilityLeave as k, isAbilityItemName as C, isHoldingAbilityItem as D } from "./fruit/abilities";
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync, setTutorialLineLookup as bpSetTutorialLine } from "./core/UI"; 
@@ -8,7 +8,7 @@ import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
-import { handleFightingStyleClick as fsClick, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore } from "./gameplay/fightingStyles";
+import { ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
@@ -196,37 +196,86 @@ ct((t, r, a) => {
    Les keycodes sont ceux du clavier QWERTY ; Bloxd remappe tout seul pour un
    AZERTY (c'est la meme touche physique).
    ══════════════════════════════════════════════════════════════════════════ */
-const CONTROLS = [
-    { id: "dash", icon: "zap", keycode: "KeyQ", description: "Dash" },
-    { id: "ability1", icon: "fire", keycode: "KeyZ", description: "Devil Fruit ability 1" },
-    { id: "ability2", icon: "snowflake", keycode: "KeyX", description: "Devil Fruit ability 2" },
-    { id: "ability3", icon: "crosshairs", keycode: "KeyC", description: "Devil Fruit ability 3" },
-    { id: "ability4", icon: "swords", keycode: "KeyV", description: "Devil Fruit ability 4" },
-    { id: "ability5", icon: "gem", keycode: "KeyF", description: "Devil Fruit ability 5" },
-];
+/* Trois groupes de boutons, jamais melanges dans la meme main :
+     dash    : toujours la (Q) ;
+     ability : capacites du fruit, autant que le fruit en a (3 a 5) ;
+     style   : les deux attaques du style de combat.
+   `ability` et `style` partagent Z/X a dessein : on ne peut tenir qu'un item a
+   la fois (Swap Orb ou Void Net), donc ils ne sont jamais actifs ensemble. */
+const CONTROLS = {
+    dash: [{ id: "dash", icon: "zap", keycode: "KeyQ", description: "Dash" }],
+    ability: [
+        { id: "ability1", icon: "fire", keycode: "KeyZ", description: "Devil Fruit ability 1" },
+        { id: "ability2", icon: "snowflake", keycode: "KeyX", description: "Devil Fruit ability 2" },
+        { id: "ability3", icon: "crosshairs", keycode: "KeyC", description: "Devil Fruit ability 3" },
+        { id: "ability4", icon: "swords", keycode: "KeyV", description: "Devil Fruit ability 4" },
+        { id: "ability5", icon: "gem", keycode: "KeyF", description: "Devil Fruit ability 5" },
+    ],
+    style: [
+        { id: "style1", icon: "hand-fist", keycode: "KeyZ", description: "Fighting Style attack 1" },
+        { id: "style2", icon: "hand-back-point-up", keycode: "KeyX", description: "Fighting Style attack 2" },
+    ],
+};
 
-function setupControls(playerId) {
+/* Boutons envoyes au client, en fonction de ce que le joueur a EN MAIN.
+   Regle (demande 76) : pas d'item en main, pas de touches. */
+function buttonsFor(playerId) {
+    if (isMobilePlayer(playerId)) return [];
+    const list = CONTROLS.dash.slice();
+    const held = heldName(playerId);
+    if (held === SWAP_ORB_Name) {
+        const count = fruitAbilityCount(playerId);
+        for (let i = 0; i < count && i < CONTROLS.ability.length; i++) list.push(CONTROLS.ability[i]);
+    } else if (held === VOID_NET_Name) {
+        for (let i = 0; i < CONTROLS.style.length; i++) list.push(CONTROLS.style[i]);
+    }
+    return list;
+}
+
+/* Un seul envoi par changement : setClientOption est un aller-retour client.
+   On garde donc la derniere liste par joueur et on compare avant d'envoyer. */
+const lastButtons = {};
+function applyButtons(playerId) {
+    if (!playerId) return;
+    const list = buttonsFor(playerId);
+    const key = JSON.stringify(list);
+    if (lastButtons[playerId] === key) return;
+    lastButtons[playerId] = key;
+    try { api.setClientOption(playerId, "customButtons", list); } catch (e) { _t("buttons", e); }
+}
+
+/* L'appareil ne change qu'en quittant le monde : on le lit UNE fois, au tout
+   debut du join (avant le fruit, qui donne des items differents selon lui). */
+function setupDevice(playerId) {
     let mobile = false;
     try { mobile = api.isMobile(playerId) === true; } catch (e) { mobile = false; }
     setPlayerDevice(playerId, mobile);
+    return mobile;
+}
+
+function setupControls(playerId) {
+    const mobile = isMobilePlayer(playerId);
     if (mobile) {
-        /* Pas de clavier : on nettoie d'eventuels boutons laisses par une
-           session PC, et on s'assure que l'item de dash est la. */
+        /* Pas de clavier : aucun bouton, et pas d'item de PC qui trainerait. */
+        lastButtons[playerId] = null;
         try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
+        dropDash(playerId), dropSwap(playerId), dropNet(playerId);
         ensureDash(playerId);
         return true;
     }
-    try { api.setClientOption(playerId, "customButtons", CONTROLS); } catch (e) {}
-    /* PC : le dash est sur Q et les capacites sur les touches, donc plus d'item
-       de dash ni d'items de capacites. */
+    /* PC : un item par domaine, et aucun item de capacite dans l'inventaire. */
     dropDash(playerId);
     dropAbilityItems(playerId);
+    dropFightingStyleItems(playerId);
+    ensureSwap(playerId);
+    ensureNet(playerId);
+    applyButtons(playerId);
     return true;
 }
 
 /* Ce qu'un CLIC aurait donne : le bloc vise, le bloc a cet endroit, et la
    creature devant le joueur. Une touche ne fournit aucune de ces valeurs, on
-   les reconstitue donc ici, une fois, pour les cinq touches de capacite. */
+   les reconstitue donc ici, une fois, pour les touches de capacite. */
 function clickPoint(playerId) {
     let pos = null, info = null;
     try { pos = api.getPosition(playerId); } catch (e) { pos = null; }
@@ -245,25 +294,46 @@ function clickPoint(playerId) {
     return { x: x, y: y, z: z, block: block, target: target };
 }
 
-/* Bouton personnalise presse (PC). Mobile n'en a pas : la garde sur l'appareil
-   est la pour qu'un bouton residuel ne declenche rien d'inattendu. */
+/* Bouton personnalise presse (PC). Le bouton n'existe que si le bon item est en
+   main, mais on revérifie ici : un client peut garder un bouton residuel. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
     if (buttonId === "dash") {
         try { ot(playerId); } catch (e) { _t("button.dash", e); }
         return;
     }
-    const m = /^ability([1-5])$/.exec(buttonId);
-    if (!m) return;
-    const aim = clickPoint(playerId);
-    try {
-        slotAbility(playerId, Number(m[1]) - 1, false, aim.x, aim.y, aim.z, aim.block, aim.target);
-    } catch (e) {
-        _t("button.ability", e);
+    const held = heldName(playerId);
+    if (held === SWAP_ORB_Name) {
+        const m = /^ability([1-5])$/.exec(buttonId);
+        if (!m) return;
+        const aim = clickPoint(playerId);
+        try {
+            slotAbility(playerId, Number(m[1]) - 1, false, aim.x, aim.y, aim.z, aim.block, aim.target);
+        } catch (e) {
+            _t("button.ability", e);
+        }
+        return;
+    }
+    if (held === VOID_NET_Name) {
+        const index = buttonId === "style1" ? 0 : buttonId === "style2" ? 1 : -1;
+        if (index < 0) return;
+        const aim = clickPoint(playerId);
+        try {
+            styleAbility(playerId, index, aim.target);
+        } catch (e) {
+            _t("button.style", e);
+        }
     }
 };
 
-onPlayerJoin = t => {St(t) //sphere
+/* Les touches dependent de l'item EN MAIN : on les recalcule quand le joueur
+   change de slot (le cas normal) et quand son inventaire bouge (item donne,
+   ramasse, perdu). applyButtons ne renvoie rien si la liste n'a pas change. */
+onPlayerSelectInventorySlot = (t, slot) => {
+    applyButtons(t);
+}, onInventoryUpdated = t => {
+    applyButtons(t);
+}, onPlayerJoin = t => {St(t) //sphere
     if (qt(t)) return;
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
@@ -272,6 +342,10 @@ onPlayerJoin = t => {St(t) //sphere
        redemarrage de lobby efface l'index, pas le mute. Sans ca un joueur
        reste muet sans apparaitre dans la liste, donc sans pouvoir etre demute. */
     try { syncMuteIndex(t); } catch (e) {}
+    /* L'appareil AVANT tout le reste : le fruit et le style donnent des items
+       differents sur PC (Swap Orb / Void Net) et sur mobile (items de
+       capacite). Lire api.isMobile plus tard donnerait « PC » a tout le monde. */
+    Gt("device", () => setupDevice(t)),
     Qt(t), Gt("fruit", () => y(t)), Gt("codes", () => X(t)), Gt("admin", () => Rt(t)),
     Gt("haki", () => Ht(t)), Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
     Gt("nametag", () => m(t)), Gt("weapons", () => i(t)), Gt("chat", () => e(t)),
@@ -291,7 +365,7 @@ onPlayerJoin = t => {St(t) //sphere
 }, onPlayerLeave = t => {
     /* L'appareil et les essais de donne d'item de dash ne survivent pas a la
        session : le prochain join relit api.isMobile. */
-    try { clearPlayerDevice(t), clearDash(t); } catch (e) {}
+    try { clearPlayerDevice(t), clearDash(t), delete lastButtons[t]; } catch (e) {}
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
     /* Chaque sortie est isolee : avant, une exception dans la premiere
@@ -330,6 +404,16 @@ onPlayerJoin = t => {St(t) //sphere
     let heldDash = null;
     try { heldDash = api.getHeldItem(t); } catch (e) { heldDash = null; }
     if (heldDash && heldDash.name === DASH_ITEM_Name) return void dashItemClick(t, heldDash.name);
+    /* Void Net (PC) : en main, le clic EST le coup de poing du style. Le filet
+       n'est pas un item de capacite, donc aucun clic ne part ailleurs. */
+    if (fsHoldingNet(t)) {
+        if (!isDash(t)) try {
+            fsM1(t, m, !0);
+        } catch (e) {
+            _t("onPlayerClick.netM1", e);
+        }
+        return;
+    }
     if (Kt(t)) return;
     if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
     if (m && isNPCEntity(m)) {
