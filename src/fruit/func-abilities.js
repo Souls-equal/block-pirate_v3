@@ -349,25 +349,18 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   FA.release = "";
   FA.sourceHash = "";
 
-  const seen = {};
-  function warn(tag, msg) {
-    const now = Date.now();
-    if (!seen[tag] || now - seen[tag] >= 2000) {
-      seen[tag] = now;
-      say(msg);
-    }
-  }
-
   /* --- Anti-spam ---------------------------------------------------------
      `load()` se rejoue jusqu'a 30 fois (chunk froid, blocs pas encore poses) et
      reemet a chaque tentative les MEMES lignes : « aucun Code Block trouve »,
      « N handler(s) absent(s) »… Un monde ou les blocs manquent produisait des
      centaines de lignes de log pour un seul etat, et noyait le vrai message.
 
-     Regle : un message identique n'est dit qu'UNE fois. S'il disparait puis
-     revient (bloc recolle, puis retire), il est redit : c'est un vrai
-     changement d'etat, pas du bruit. `warn()` (limite a 2 s par tag) reste pour
-     le bruit transitoire, `sayOnce()` pour les constats durables. */
+     Regle unique : un message identique n'est dit qu'UNE fois. S'il disparait
+     puis revient (bloc recolle, puis retire), il est redit : c'est un vrai
+     changement d'etat, pas du bruit. Il n'y a plus de limite « une fois toutes
+     les 2 s » : elle laissait passer une ligne toutes les 2 s, indefiniment,
+     pour un etat qui ne changeait pas (chunk froid) — soit 30 lignes par
+     minute a vie. */
   const said = {};
   function sayOnce(key, msg) {
     if (said[key]) return;
@@ -419,9 +412,18 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
           : d?.persisted?.shared?.text || d?.persisted?.text || d?.text || null;
       return typeof text === "string" && text.length ? { z, text } : null;
     } catch (e) {
-      /* UN tag pour toutes les cases : avec un tag par `z`, 24 cases en echec
-         autorisaient 24 lignes toutes les 2 s. */
-      warn("slot", "[FA] lecture d'un Code Block z=" + z + " : " + (e?.message || e));
+      /* Un chunk froid fait LEVER getBlock/getBlockData : c'est le cas NORMAL
+         au demarrage du monde, et il se reproduit a chaque tentative. Une ligne
+         par echec (meme limitee a une toutes les 2 s) finissait par remplir le
+         log : mesure en monde complet, 62 lignes en 7 min, sans jamais
+         s'arreter. On compte, et on ne dit l'etat qu'UNE fois. */
+      readFailures++;
+      sayOnce(
+        "readfail",
+        "[FA] le chunk des Code Blocks n'est pas lisible pour l'instant (" +
+          (e?.message || e) +
+          ") : c'est normal au demarrage du monde, le chargeur reessaie.",
+      );
       return null;
     }
   }
@@ -534,6 +536,11 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   let evaluatedOnce = false;
   /* Balayage en cours : il survit d'un tick à l'autre (cf. SLOTS_PER_LOAD). */
   let scan = null;
+  /* Cases illisibles (chunk froid). Compte, jamais repete dans le log. */
+  let readFailures = 0;
+  /* Le chargeur a-t-il fini par renoncer ? (30 essais sans jamais lire un
+     bloc). Sert a ne pas relancer indefiniment un balayage inutile. */
+  let gaveUp = false;
 
   function load(force) {
     if (!alive() || loading) return;
@@ -632,6 +639,14 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       }
 
       FA.ready = packs.length === total && missing.length === 0 && FA.errors.length === 0;
+      if (!FA.ready && !evaluatedOnce && retries >= 30) {
+        gaveUp = true;
+        sayOnce(
+          "giveup",
+          "[FA] chargeur arrete : rien de lisible apres 30 essais. " +
+            "Pose les blocs puis FA.reload() (voir FA.status()).",
+        );
+      }
       if (!FA.ready && retries < 30) {
         retries++;
         // Les 2 premiers essais sont rapprochés (2 ticks) pour profiter du
@@ -652,6 +667,10 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   }
 
   function boot() {
+    /* Un chargeur qui a deja renonce (30 essais, aucun bloc) ne doit pas etre
+       relance par chaque clic de capacite : c'etait un balayage complet toutes
+       les 750 ms, pour rien. `FA.reload()` reste la pour redemander. */
+    if (gaveUp) return;
     if (!alive() || loading || (booted && Date.now() - lastLoad < 750)) return;
     booted = true;
     load(false);
@@ -693,6 +712,8 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
          normal. "ok" = lus. C'est ce qui explique un message « still loading ». */
       phase: evaluatedOnce ? "ok" : "boot",
       ignoredEarly: earlyCalls,
+      readErrors: readFailures,
+      gaveUp: gaveUp,
       missingCount: missing.length,
       missing: detail ? missing : missing.slice(0, MAX_NAMES),
       errors: FA.errors.slice(0, MAX_ERRORS).map(cut),
@@ -718,10 +739,10 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   const toldPending = {};
   let earlyCalls = 0;
   function tooEarly(name, args) {
-    /* UNE seule ligne pour tous les handlers. `warn()` est limite a 2 s mais son
-       compteur est par `tag`, et le tag contenait le nom du handler : avec 197
-       capacites, cela faisait 197 lignes autorisees toutes les 2 s. On veut
-       savoir qu'on est dans la fenetre de demarrage, pas la liste des clics. */
+    /* UNE seule ligne pour tous les handlers. Le compteur etait par `tag` et le
+       tag contenait le nom du handler : avec 197 capacites, cela faisait 197
+       lignes autorisees. On veut savoir qu'on est dans la fenetre de demarrage,
+       pas la liste des clics. */
     sayOnce(
       "early",
       "[FA] capacités utilisées avant la fin du chargement : ignorées (le monde démarre). " +

@@ -245,13 +245,30 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
             else if (!/^\d+px$/.test(b[key])) errors.push(`${label} : ${key} = ${b[key]} (attendu en px)`);
         }
     }
-    /* Vert pour l'XP, bleu pour la stamina : c'est la demande du joueur, verifiee
-       sur la teinte et non sur une constante recopiee. */
-    const hues = bars.map((b) => (b.colours && b.colours[0] ? hueOf(b.colours[0].replace(/\s.*$/, "")) : -1));
-    if (bars.length === 2) {
-        if (!(hues[0] >= 90 && hues[0] <= 165)) errors.push(`${label} : barre d'XP pas verte (teinte ${Math.round(hues[0])})`);
-        if (!(hues[1] >= 190 && hues[1] <= 260)) errors.push(`${label} : barre de stamina pas bleue (teinte ${Math.round(hues[1])})`);
+    /* REGLE (demande 74) : une barre porte la couleur de SON texte. On ne teste
+       donc pas « vert » / « bleu » (des constantes recopiees, qui divergeraient
+       au premier changement de palette) mais l'EGALITE avec la couleur de la
+       ligne qui precede la barre. L'XP doit donc etre cyan comme « XP 1260/… »,
+       et la stamina bleue comme « 100/100 100% ». */
+    const norm = (c) => String(c).trim().toLowerCase();
+    for (const b of bars) {
+        const at = sidebar.indexOf(b);
+        let label = null;
+        for (let i = at - 1; i >= 0; i--) {
+            const p = sidebar[i];
+            if (p && typeof p.str === "string" && p.str.trim()) { label = p; break; }
+        }
+        if (!label) { errors.push(`${label} : barre sans texte au-dessus`); continue; }
+        const textColour = label.style && label.style.color;
+        const barColour = b.colours && b.colours[0];
+        if (!textColour) errors.push(`${label} : le texte de la barre n'a pas de couleur`);
+        else if (norm(textColour) !== norm(barColour))
+            errors.push(`${label} : barre ${barColour} mais son texte ${textColour} (doivent etre identiques)`);
     }
+    /* Et les deux barres ne doivent pas avoir la MEME couleur : sinon on ne
+       distingue plus l'XP de la stamina. */
+    if (bars.length === 2 && bars[0].colours && bars[1].colours && norm(bars[0].colours[0]) === norm(bars[1].colours[0]))
+        errors.push(`${label} : XP et stamina ont la meme couleur (${bars[0].colours[0]})`);
     /* Priorite 0 = garde en premier : l'objectif du tutoriel doit survivre a un
        joueur charge (regression de `priority || 9`, qui le mettait en dernier). */
     if (tutorialLine) {
