@@ -34,11 +34,44 @@ import {
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { eachItemSlot } from "./customItem";
-import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "../utils/data";
+import { cancelConfirm, confirmAction, getTotalMoney, isMobilePlayer, payMoney } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, say, txt, bold, ic } from "../core/theme";
 
 const FS_DB_KEY = "fs";
+
+/* PC : a la place des deux items de capacite, UN SEUL item a garder en main.
+   Le tenir donne le coup de poing du style au clic et ses deux attaques aux
+   touches ; le lacher rend la main nue. « Void Net » est un vrai item Bloxd,
+   donc aucun nom invente (regle de la demande 63). */
+export const VOID_NET = "Void Net";
+
+export function voidNetAmount(playerId) {
+    let n = 0;
+    try { n = api.getInventoryItemAmount(playerId, VOID_NET); } catch (e) { n = 0; }
+    return typeof n === "number" && n > 0 ? n : 0;
+}
+
+function giveVoidNet(playerId) {
+    if (voidNetAmount(playerId) > 0) return true;
+    try { api.giveItem(playerId, VOID_NET, 1); } catch (e) { return false; }
+    return voidNetAmount(playerId) > 0;
+}
+
+export function removeVoidNet(playerId) {
+    const n = voidNetAmount(playerId);
+    if (!n) return false;
+    try { api.removeItemName(playerId, VOID_NET, n); } catch (e) { return false; }
+    return true;
+}
+
+/* PC seulement, et seulement si un style est actif. */
+export function ensureVoidNet(playerId) {
+    if (!playerId) return false;
+    const styleName = getFightingStyle(playerId);
+    if (isMobilePlayer(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
+    return giveVoidNet(playerId);
+}
 
 const m1Combo = {};
 const freezeTok = {};
@@ -774,12 +807,17 @@ export function removeFightingStyleItems(playerId, keepStyleName = null) {
             } catch (e) {}
         }
     });
+    /* Le filet suit le style : pas de style garde, pas de filet. */
+    if (!keepStyleName) removeVoidNet(playerId);
 }
 
 export function giveFightingStyleItems(playerId, styleName) {
     const style = FIGHTING_STYLES[styleName];
     if (!style) return false;
     removeFightingStyleItems(playerId, styleName);
+    /* PC : un seul item en main. Les deux items de capacite disparaissent, le
+       filet les remplace et ouvre les deux touches (voir index.js). */
+    if (!isMobilePlayer(playerId)) return giveVoidNet(playerId);
     for (let i = 0; i < style.abilities.length; i++) {
         const ab = style.abilities[i];
         if (hasAbilityItem(playerId, ab)) continue;
@@ -927,55 +965,32 @@ function getHeldItemAndCustomName(playerId) {
 
 export function isHoldingFightingStyleItem(playerId) {
     const { itemName, customName } = getHeldItemAndCustomName(playerId);
+    if (itemName === VOID_NET) return true;
     if (customName && isFightingStyleAbilityName(customName)) return true;
     if (itemName && isFightingStyleItemName(itemName)) return true;
     return false;
 }
 
-export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockName, targetId) {
+export function isHoldingVoidNet(playerId) {
+    return getHeldItemAndCustomName(playerId).itemName === VOID_NET;
+}
+
+/* Attaque d'un style lancee par une TOUCHE (bouton personnalise, PC). Le clic
+   par item reste gere par handleFightingStyleClick plus bas ; les deux passent
+   par castStyleAbility, donc meme cooldown, meme message, meme provenance. */
+export function useFightingStyleAbility(playerId, index, targetId) {
     const styleName = getFightingStyle(playerId);
-    if (!styleName) return false;
-    const style = FIGHTING_STYLES[styleName];
+    const style = styleName ? FIGHTING_STYLES[styleName] : null;
     if (!style) return false;
+    const ability = style.abilities[index];
+    if (!ability) return false;
+    return castStyleAbility(playerId, ability, targetId);
+}
 
-    const { itemName, customName } = getHeldItemAndCustomName(playerId);
-    if (!itemName && !customName) return false;
-
-    let matched = null;
-    if (customName) {
-        for (let i = 0; i < style.abilities.length; i++) {
-            if (style.abilities[i].name === customName) {
-                matched = style.abilities[i];
-                break;
-            }
-        }
-    }
-    /* Le NOM de l'item est la seule source fiable. Plusieurs items de style
-       partageaient leur ancien type de base avec une capacite de fruit (ex.
-       "Red Quick Paintball Explosive Item" = Crimson Beam du Flame ET ancien
-       Grapple Rush de Combat) : un clic sur le Crimson Beam lançait le dash de
-       Combat. Un item qui porte un AUTRE nom n'appartient donc pas au style et
-       on rend la main au fruit. Le repli par type ne sert plus qu'aux vieux
-       items sans nom personnalise. */
-    if (!matched && !customName && itemName) {
-        for (let i = 0; i < style.abilities.length; i++) {
-            if (style.abilities[i].itemType === itemName) {
-                matched = style.abilities[i];
-                break;
-            }
-        }
-        if (!matched) {
-            for (let i = 0; i < style.abilities.length; i++) {
-                const ab = style.abilities[i];
-                if (ab.legacyItemType && ab.legacyItemType === itemName) {
-                    matched = ab;
-                    break;
-                }
-            }
-        }
-    }
-    if (!matched || typeof matched.handler !== "function") return false;
-
+/* Coeur commun d'une attaque de style : cooldown, son, provenance des
+   effets, message de retour. Appele par le clic (item) et par les
+   touches du PC, pour qu'ils ne puissent pas diverger. */
+function castStyleAbility(playerId, matched, targetId) {
     const now = Date.now();
     let cdMap = abilityCooldowns.get(playerId);
     if (!cdMap) {
@@ -1048,6 +1063,53 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
         }, ticks);
     }
     return true;
+}
+
+export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockName, targetId) {
+    const styleName = getFightingStyle(playerId);
+    if (!styleName) return false;
+    const style = FIGHTING_STYLES[styleName];
+    if (!style) return false;
+
+    const { itemName, customName } = getHeldItemAndCustomName(playerId);
+    if (!itemName && !customName) return false;
+
+    let matched = null;
+    if (customName) {
+        for (let i = 0; i < style.abilities.length; i++) {
+            if (style.abilities[i].name === customName) {
+                matched = style.abilities[i];
+                break;
+            }
+        }
+    }
+    /* Le NOM de l'item est la seule source fiable. Plusieurs items de style
+       partageaient leur ancien type de base avec une capacite de fruit (ex.
+       "Red Quick Paintball Explosive Item" = Crimson Beam du Flame ET ancien
+       Grapple Rush de Combat) : un clic sur le Crimson Beam lançait le dash de
+       Combat. Un item qui porte un AUTRE nom n'appartient donc pas au style et
+       on rend la main au fruit. Le repli par type ne sert plus qu'aux vieux
+       items sans nom personnalise. */
+    if (!matched && !customName && itemName) {
+        for (let i = 0; i < style.abilities.length; i++) {
+            if (style.abilities[i].itemType === itemName) {
+                matched = style.abilities[i];
+                break;
+            }
+        }
+        if (!matched) {
+            for (let i = 0; i < style.abilities.length; i++) {
+                const ab = style.abilities[i];
+                if (ab.legacyItemType && ab.legacyItemType === itemName) {
+                    matched = ab;
+                    break;
+                }
+            }
+        }
+    }
+    if (!matched || typeof matched.handler !== "function") return false;
+
+    return castStyleAbility(playerId, matched, targetId);
 }
 
 export function handleFightingStyleM1(playerId, targetId, allowHeldItem) {

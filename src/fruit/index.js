@@ -486,8 +486,54 @@ function I(t, e, o) {
     f("equipFruit.giveItem", t, r);
   }
 }
+/* PC : a la place des cinq items de capacite, UN SEUL item a garder en main.
+   Le tenir ouvre les touches (customButtons, voir index.js) ; le lacher les
+   ferme. « Swap Orb » est un vrai item Bloxd : aucun nom invente ici, donc
+   rien a declarer dans customItem.js (regle de la demande 63). */
+export const SWAP_ORB = "Swap Orb";
+
+export function swapOrbAmount(t) {
+  let c = 0;
+  try { c = api.getInventoryItemAmount(t, SWAP_ORB); } catch (e) { c = 0; }
+  return typeof c === "number" && c > 0 ? c : 0;
+}
+
+function giveSwapOrb(t) {
+  if (swapOrbAmount(t) > 0) return true;
+  try { api.giveItem(t, SWAP_ORB, 1); } catch (e) { return false; }
+  return swapOrbAmount(t) > 0;
+}
+
+export function removeSwapOrb(t) {
+  const c = swapOrbAmount(t);
+  if (!c) return false;
+  try { api.removeItemName(t, SWAP_ORB, c); } catch (e) { return false; }
+  return true;
+}
+
+/* PC seulement. Sur mobile, l'item de dash et les items de capacite restent la
+   seule entree possible : pas d'orb. */
+export function ensureSwapOrb(t) {
+  if (!t) return false;
+  if (isMobilePlayer(t) || !getFruit(t)) return removeSwapOrb(t), false;
+  return giveSwapOrb(t);
+}
+
+/* Nombre de capacites du fruit porte : c'est lui qui decide du nombre de
+   boutons du PC (3 pour un Common, 4 pour un Uncommon/Rare, 5 pour un
+   Legendaire/Mythique). Aucun fruit = aucun bouton. */
+export function fruitAbilityCount(t) {
+  const e = t ? n[getFruit(t)] : null;
+  if (!e) return 0;
+  let c = 0;
+  for (let i = 1; i <= 5; i++) if (e["attack" + i]) c = i;
+  return c;
+}
+
 function k(t) {
   const e = {};
+  /* L'orb part avec les items : sans fruit, il n'a plus rien a ouvrir. */
+  removeSwapOrb(t);
   for (const o in n) {
     const r = n[o];
     if (r && r.giveditems)
@@ -512,7 +558,9 @@ function N(t, e, o) {
     /* PC : les capacites sont sur Z/X/C/V/F (voir index.js, customButtons), donc
        AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
        encombrer les 5 slots. Mobile : les items restent, c'est son seul moyen. */
-    if ((k(t), r.giveditems && !isMobilePlayer(t))) for (const e of r.giveditems) I(t, e, r);
+    if (k(t), isMobilePlayer(t)) {
+      if (r.giveditems) for (const e of r.giveditems) I(t, e, r);
+    } else giveSwapOrb(t);
     try {
       restoreFightingStyle(t);
     } catch (t) {}
@@ -747,7 +795,9 @@ export function restorePlayerFruit(t) {
     }
     if (missing) {
       k(t);
-      if (r.giveditems && !isMobilePlayer(t)) for (const item of r.giveditems) I(t, item, r);
+      if (isMobilePlayer(t)) {
+        if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
+      } else giveSwapOrb(t);
       try {
         restoreFightingStyle(t);
       } catch (t) {}

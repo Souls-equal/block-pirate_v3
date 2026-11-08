@@ -180,9 +180,10 @@ compareLists(ingame, OFFICIAL_INGAME, "theme.js INGAME_NAMES");
 /* Les boutons personnalises (customButtons) sont le SEUL endroit ou une icone
    s'ecrit en nom nu (« zap ») : c'est ce que l'API attend. Ce bloc est donc
    retire du scan generique et verifie a part, plus bas (section 3). */
-const CONTROLS_RE = /const CONTROLS = \[([\s\S]*?)\n\];/;
 const controlsSource = readFileSync(join(ROOT, "src/index.js"), "utf8");
-const controlsBlock = CONTROLS_RE.exec(controlsSource);
+/* Retire le bloc CONTROLS du scan generique : ses icones sont des noms nus,
+   volontairement, et sont verifiees par la section 3. */
+const controlsBlock = /const CONTROLS = \{[\s\S]*?\n\};/.exec(controlsSource);
 
 for (const file of files) {
     let source = readFileSync(file, "utf8");
@@ -419,56 +420,98 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
      - un `keycode` hors de la liste autorisee par Bloxd -> le bouton ne se
        declenche jamais ;
      - un `id` que `onPlayerPressedButton` ne traite pas -> un bouton mort.
-   Et deux boutons sur la meme touche : le second est inutilisable. */
-const KEYCODE_OK = /^(Key[A-Z]|Digit[0-9]|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Space)$/;
-const EXPECTED_IDS = ["dash", "ability1", "ability2", "ability3", "ability4", "ability5"];
+   Et deux boutons sur la meme touche : le second est inutilisable.
 
-if (!controlsBlock) {
+   Les boutons sont maintenant groupes (demande 76) : le dash toujours la, les
+   capacites du fruit seulement si le « Swap Orb » est en main, les attaques du
+   style seulement si le « Void Net » est en main. `ability` et `style` ont le
+   DROIT de partager Z/X (une seule main a la fois) ; le dash, lui, est toujours
+   actif et ne peut donc rien partager. */
+const KEYCODE_OK = /^(Key[A-Z]|Digit[0-9]|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Space)$/;
+const GROUPS = { dash: 1, ability: 5, style: 2 };
+
+/* Contenu du tableau qui suit `groupe:` — crochets equilibres, pour ne pas
+   dependre de la mise en forme (un tableau sur une ligne est valide). */
+function arrayAfter(source, name) {
+    const at = source.indexOf(name + ":");
+    if (at < 0) return null;
+    const open = source.indexOf("[", at);
+    if (open < 0) return null;
+    let depth = 0;
+    for (let i = open; i < source.length; i++) {
+        const c = source[i];
+        if (c === "[") depth++;
+        else if (c === "]") {
+            depth--;
+            if (!depth) return source.slice(open + 1, i);
+        }
+    }
+    return null;
+}
+
+const controlsRe = /const CONTROLS = \{([\s\S]*?)\n\};/;
+const controlsMatch = controlsRe.exec(controlsSource);
+const entries = { dash: [], ability: [], style: [] };
+
+if (!controlsMatch) {
     errors.push("src/index.js : bloc CONTROLS introuvable (boutons du PC)");
 } else {
-    const entries = [];
-    const reEntry = /\{[^{}]*\}/g;
-    let em;
-    while ((em = reEntry.exec(controlsBlock[1]))) {
-        const raw = em[0];
-        const id = /id:\s*"([^"]*)"/.exec(raw);
-        const icon = /icon:\s*"([^"]*)"/.exec(raw);
-        const keycode = /keycode:\s*"([^"]*)"/.exec(raw);
-        const description = /description:\s*"([^"]*)"/.exec(raw);
-        if (!id || !icon || !keycode) {
-            errors.push("src/index.js : bouton incomplet (" + raw.replace(/\s+/g, " ") + ")");
-            continue;
+    for (const group of Object.keys(GROUPS)) {
+        const body = arrayAfter(controlsMatch[1], group);
+        if (body === null) { errors.push("src/index.js : groupe de boutons \"" + group + "\" absent"); continue; }
+        const reEntry = /\{[^{}]*\}/g;
+        let em;
+        while ((em = reEntry.exec(body))) {
+            const raw = em[0];
+            const id = /id:\s*"([^"]*)"/.exec(raw);
+            const icon = /icon:\s*"([^"]*)"/.exec(raw);
+            const keycode = /keycode:\s*"([^"]*)"/.exec(raw);
+            const description = /description:\s*"([^"]*)"/.exec(raw);
+            if (!id || !icon || !keycode) {
+                errors.push("src/index.js : bouton incomplet dans \"" + group + "\" (" + raw.replace(/\s+/g, " ") + ")");
+                continue;
+            }
+            entries[group].push({ group, id: id[1], icon: icon[1], keycode: keycode[1], description: description ? description[1] : "" });
         }
-        entries.push({ id: id[1], icon: icon[1], keycode: keycode[1], description: description ? description[1] : "" });
     }
-    checked += entries.length;
-    if (entries.length !== EXPECTED_IDS.length)
-        errors.push("src/index.js : " + entries.length + " boutons au lieu de " + EXPECTED_IDS.length);
-    for (let i = 0; i < EXPECTED_IDS.length; i++) {
-        if (!entries.some((e) => e.id === EXPECTED_IDS[i]))
-            errors.push("src/index.js : bouton \"" + EXPECTED_IDS[i] + "\" absent");
-    }
-    const keySeen = {};
-    for (const e of entries) {
-        if (e.icon.indexOf("fa-") === 0) {
-            errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" — customButtons attend un nom NU (sans \"fa-solid\")");
-        } else if (!fa.has(e.icon)) {
-            errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" absente de la liste blanche (elle s'afficherait « ? »)");
+
+    for (const group of Object.keys(GROUPS)) {
+        const list = entries[group];
+        checked += list.length;
+        if (list.length !== GROUPS[group])
+            errors.push("groupe \"" + group + "\" : " + list.length + " bouton(s) au lieu de " + GROUPS[group]);
+        const seenKey = {};
+        for (const e of list) {
+            if (e.icon.indexOf("fa-") === 0)
+                errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" — customButtons attend un nom NU (sans \"fa-solid\")");
+            else if (!fa.has(e.icon))
+                errors.push("bouton " + e.id + " : icone \"" + e.icon + "\" absente de la liste blanche (elle s'afficherait « ? »)");
+            if (!KEYCODE_OK.test(e.keycode))
+                errors.push("bouton " + e.id + " : keycode \"" + e.keycode + "\" refuse par Bloxd");
+            if (seenKey[e.keycode]) errors.push("bouton " + e.id + " : touche " + e.keycode + " deja prise par " + seenKey[e.keycode]);
+            seenKey[e.keycode] = e.id;
+            if (!e.description.trim()) errors.push("bouton " + e.id + " : description vide");
         }
-        if (!KEYCODE_OK.test(e.keycode))
-            errors.push("bouton " + e.id + " : keycode \"" + e.keycode + "\" refuse par Bloxd");
-        if (keySeen[e.keycode]) errors.push("bouton " + e.id + " : touche " + e.keycode + " deja prise par " + keySeen[e.keycode]);
-        keySeen[e.keycode] = e.id;
-        if (!e.description.trim()) errors.push("bouton " + e.id + " : description vide");
+    }
+    /* Le dash est toujours actif : ses touches ne doivent appartenir a aucun
+       autre groupe. ability et style, eux, ne coexistent jamais. */
+    const dashKeys = new Set(entries.dash.map((e) => e.keycode));
+    for (const group of ["ability", "style"]) {
+        for (const e of entries[group]) {
+            if (dashKeys.has(e.keycode))
+                errors.push("bouton " + e.id + " : touche " + e.keycode + " deja prise par le dash (toujours actif)");
+        }
     }
     /* Chaque id doit etre traite par le handler, sinon le bouton ne fait rien. */
     const handlerAt = controlsSource.indexOf("onPlayerPressedButton");
-    const handler = handlerAt >= 0 ? controlsSource.slice(handlerAt, handlerAt + 700) : "";
+    const handler = handlerAt >= 0 ? controlsSource.slice(handlerAt, handlerAt + 1600) : "";
     if (handlerAt < 0) errors.push("src/index.js : onPlayerPressedButton introuvable");
     else {
         if (handler.indexOf('"dash"') === -1) errors.push("onPlayerPressedButton ne traite pas le bouton \"dash\"");
         if (!/ability\(\[1-5\]\)|ability\(\d/.test(handler))
             errors.push("onPlayerPressedButton ne traite pas les boutons ability1..5");
+        if (handler.indexOf("style1") === -1 || handler.indexOf("style2") === -1)
+            errors.push("onPlayerPressedButton ne traite pas les boutons style1/style2");
     }
 }
 
@@ -516,4 +559,4 @@ if (unique.length) {
 }
 console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.length + " sidebars + barres), tout est valide.");
 console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");
-console.log("  Boutons PC : " + EXPECTED_IDS.join(", ") + " (icones, touches uniques, ids traites).");
+console.log("  Boutons PC : dash " + entries.dash.length + " | capacites " + entries.ability.length + " | style " + entries.style.length + " (icones, touches, ids).");
