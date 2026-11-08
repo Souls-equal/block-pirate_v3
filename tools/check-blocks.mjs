@@ -765,6 +765,7 @@ void domain;
 function runDomainOnCliff(actors, ticks) {
   const pos = { ...actors };
   const teleports = [];
+  const effects = [];
   let co = null;
   const res = runScenario(texts, "dôme sur une falaise", (helpers, api) => {
     const wall = (x) => x >= 10 && x <= 12;
@@ -786,6 +787,10 @@ function runDomainOnCliff(actors, ticks) {
     helpers.isMobAlive = (id) => !!pos[id] && id[0] === "m";
     helpers.solidVoxel = (x) => wall(x);
     helpers.isSolid = (x) => wall(x);
+    helpers.eff = (id, name) => {
+      effects.push({ id, name });
+      return true;
+    };
     helpers.teleport = api.setPosition;
     helpers.entitiesIn = (lo, hi) =>
       Object.keys(pos).filter((id) => {
@@ -799,7 +804,7 @@ function runDomainOnCliff(actors, ticks) {
     globalThis.FA.r.onPlayerClickControlDomain("p1", "item", false, 0, 0, 0, "Air", null);
   cast();
   for (let i = 0; i < ticks && co && !co.next().done; i++);
-  return { res, pos, teleports, cast };
+  return { res, pos, teleports, effects, cast };
 }
 {
   const inWall = (q) => q[0] >= 10 && q[0] <= 12;
@@ -811,6 +816,17 @@ function runDomainOnCliff(actors, ticks) {
   check(
     a.teleports.filter((t) => t.id === "m2").length === 0,
     "dôme : un boss a été déplacé par le dôme",
+  );
+  /* Aucun effet de contrôle non plus : ni Slowness, ni Weakness. Un boss doit
+     rester pleinement mobile et frappeur pendant le dôme. */
+  check(
+    a.effects.filter((e) => e.id === "m2").length === 0,
+    "dôme : un boss a reçu un effet de contrôle",
+  );
+  /* Les mobs ordinaires, eux, sont toujours tenus ET ralentis. */
+  check(
+    a.effects.filter((e) => e.id === "m1").length > 0,
+    "dôme : les mobs ordinaires ne reçoivent plus leurs effets",
   );
   delete globalThis.__isBossMob;
   const held = a.teleports.filter((t) => t.id === "p2");

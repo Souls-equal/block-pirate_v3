@@ -56,11 +56,7 @@
     try {
       api.sendFlyingMiddleMessage(
         pid,
-        [
-          { icon: "fa-solid fa-sparkle", style: { color: color || "#facc15" } },
-          { str: " " + title + " ", style: { color: color || "#facc15", fontWeight: "700" } },
-          { icon: "fa-solid fa-sparkle", style: { color: color || "#facc15" } },
-        ],
+        [{ str: "✦ " + title + " ✦", style: { color: color || "#facc15", fontWeight: "700" } }],
         90,
       );
     } catch (e) {}
