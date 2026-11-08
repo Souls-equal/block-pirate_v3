@@ -692,6 +692,24 @@ export function ic(name, color, extra) {
     return style ? { icon: name, style: style } : { icon: name };
 }
 
+/* Barre de progression NATIVE de Bloxd (`type: "ProgressBar"`, ajoutee en
+   novembre 2026) : c'est le moteur qui dessine, plus une suite de « █ ».
+   `progress` est un ratio 0..1 ; les couleurs sont du CSS simple (nom, hex,
+   rgb()/hsl()), eventuellement suivies d'une position d'arret
+   (« #4ADE80 30% »). Aucune fonction CSS exotique : url() est refuse.
+   L'objet est un element de CustomTextStyling comme un autre — il n'a ni `str`
+   ni `icon`, donc format() et fit() le laissent intact, et measure() le compte
+   a sa taille JSON reelle (d'ou l'interet de ne pas le surcharger). */
+export function bar(progress, colours, extra) {
+    const ratio = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+    /* 3 decimales suffisent : au-dela on paie des caracteres pour une
+       difference invisible a l'ecran (0.3333333 > 0.333). */
+    const out = { type: "ProgressBar", progress: Math.round(ratio * 1000) / 1000 };
+    if (colours) out.colours = colours;
+    if (extra) for (const key in extra) out[key] = extra[key];
+    return out;
+}
+
 /* --- Patch de l'API -------------------------------------------------------
    Dernier filet : tout ce qui passe par api.sendMessage / broadcastMessage /
    les textes de boutique est normalise, y compris le code des Code Blocks.
