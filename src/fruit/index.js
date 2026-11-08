@@ -1,6 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout, txt, ic } from "../core/theme";
-import { bestFruitTicket, confirmAction, fruitRollPrice, isMobilePlayer, spendFruitTicket } from "../utils/data";
+import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket, useItemControls } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -515,7 +515,7 @@ export function removeSwapOrb(t) {
    seule entree possible : pas d'orb. */
 export function ensureSwapOrb(t) {
   if (!t) return false;
-  if (isMobilePlayer(t) || !getFruit(t)) return removeSwapOrb(t), false;
+  if (useItemControls(t) || !getFruit(t)) return removeSwapOrb(t), false;
   return giveSwapOrb(t);
 }
 
@@ -558,7 +558,7 @@ function N(t, e, o) {
     /* PC : les capacites sont sur Z/X/C/V/F (voir index.js, customButtons), donc
        AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
        encombrer les 5 slots. Mobile : les items restent, c'est son seul moyen. */
-    if (k(t), isMobilePlayer(t)) {
+    if (k(t), useItemControls(t)) {
       if (r.giveditems) for (const e of r.giveditems) I(t, e, r);
     } else giveSwapOrb(t);
     try {
@@ -795,7 +795,7 @@ export function restorePlayerFruit(t) {
     }
     if (missing) {
       k(t);
-      if (isMobilePlayer(t)) {
+      if (useItemControls(t)) {
         if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
       } else giveSwapOrb(t);
       try {

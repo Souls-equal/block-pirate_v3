@@ -428,3 +428,48 @@ export function isMobilePlayer(playerId) {
 export function clearDevice(playerId) {
     delete devices[playerId];
 }
+
+/* MODE DE COMMANDE — un REGLAGE, pas un appareil (demande 77)
+   ---------------------------------------------------------------------------
+     "items"   : les items de capacite et de style, et le dash a l'action
+                 secondaire. C'est le comportement historique, et le DEFAUT.
+     "buttons" : Swap Orb / Void Net et les touches du PC (demande 76).
+   Le mobile n'a pas le choix : pas de clavier, donc toujours "items" (le dash
+   passe par l'item « Dash »). Un reglage enregistre ne le change pas. */
+const CTRL_DB_KEY = "ctl";
+export const CTL_ITEMS = "items";
+export const CTL_BUTTONS = "buttons";
+
+/* Un seul endroit qui decide : tout le reste du code passe par la. */
+export function getControlMode(playerId) {
+    if (!playerId) return CTL_ITEMS;
+    if (isMobilePlayer(playerId)) return CTL_ITEMS;
+    let saved = null;
+    try { saved = api.getPlayerDbValue(playerId, CTRL_DB_KEY); } catch (e) { saved = null; }
+    return saved === CTL_BUTTONS ? CTL_BUTTONS : CTL_ITEMS;
+}
+
+export function setControlMode(playerId, mode) {
+    const value = mode === CTL_BUTTONS ? CTL_BUTTONS : CTL_ITEMS;
+    if (!playerId) return value;
+    try { api.setPlayerDbValue(playerId, CTRL_DB_KEY, value); } catch (e) {}
+    return value;
+}
+
+/* Vrai quand les commandes passent par des ITEMS (main nue + items). */
+export function useItemControls(playerId) {
+    return getControlMode(playerId) === CTL_ITEMS;
+}
+
+/* Pose les items et les boutons du mode courant. Enregistre par src/index.js :
+   data -> index serait un cycle (index importe deja data). */
+let controlsHook = null;
+export function setControlsHook(fn) {
+    controlsHook = typeof fn === "function" ? fn : null;
+}
+
+/* Applique le mode : retire ce qui n'a plus lieu d'etre, donne le reste. */
+export function applyControls(playerId) {
+    if (!controlsHook || !playerId) return false;
+    try { return controlsHook(playerId) !== false; } catch (e) { return false; }
+}

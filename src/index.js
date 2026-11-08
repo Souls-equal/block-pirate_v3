@@ -10,7 +10,7 @@ import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/tim
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
-import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook } from "./utils/data";
+import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { pickTarget as bpPickTarget, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
@@ -98,6 +98,11 @@ try {
     bpSetTutorialLine(tutorialObjective);
     startTutorialLoop();
 } catch (e) {}
+
+/* Settings -> Controls : c'est setupControls qui sait retirer les items d'un
+   mode et donner ceux de l'autre. Enregistre ici parce que data -> index
+   serait un cycle (index importe deja data). */
+try { bpSetControlsHook(setupControls); } catch (e) {}
 
 const xt = {};
 
@@ -220,7 +225,8 @@ const CONTROLS = {
 /* Boutons envoyes au client, en fonction de ce que le joueur a EN MAIN.
    Regle (demande 76) : pas d'item en main, pas de touches. */
 function buttonsFor(playerId) {
-    if (isMobilePlayer(playerId)) return [];
+    /* Mode « items » (le defaut) : aucun bouton, tout passe par les items. */
+    if (useItemControls(playerId)) return [];
     const list = CONTROLS.dash.slice();
     const held = heldName(playerId);
     if (held === SWAP_ORB_Name) {
@@ -276,17 +282,26 @@ function setupDevice(playerId) {
     return mobile;
 }
 
+/* Pose les commandes du mode courant, et RIEN de l'autre :
+     « items »   : items de capacite + items de style, dash a l'action
+                   secondaire (mobile : l'item Dash, puisqu'il n'a pas de
+                   clic droit) ;
+     « buttons » : Swap Orb / Void Net, touches, aucun item de capacite.
+   Appele au join ET a chaque bascule des Settings (data.applyControls). */
 function setupControls(playerId) {
-    const mobile = isMobilePlayer(playerId);
-    if (mobile) {
-        /* Pas de clavier : aucun bouton, et pas d'item de PC qui trainerait. */
+    if (useItemControls(playerId)) {
         lastButtons[playerId] = null;
         try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
-        dropDash(playerId), dropSwap(playerId), dropNet(playerId);
-        ensureDash(playerId);
+        dropSwap(playerId), dropNet(playerId);
+        /* Le dash par item n'existe que sur mobile : sur PC c'est le clic droit. */
+        if (isMobilePlayer(playerId)) ensureDash(playerId);
+        else dropDash(playerId);
+        /* Les items du fruit et du style reviennent (restore ne redonne que ce
+           qui manque, donc un joueur deja equipe ne recoit rien en double). */
+        Gt("controls.fruit", () => g(playerId));
+        Gt("controls.style", () => fsRestore(playerId));
         return true;
     }
-    /* PC : un item par domaine, et aucun item de capacite dans l'inventaire. */
     dropDash(playerId);
     dropAbilityItems(playerId);
     dropFightingStyleItems(playerId);
@@ -519,8 +534,12 @@ onPlayerStartChargingItem = (t, itemName) => {
     }
     /* Clic droit sur un item de commande : rien du tout. */
     if (isCommandItemName(heldItem)) return "preventAction";
-    /* Plus de dash sur l'action secondaire : sur PC c'est Q, sur mobile c'est
-       l'item. tryDash n'est donc plus appele ici. */
+    /* Mode « items » (le defaut) : l'action secondaire EST le dash, comme
+       avant la demande 76. En mode « buttons » le dash est sur Q, donc on ne
+       l'appelle pas ici (sinon un clic droit ferait deux dashs). */
+    if (useItemControls(t) && !heldItem && m && 1 !== m.type && !api.isPlayerCrouching(t)) {
+        try { if (ot(t)) return; } catch (e) { _t("onPlayerAltAction.dash", e); }
+    }
     return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r) => {
     if (A(r)) return "preventDamage";
@@ -665,7 +684,7 @@ onPlayerStartChargingItem = (t, itemName) => {
     const l = "string" == typeof e ? e : e?.name || e?.type;
     /* Les deux items de commande en font partie : perdus, le joueur n'a plus ni
        touches de capacite ni attaques de style. */
-    return l && (C(l) || fsItemName(l) || spLocked(l) || hkPod(l) || isCommandItemName(l)) ? "preventDrop" : void 0;
+    return l && (C(l) || fsItemName(l) || spLocked(l) || hkPod(l) || isCommandItemName(l) || l === DASH_ITEM_Name) ? "preventDrop" : void 0;
 }, onPlayerAttemptOpenChest = (t, r, a, i, e, o) => {
     if (!e) return "preventOpen";
 }, onPlayerBoughtShopItem = (t, r, a, i, e) => {
