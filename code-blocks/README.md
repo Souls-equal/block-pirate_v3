@@ -2,27 +2,27 @@
 
 Généré par `npm run build:blocks`. Sources lisibles : `src/blocks/`.
 
-**36 fichiers sources → 8 Code Blocks** (452 190 → 232 772 caractères, -49 %).
+**36 fichiers sources → 8 Code Blocks** (451 847 → 232 568 caractères, -49 %).
 
 Colle **le contenu entier** de chaque `pack-XX.js` dans UN Code Block du monde,
 à x=100000, y=100000, z indiqué ci-dessous (blocs consécutifs).
 L'ordre est libre : le chargeur lit l'en-tête `BP3:<n>/<N>` de chaque bloc.
 
-Version de cette publication : `v=4df108ec` (la même empreinte sur les 8 blocs).
+Version de cette publication : `v=9ccfe0ff` (la même empreinte sur les 8 blocs).
 Colle-les tous depuis **la même publication** : un bloc d'une autre version se
 charge sans erreur mais ne fournit pas les bons handlers — le chargeur te le dit
 (`[FA] N Code Block(s) d'une AUTRE version`) et `FA.status().stale` les liste.
 
 | Pack | z | Caractères | Version | Fruits / modules |
 | --- | --- | --- | --- | --- |
-| `pack-01.js` | `100002` | 31 504 | `4df108ec` | spring, ice, quakes, light, rocket, paintballs, portal, rubber, diamond, pain, gas |
-| `pack-02.js` | `100003` | 31 229 | `4df108ec` | song, control state, control domain, control slash, control shambles |
-| `pack-03.js` | `100004` | 31 158 | `4df108ec` | lightning, dark, smoke, ghost, tiger mark, creation |
-| `pack-04.js` | `100005` | 30 880 | `4df108ec` | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
-| `pack-05.js` | `100006` | 26 674 | `4df108ec` | blade, dought, tiger form, magma |
-| `pack-06.js` | `100007` | 26 941 | `4df108ec` | common uncommon plus, rare legendary plus |
-| `pack-07.js` | `100008` | 23 322 | `4df108ec` | legendary mythical plus |
-| `pack-08.js` | `100009` | 31 064 | `4df108ec` | flame, mythical apex plus |
+| `pack-01.js` | `100002` | 31 504 | `9ccfe0ff` | spring, ice, quakes, light, rocket, paintballs, portal, rubber, diamond, pain, gas |
+| `pack-02.js` | `100003` | 31 225 | `9ccfe0ff` | song, control state, control domain, control slash, control shambles |
+| `pack-03.js` | `100004` | 31 158 | `9ccfe0ff` | lightning, dark, smoke, ghost, tiger mark, creation |
+| `pack-04.js` | `100005` | 30 880 | `9ccfe0ff` | blizzard, gravity state, gravity fx, gravity barrage, gravity grab |
+| `pack-05.js` | `100006` | 26 674 | `9ccfe0ff` | blade, dought, tiger form, magma |
+| `pack-06.js` | `100007` | 26 941 | `9ccfe0ff` | common uncommon plus, rare legendary plus |
+| `pack-07.js` | `100008` | 23 222 | `9ccfe0ff` | legendary mythical plus |
+| `pack-08.js` | `100009` | 30 964 | `9ccfe0ff` | flame, mythical apex plus |
 
 ## Anti-censure Bloxd.io
 

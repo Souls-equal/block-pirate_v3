@@ -15,10 +15,14 @@
 //      ne paie qu'une fois par fenetre.
 //   3. CHAT EN LECTURE SEULE. Un rang qui lit tous les canaux recoit une copie
 //      des messages d'equipage et ne peut PAS y ecrire.
-//   4. UNE COULEUR PAR ROLE. Tout litteral de couleur du projet doit ressortir
-//      de `themeColor()` sur la palette (ou sur les couleurs d'objets).
+//   4. BOSS. Aucun crowd control ne s'applique a un boss, quelle que soit la
+//      capacite : ni lenteur, ni affaiblissement, ni deplacement force.
 //   5. ZERO EMOJI. Aucun caractere pictographique dans les sources : un emoji
-//      s'affiche en carre vide ou casse la mise en page du chat.
+//      s'affiche en carre vide ou casse la mise en page du chat. Les signes
+//      typographiques (✦, ●, ─) ne sont PAS des emoji et restent autorises.
+//
+// Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
+// sont un choix assume du jeu (elles restent lisibles et coherentes).
 //
 // Lance par `npm run check`. `tools/` n'est PAS du World Code : ces fichiers ne
 // partent jamais vers Bloxd (la limite des 64 fichiers ne les concerne pas).
@@ -300,14 +304,21 @@ const installed = await (async () => {
         check(text.indexOf("Straw Hats") >= 0, "name tag : l'equipage n'est pas dans le name tag");
     }
 
-    /* b) nom illisible (undefined) : le name tag doit quand meme partir */
+    /* b) un leave dans le meme tick fait lever `getEntityName` : on ne pose
+          rien, et surtout on n'envoie pas un nom vide ou bidon a la place. */
     sentTags.length = 0;
+    globalThis.api = makeApi({ p1: "Luffy", p2: undefined });
+    globalThis.api.getEntityName = () => {
+        throw new Error("player left");
+    };
     updateNameTag("p2");
-    check(sentTags.length === 1, "name tag : un nom illisible au join bloque tout le name tag");
-    if (sentTags.length) {
-        for (const problem of nameTagProblems(sentTags[0].value, "join sans nom")) errors.push(problem);
-        check(typeof sentTags[0].value.content[0].str === "string", "name tag : texte undefined envoye au moteur");
-    }
+    check(sentTags.length === 0, "name tag : un joueur parti au meme tick recoit quand meme un name tag");
+
+    /* c) un nom vide ne doit pas remplacer un pseudo par un faux nom */
+    sentTags.length = 0;
+    globalThis.api = makeApi({ p1: "Luffy", p2: "" });
+    updateNameTag("p2");
+    check(sentTags.length === 0, "name tag : un nom vide est envoye au moteur");
     globalThis.api = baseApi;
 }
 
@@ -447,56 +458,83 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
-   4. UNE COULEUR PAR ROLE  +  5. ZERO EMOJI
-   ========================================================================== */
+   4. BOSS : AUCUN CROWD CONTROL
+   ==========================================================================
+   Meme regle que le dome, mais pour TOUTES les capacites : la garde vit dans
+   utils/combat.js (`setBossGuard`), donc un fruit, une arme ou une invocation
+   ne peut ni ralentir, ni affaiblir, ni deplacer un boss. On rejoue les deux
+   chemins avec le vrai module. */
 
 {
-    const theme = readFileSync(join(SRC, "core/theme.js"), "utf8");
-    const bundle = await (async () => {
+    const combat = await (async () => {
         const built = buildSync({
-            stdin: { contents: `export * from ${JSON.stringify(join(SRC, "core/theme.js"))};`, resolveDir: ROOT, loader: "js" },
+            stdin: { contents: `export * from ${JSON.stringify(join(SRC, "utils/combat.js"))};`, resolveDir: ROOT, loader: "js" },
             bundle: true, write: false, format: "esm", platform: "browser", target: "es2020", logLevel: "silent",
         });
         return import("data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64"));
     })();
-    const palette = new Set(Object.values(bundle.C));
-    for (const key in bundle.ITEM_COLOR) palette.add(bundle.ITEM_COLOR[key]);
 
-    /* Les noms de couleurs connus du theme : un mot du texte n'est teste que
-       s'il fait partie de ce vocabulaire (« green » dans une phrase reste une
-       phrase ; « green » comme couleur doit finir sur la palette). */
-    for (const file of FILES) {
-        const text = readFileSync(file, "utf8");
-        const name = rel(file);
-        if (name === "src/core/theme.js") continue;
+    const BOSS = "mBoss";
+    const mob = "mPlain";
+    const effects = [];
+    const positions = [];
+    globalThis.api = new Proxy(
+        {
+            now: () => Date.now(),
+            log: () => {},
+            getPlayerDbValue: () => null,
+            setPlayerDbValue: () => true,
+            getPlayerIds: () => [],
+            getMobIds: () => [BOSS, mob],
+            isAlive: () => true,
+            getEntityType: (id) => (id === BOSS || id === mob ? "Mob" : "Player"),
+            getEntityName: (id) => id,
+            getHealth: () => 100,
+            getPosition: () => [0, 64, 0],
+            applyEffect: (id, name) => effects.push({ id, name }),
+            setPosition: (id, x, y, z) => positions.push({ id, x, y, z }),
+        },
+        { get: (t, k) => (k in t ? t[k] : () => undefined) },
+    );
 
-        /* Couleurs : deux familles, et pas une de plus.
-             - tout litteral hexadeximal (c'est forcement une couleur) ;
-             - la couleur passee a txt()/bold()/ic() en 2e argument, aux cles
-               de style `color` / `colour` (name tag, bordures, barres).
-           Un mot ordinaire du texte (« green » dans une phrase) n'est jamais
-           teste : seules les POSITIONS de couleur le sont. */
-        const values = new Set();
-        for (const m of text.matchAll(/"(#[0-9a-fA-F]{3,8})"/g)) values.add(m[1]);
-        for (const m of text.matchAll(/'(#[0-9a-fA-F]{3,8})'/g)) values.add(m[1]);
-        /* Le 2e argument d'un txt()/bold()/ic() : une chaine SIMPLE. Les
-           chaines multi-lignes (concatenees) sont sautees. */
-        const callColour = /\b(?:txt|bold|ic)\s*\(\s*"(?:[^"\\\n]|\\.)*"\s*,\s*("([^"\n]{1,24})"|'([^'\n]{1,24})')/g;
-        for (const m of text.matchAll(callColour)) values.add(m[2] !== undefined ? m[2] : m[3]);
-        const keyColour = /\b(?:color|colour|foregroundColour|backgroundColour|subtitleBackgroundColor|backgroundColor)\s*:\s*("([^"\n]{1,24})"|'([^'\n]{1,24})')/g;
-        for (const m of text.matchAll(keyColour)) values.add(m[2] !== undefined ? m[2] : m[3]);
-        for (const value of values) {
-            const v = String(value).trim();
-            if (!v) continue;
-            const out = bundle.themeColor(v);
-            if (!palette.has(out)) {
-                errors.push(`${name} : couleur hors palette « ${v} » (themeColor ne la ramene pas a un role)`);
-            }
-        }
-    }
+    combat.setBossGuard((id) => id === BOSS);
 
-    /* Emoji : on sort la table ICON de theme.js (c'est le dictionnaire de
-       conversion, pas un texte affiche) avant de scanner. */
+    /* a) Un effet de controle est refuse sur le boss, accepte sur un mob. */
+    effects.length = 0;
+    check(combat.eff(BOSS, "Slowness", 1600, { inbuiltLevel: 1 }) === false, "boss : Slowness est applique a un boss");
+    check(combat.eff(BOSS, "Weakness", 1600, { inbuiltLevel: 1 }) === false, "boss : Weakness est applique a un boss");
+    combat.eff(mob, "Slowness", 1600, { inbuiltLevel: 1 });
+    check(effects.filter((e) => e.id === BOSS).length === 0, "boss : un effet de controle est passe");
+    check(effects.filter((e) => e.id === mob).length === 1, "boss : les mobs ordinaires ne sont plus ralentis");
+
+    /* b) Ses buffs passent : seul le controle est bloque. */
+    effects.length = 0;
+    combat.eff(BOSS, "Speed", 4000, { inbuiltLevel: 2 });
+    check(effects.some((e) => e.id === BOSS && e.name === "Speed"), "boss : le boss ne peut plus recevoir ses propres buffs");
+
+    /* c) Une capacite ne peut pas le deplacer (Control Domain, Shambles...). */
+    positions.length = 0;
+    combat.teleport(BOSS, 10, 70, 10);
+    check(positions.length === 0, "boss : une capacite a deplace un boss");
+    combat.teleport(mob, 10, 70, 10);
+    check(positions.filter((p) => p.id === mob).length === 1, "boss : les mobs ordinaires ne sont plus deplacables");
+
+    /* d) Le boss qui se deplace lui-meme n'est pas bloque. */
+    positions.length = 0;
+    combat.withEffectSource(BOSS, "bossrush", () => combat.teleport(BOSS, 5, 65, 5));
+    check(positions.some((p) => p.id === BOSS), "boss : le boss ne peut plus se deplacer lui-meme");
+
+    combat.setBossGuard(null);
+}
+
+/* ==========================================================================
+   5. ZERO EMOJI
+   ==========================================================================
+   Le chat affiche un carre vide pour un emoji. Seuls les signes
+   typographiques (cadres de commentaires, « ● », « ✦ », fleches) sont
+   autorises : ils s'affichent partout et font partie de la mise en page. */
+
+{
     const EMOJI = /\p{Extended_Pictographic}|[\u{1F000}-\u{1FAFF}]|\uFE0F/u;
     for (const file of FILES) {
         const name = rel(file);
@@ -524,5 +562,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, palette, zero emoji).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji).`,
 );

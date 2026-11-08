@@ -63,20 +63,19 @@ export function markBossMob(mobId, name) {
     return true;
 }
 
-/* ── PONT VERS LES CODE BLOCKS ─────────────────────────────────────────────
-   Le Control Domain (Code Block) doit savoir qu'un mob est un BOSS : il le
-   ralentit comme les autres, mais il ne l'orbite JAMAIS. Un boss aspire dans
-   l'orbite sort de son arene et son IA de poursuite casse (il ne peut plus
-   frapper personne) : le combat devenait une distribution gratuite de butin.
+/* Un mob est-il un boss ? Le World Code s'en sert pour les IMMUNISER au crowd
+   control (voir utils/combat : applyEffect / teleport) et le Control Domain
+   pour ne pas les aspirer. `loot.js` est le seul fichier qui marque les boss,
+   donc le seul qui puisse repondre ; la table est lue a chaque appel (elle
+   change a chaque spawn et a chaque kill), aucune copie a maintenir.
+   `index.js` branche cette fonction sur combat (setBossGuard) et les Code
+   Blocks, qui n'importent rien, la lisent dans globalThis. */
+export function isBossMob(mobId) {
+    return !!(mobId && BOSS_MOBS[mobId]);
+}
 
-   `loot.js` est le seul fichier qui marque les boss (`markBossMob`), donc le
-   seul qui puisse publier la reponse. La fonction lit la table a chaque appel
-   (elle change a chaque spawn et a chaque kill) : aucune copie a maintenir.
-   Les Code Blocks n'importent rien : ils lisent ce global. */
 try {
-    globalThis.__isBossMob = function (mobId) {
-        return !!(mobId && BOSS_MOBS[mobId]);
-    };
+    globalThis.__isBossMob = isBossMob;
 } catch (e) {}
 
 /* Un mob ne meurt qu'une fois, mais le moteur peut reutiliser un id : on

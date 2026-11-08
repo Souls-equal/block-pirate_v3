@@ -12,7 +12,8 @@ import { ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, remove
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
-import { pickTarget as bpPickTarget, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
+import { isBossMob as isBossMob } from "./gameplay/loot";
+import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { STAMINA_CONFIG as tt, DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, ensureDashItem as ensureDash, handleDashItemClick as dashItemClick, hasDashItem as hasDash, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -168,6 +169,10 @@ $(), x(), rt(H), yt(E),
    capacite par ce hook, donc Garp, le Saber Expert et le Mob Leader ne
    peuvent pas etre tues d'un seul coup (voir bossDamageGate). */
 bpSetMobDamageHook((mobId, amount) => bpBossGate(mobId, amount));
+/* IMMUNITE DES BOSS AU CROWD CONTROL : utils/combat.js passe tous les effets
+   et tous les deplacements de capacite par ce hook. `isBossMob` vient de
+   gameplay/loot (le seul fichier qui marque les boss) : aucun import croise. */
+setBossGuard(isBossMob);
 ct((t, r, a) => {
     /* Le kill peut être crédité après la déconnexion du tueur : toutes les
        fonctions appelées ici sont protégées (try/catch), on ne filtre rien. */

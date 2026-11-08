@@ -897,6 +897,10 @@ export function restoreClientOption(id, option, value) {
 
 export function teleport(id, x, y, z) {
     if (!id || isNpcEntity(id) || !isAliveId(id)) return false;
+    /* Un boss ne se fait pas teleporter par la capacite de quelqu'un d'autre
+       (Control Domain, Shambles, Gravity Grab). Ses propres deplacements
+       passent : ils ne viennent pas d'un cast. */
+    if (isBossCrowdControlled(id) && !isSelfMoving(id)) return false;
     const blocked = moveBlocked(id);
     if (blocked) {
         if (blocked === "vehicle" && effectCast && effectCast.caster === String(id)) {
@@ -994,6 +998,28 @@ function provenanceKey(effectId, opts) {
     return (caster || "?") + "|" + ability;
 }
 
+/* ── IMMUNITE DES BOSS AU CROWD CONTROL ───────────────────────────────────
+   Un boss (Garp, Saber Expert, Mob Leader) ne se fait ni ralentir, ni
+   affaiblir, ni deplacer : sorti de son arene, il ne peut plus poursuivre
+   personne et le combat devient une distribution gratuite de butin. Poser un
+   Control Domain sur lui suffisait.
+
+   La regle est ici, au passage oblige de TOUTES les capacites (fruits,
+   armes, invocations), et pas dans chaque abilite : un boss est immunise
+   quelle que soit la source, aujourd'hui et demain.
+
+   Le hook est pose par index.js (setBossGuard) avec `isBossMob` de
+   gameplay/loot : pas d'import croise. Sans hook, rien n'est bloque — les
+   tests et les Code Blocks ne dependent pas de ce fichier. */
+let bossGuard = null;
+export function setBossGuard(fn) {
+    bossGuard = typeof fn === "function" ? fn : null;
+}
+function isBossCrowdControlled(id) {
+    if (!id || !bossGuard) return false;
+    try { return !!bossGuard(id); } catch (e) { return false; }
+}
+
 /* Empilements vivants pour (cible, effet) — purge les entrées expirées. */
 function sourceSlots(targetId, effectId, now) {
     let book = effectSources[targetId];
@@ -1055,6 +1081,11 @@ export function applyEffect(targetId, effectId, duration, opts = {}) {
        immunise ne s'inflige pas a lui-meme un ralentissement, alors qu'il a
        besoin de bouger lui-meme. */
     if (isCrowdControlEffect(effectId) && isCrowdControlImmune(targetId)) return false;
+
+    /* Un boss ne subit AUCUN controle : ni lenteur, ni affaiblissement, ni
+       aveuglement, ni gel. Ses propres effets (Speed, buffs de phase) passent :
+       seuls ceux listes dans CC_EFFECTS sont refuses. */
+    if (isCrowdControlEffect(effectId) && isBossCrowdControlled(targetId)) return false;
 
     if (isMobEntityType(type) || isMobAlive(targetId)) {
         const effectOpts = { inbuiltLevel };

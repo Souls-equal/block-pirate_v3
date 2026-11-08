@@ -229,11 +229,14 @@ export function aliveNow(id) {
    son ancien nom, ou aucun. Une seule valeur fautive suffit, et elle se
    glissait facilement :
 
-     - `border: null` (le schema accepte un objet ou l'absence, pas null) ;
-     - `{ str: undefined }` quand le nom du joueur n'est pas encore lisible au
-       join (`api.getEntityName` peut rendre undefined) ;
+     - `border: null` : la seule valeur hors schema qui existait dans le
+       projet (vanish « effacait » le name tag d'un joueur avec un null) ;
      - une cle inventee (`fontSize`, `name`, `colour`...) ;
-     - une icone dans une partie de texte : les icones sont reservees au chat.
+     - une icone dans une partie de texte : les icones sont reservees au chat ;
+     - une partie de texte qui n'est pas une chaine.
+
+   Le nom d'un joueur, lui, est TOUJOURS lisible : un id reste valide du join
+   au leave. Ce n'etait pas la cause.
 
    `sanitizeNameTag()` reconstruit donc l'objet CLE PAR CLE a partir du seul
    schema documente (ENTITY_SETTINGS.md) et jette tout le reste. Il ne devine

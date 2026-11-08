@@ -442,10 +442,15 @@ ancien nom, ou aucun. Une seule valeur fautive suffit :
 
 | Ce qui arrivait | Pourquoi c'est refusé |
 | --- | --- |
-| `{ str: undefined }` au join (`getEntityName` pas encore lisible) | une partie de texte doit être une **chaîne** |
-| `border: null` (vanish) | le schéma accepte un objet **ou l'absence**, pas `null` |
+| `border: null` (vanish) — la seule valeur hors schéma qui existait dans le projet | le schéma accepte un objet **ou l'absence**, pas `null` |
 | `{ icon: … }` dans un name tag | les icônes sont réservées au chat |
 | une clé inventée (`fontSize`, `name`, `colour`…) | le schéma est fermé |
+| une partie de texte qui n'est pas une chaîne | `str` doit être un `string` |
+
+Le **nom** n'était pas en cause : un id reste valide du join au leave, donc
+`getEntityName()` répond (au tick près : si le joueur part dans le même tick,
+l'appel lève et on ne pose simplement rien — pas de faux « Player » à la place
+d'un vrai pseudo).
 
 Tout passe donc par **`sanitizeNameTag()`** / **`applyNameTag()`**
 (`src/utils/lifeform.js`) : l'objet est reconstruit **clé par clé** à partir du
@@ -453,9 +458,9 @@ seul schéma documenté (`ENTITY_SETTINGS.md`), le reste est jeté. Les
 `content`/`subtitle` **vides sont conservés** : c'est ainsi qu'on efface un nom
 (vanish) ; les supprimer laisserait le pseudo visible.
 
-`npm run check` (via `tools/check-rules.mjs`) rejoue le cas du join : nom
-lisible, nom `undefined`, avec et sans équipage, et refuse tout `nameTagInfo`
-écrit à la main hors de cette porte.
+`npm run check` (via `tools/check-rules.mjs`) rejoue le cas du join — nom
+lisible avec et sans équipage, joueur parti dans le même tick, nom vide — et
+refuse tout `nameTagInfo` écrit à la main hors de cette porte.
 
 ### Icônes : une liste blanche, sinon « ? »
 
@@ -500,13 +505,12 @@ Trois mutations vérifient que ces garde-fous mordent : une icône inexistante, 
 la liste blanche et une icône ingame en minuscules font tous tomber la CI.
 
 Et **`tools/check-rules.mjs`** couvre ce qui ne se voit pas dans une capture : name tags
-(schéma Bloxd), prime anti-farm, chat en lecture seule, **une couleur par rôle** et
-**zéro emoji**. Les couleurs sont lues aux *positions* de couleur (`txt`/`bold`/`ic` en 2e
-argument, `color:`/`colour:`), pas dans les phrases, puis passées au vrai `themeColor()` :
-une teinte qui n'atterrit pas sur la palette fait échouer la CI. C'est ce contrôle qui a
-trouvé `"orange"` — la seule couleur du jeu hors palette, parce que `parseColor()` ne
-connaissait que blanc/noir/gris. `NAMED_COLOURS` couvre maintenant les 16 couleurs CSS de
-base et les plus courantes, et `orange` est explicitement du **danger** (comme `#ff9900`).
+(schéma Bloxd), prime anti-farm, chat en lecture seule, **boss sans crowd control** et
+**zéro emoji**. Sur les couleurs, la règle est volontairement souple : `themeColor()`
+ramène l'essentiel sur la palette, mais **quelques teintes hors palette sont un choix
+assumé** (un avertissement orange reste orange) et la CI ne les refuse pas. Les signes
+typographiques — `✦` des bandeaux, `●` des lignes d'état, les cadres `─`/`═` des
+commentaires — ne sont pas des emoji et restent autorisés.
 
 Le même script rend la sidebar avec une `api` simulée pour vérifier
 les **barres** (forme, ratio, couleur CSS, teinte verte/bleue) et le **budget** : voir
@@ -710,11 +714,11 @@ Un rang qui a **`readsAllChannels`** (`ranks.js`, MOD/DEV/ADMIN/OWNER) reçoit u
 * parler en Global, dans sa Team ou dans son Crew reste normal : le droit de
   lecture n'élargit jamais l'écriture.
 
-Les deux flags étaient **confondus** : c'est `byPassChatRestriction` (qui sert au
-filtre anti-majuscules) qui donnait la lecture de tous les canaux. Un rang sans
-rapport avec la modération héritait donc de la lecture des équipages. Ils sont
-séparés, et `byPassChatRestriction` ne fait plus que ce que son nom dit : le
-staff n'est pas mis en minuscules par le filtre anti-caps.
+Le flag s'appelait `byPassChatRestriction`, ce qui ne disait pas ce qu'il
+faisait : il ne contournait aucune restriction d'écriture, il donnait la
+**lecture**. Il s'appelle maintenant `readsAllChannels` (`ranks.js`) et ne fait
+que ça — voir tous les messages pour pouvoir modérer. Le filtre anti-majuscules,
+lui, s'applique à tout le monde, staff compris.
 
 `npm run check` vérifie les quatre règles sur une vraie simulation : un membre
 reçoit son message, un autre équipage **non**, le staff reçoit une copie
@@ -1578,20 +1582,28 @@ et il est throttlé (1 s) quand la zone entière est solide : aucun coût dans l
 Shambles utilise `ct_open` de la même façon pour sa traction — la cible s'arrête au ras du
 mur au lieu d'entrer dedans.
 
-### Un boss dans le dôme : ralenti, jamais déplacé
+### Un boss ne prend AUCUN crowd control
 
-Le dôme aspire les créatures ordinaires dans son orbite. Pour un **boss**, c'était un
-cadeau : sorti de son arène, il ne pouvait plus poursuivre personne, et il suffisait de
-poser le dôme pour le tuer sans riposte (le butin tombait quand même).
+Sorti de son arène, un boss ne peut plus poursuivre personne : poser un Control Domain
+suffisait à le tuer sans riposte (le butin tombait quand même). Et ce n'était pas qu'une
+affaire de dôme : n'importe quel fruit pouvait le ralentir ou le déplacer.
 
-`gameplay/loot.js` — le seul fichier qui marque les boss (`markBossMob`) — publie donc
-`globalThis.__isBossMob(id)`. Le bloc Control Domain marque la cible `ancre` : elle subit
-**`Slowness` et `Weakness`** comme les autres, mais elle ne reçoit **ni caméra, ni orbite,
-ni téléportation**. Le boss reste dans son arène et continue de frapper.
+La règle est donc posée **au passage obligé de toutes les capacités**, dans
+`utils/combat.js` — pas capacité par capacité :
 
-Vérifié par régression dans `npm run check` : un boss placé dans le dôme est ralenti et
-reçoit **zéro** placement ; sans la règle, le test échoue (`dôme : un boss a été déplacé
-par le dôme`).
+| Fonction | Sur un boss |
+| --- | --- |
+| `eff()` / `applyEffect()` | les effets de contrôle (`Slowness`, `Weakness`, `Blindness`, `Frozen`) sont **refusés** ; ses propres buffs (`Speed`…) passent |
+| `teleport()` | refusé si le déplacement vient d'un **cast** : Control Domain, Shambles, Gravity Grab ne peuvent plus le déplacer ; ses propres ruées passent |
+
+Le lien se fait par `setBossGuard(isBossMob)` dans `index.js` : `gameplay/loot.js` est le
+seul fichier qui marque les boss (`markBossMob`) et publie la réponse dans
+`globalThis.__isBossMob`, que les Code Blocks lisent aussi (le Control Domain exclut
+carrément les boss de ses victimes : pas d'orbite, pas de caméra, pas d'effet).
+
+Vérifié par régression : un boss dans le dôme reçoit **zéro** placement et **zéro** effet,
+un mob ordinaire continue d'être tenu et ralenti, et les quatre règles de `combat.js` sont
+rejouées dans `tools/check-rules.mjs` (mutation testée : retirer la garde fait échouer la CI).
 
 ### Le dôme tient aussi les mobs
 

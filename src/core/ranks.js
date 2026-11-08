@@ -1,21 +1,16 @@
 /* Chaque rang porte des FLAGS booleens, lus par les gardes du jeu.
    Ajouter une immunite = une ligne ici, rien a toucher ailleurs.
 
-     readsAllChannels      : recoit une COPIE de tous les canaux de chat
-                             (global, team, equipage). Lecture seule : ce
-                             droit n'ouvre aucune ecriture. Un staff parle
-                             dans ses propres canaux, comme tout le monde.
-     byPassChatRestriction : n'est pas soumis au filtre anti-majuscules.
-                             Ce n'est pas un droit de lecture.
-     immuneToCrowdControl  : ne peut etre ni ralentie, ni root, ni pousse,
-                             ni teleporte par la capacite de quelqu'un d'autre.
-                             Son propre deplacement reste evidemment permis.
-                             Actif pour ADMIN et OWNER.
-
-   Les deux flags de chat etaient confondus : `byPassChatRestriction` servait
-   a la LECTURE des canaux. Un rang qui n'a rien a voir avec la moderation
-   heritait donc de la lecture de tous les equipages. Ils sont separes ici, et
-   chaque nom dit ce qu'il fait. */
+     readsAllChannels     : voit TOUS les messages, pour pouvoir moderer.
+                            Il recoit une copie de chaque canal (global,
+                            team, equipage) prefixee par son nom. C'est un
+                            droit de LECTURE : il n'ecrit jamais dans un canal
+                            dont il n'est pas membre, et il ne contourne pas
+                            le filtre anti-majuscules.
+     immuneToCrowdControl : ne peut etre ni ralentie, ni root, ni pousse,
+                            ni teleporte par la capacite de quelqu'un d'autre.
+                            Son propre deplacement reste evidemment permis.
+                            Actif pour ADMIN et OWNER. */
 export const PERMISSION_LEVELS = {
     NONE: 0,
     BASIC: 1,
@@ -31,7 +26,6 @@ export const RANKS = {
         prefix: "",
         color: "#aaaaaa",
         permissionLevel: PERMISSION_LEVELS.NONE,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -40,7 +34,6 @@ export const RANKS = {
         prefix: "[OWNER]",
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.OWNER,
-        byPassChatRestriction: true,
         readsAllChannels: true,
         immuneToCrowdControl: true,
     },
@@ -49,7 +42,6 @@ export const RANKS = {
         prefix: "[ADMIN]",
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.ADMIN,
-        byPassChatRestriction: true,
         readsAllChannels: true,
         immuneToCrowdControl: true,
     },
@@ -58,7 +50,6 @@ export const RANKS = {
         prefix: "[DEV]",
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.DEV,
-        byPassChatRestriction: true,
         readsAllChannels: true,
         immuneToCrowdControl: false,
     },
@@ -67,7 +58,6 @@ export const RANKS = {
         prefix: "[MOD]",
         color: "#ff9900",
         permissionLevel: PERMISSION_LEVELS.MOD,
-        byPassChatRestriction: true,
         readsAllChannels: true,
         immuneToCrowdControl: false,
     },
@@ -76,7 +66,6 @@ export const RANKS = {
         prefix: "[TESTER]",
         color: "#ff4444",
         permissionLevel: PERMISSION_LEVELS.BASIC,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -85,7 +74,6 @@ export const RANKS = {
         prefix: "[MOBLANDS]",
         color: "#75dec5",
         permissionLevel: PERMISSION_LEVELS.BASIC,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -94,7 +82,6 @@ export const RANKS = {
         prefix: "[KNIGHT FALL]",
         color: "#b08dfb",
         permissionLevel: PERMISSION_LEVELS.BASIC,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -103,7 +90,6 @@ export const RANKS = {
         prefix: "[VIP]",
         color: "#FFD700",
         permissionLevel: PERMISSION_LEVELS.BASIC,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -112,7 +98,6 @@ export const RANKS = {
         prefix: "[YOUTUBER]",
         color: "red",
         permissionLevel: PERMISSION_LEVELS.BASIC,
-        byPassChatRestriction: false,
         readsAllChannels: false,
         immuneToCrowdControl: false,
     },
@@ -187,12 +172,8 @@ export function isMod(playerId) {
     return getPermissionLevel(playerId) >= PERMISSION_LEVELS.MOD;
 }
 
-export function canBypassChatRestriction(playerId) {
-    return getRankDataForPlayer(playerId).byPassChatRestriction === true;
-}
-
-/* Droit de LECTURE de tous les canaux. Il ne donne jamais le droit d'ecrire
-   dans un canal dont on n'est pas membre (voir handleChat). */
+/* Droit de LECTURE de tous les canaux (moderation). Il ne donne jamais le
+   droit d'ecrire dans un canal dont on n'est pas membre (voir handleChat). */
 export function canReadAllChannels(playerId) {
     return getRankDataForPlayer(playerId).readsAllChannels === true;
 }

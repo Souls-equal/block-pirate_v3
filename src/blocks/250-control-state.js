@@ -33,6 +33,16 @@
     b = C.ang,
     x = C.mesh,
     w = C.blades,
+    /* Boss = immunise au controle. Le World Code publie la reponse dans
+       globalThis.__isBossMob (gameplay/loot.js) ; sans elle, personne n'est
+       exclu (le dome se comporte comme avant). */
+    ct_boss = function (id) {
+      try {
+        return !!(globalThis.__isBossMob && globalThis.__isBossMob(id));
+      } catch (e) {
+        return false;
+      }
+    },
     A = 0.05,
     I = "Glass",
     P = 0.06,
@@ -318,6 +328,8 @@
     },
     ct_mine: z,
     ct_at: q,
+    /* Un boss ne se controle pas : ni orbite, ni lenteur, ni camera. */
+    ct_boss: ct_boss,
     ct_victims: function (t, o) {
       const n = [];
       let r = [];
@@ -331,7 +343,12 @@
       }
       /* Les mobs comptent aussi : un dome qui ne tient que les joueurs ne
          controle rien en PvE. `O` (ct_in) fait UNE requete spatiale puis filtre
-         les vivants ; isMobAlive ecarte les PNJ (marchands, queteurs). */
+         les vivants ; isMobAlive ecarte les PNJ (marchands, queteurs).
+
+         Les BOSS, eux, sont exclus : un boss sorti de son arene ne peut plus
+         poursuivre personne, et poser le dome suffisait a le tuer sans
+         riposte. La reponse vient du World Code (`globalThis.__isBossMob`,
+         gameplay/loot.js), les Code Blocks n'important rien. */
       let box = [];
       try {
         box = O(t, o);
@@ -340,6 +357,7 @@
       }
       for (const e of box) {
         if (n.indexOf(e) >= 0 || !mo(e)) continue;
+        if (ct_boss(e)) continue;
         const r = i(e);
         r && L(r, t) <= o && n.push(e);
       }

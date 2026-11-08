@@ -2,7 +2,7 @@
 
 import { applyItemLooks, convertWeaponAttributes, scanAllItems, writeItem } from "../gameplay/customItem";
 import { deleteStat, getStat, setStat } from "../utils/data";
-import { getRankDataForPlayer, canBypassChatRestriction, canReadAllChannels } from './ranks'
+import { getRankDataForPlayer, canReadAllChannels } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
 import { applyNameTag, isOnlinePlayer } from "../utils/lifeform";
@@ -153,13 +153,14 @@ setPlayerTeam = (playerId, teamId) => {
 
 /* NAME TAG */
 export function updateNameTag(playerId) {
-    /* `getEntityName` peut rendre undefined au tout premier tick d'un join :
-       `{ str: undefined }` faisait refuser TOUT le name tag par le moteur
-       (« Expected: valid nameTagInfo value »). Un nom de repli evite de
-       perdre la ligne entiere pour un pseudo pas encore lisible. */
+    /* Un id de joueur reste valide du join au leave : le nom est donc
+       lisible. Le seul cas ou l'appel peut lever, c'est un leave dans le meme
+       tick que l'appel (on ignore alors le name tag, il n'y a plus personne a
+       afficher). Pas de faux nom : on ne pose rien plutot qu'un « Player »
+       qui remplacerait un vrai pseudo. */
     let name = "";
-    try { name = api.getEntityName(playerId) || ""; } catch (e) { name = ""; }
-    name = String(name).trim() || "Player";
+    try { name = String(api.getEntityName(playerId) || ""); } catch (e) { return; }
+    if (!name) return;
     const team = getTeamData(getPlayerTeam(playerId));
     const crew = getCrewName(playerId);
     /* Name tag = identite : pseudo, puis team et equipage sur la 2e ligne.
@@ -503,10 +504,7 @@ export function handleChat(playerId, message, channel) {
         return false;
     }
 
-    /* Le filtre anti-majuscules ne s'applique pas au staff : son annonce
-       garde sa casse. La regle vit dans le rang (`byPassChatRestriction`),
-       pas dans une exception ecrite ici. */
-    if (!canBypassChatRestriction(playerId)) message = normalizeCaps(message);
+    message = normalizeCaps(message);
 
     const name = api.getEntityName(playerId);
     const team = getTeamData(getPlayerTeam(playerId));
