@@ -370,9 +370,14 @@ dessine la barre, on ne fabrique plus une suite de `█`/`▒`. La sidebar s'en 
 pour l'**XP** (verte) et la **stamina** (bleue) :
 
 ```js
-bar(0.43, ["#4ADE80"], { height: "0.75em" })
-// => { type: "ProgressBar", progress: 0.43, colours: ["#4ADE80"], height: "0.75em" }
+bar(0.43, ["#4ADE80"], { height: "24px", width: "250px" })
+// => { type: "ProgressBar", progress: 0.43, colours: ["#4ADE80"], height: "24px", width: "250px" }
 ```
+
+La taille est **250 × 24 px**, réglée en jeu (demande 71) : sans `width`, la barre
+prenait la largeur de la ligne et restait très fine. En px, sa taille ne dépend
+plus de la police du joueur. Coût : ~89 caractères de JSON par barre (contre 79
+sans `width`), pris dans la marge du budget — voir « La sidebar : budget ».
 
 * `progress` est un **ratio 0..1** (borné, arrondi à 3 décimales : au-delà on
   paie des caractères pour une différence invisible) ;
@@ -394,15 +399,32 @@ somme dépassait, et `fit()` coupait la fin du message — le plus souvent
 l'objectif du tutoriel.
 
 Les priorités disent dans quel ordre on sacrifie : `0` tutoriel, `1` quête,
-`2` XP, `3` stamina, `4` points de stat, `8` « pas de quête », `9` par défaut.
+`2` XP, `3` stamina, `4` points de stat, `8` « pas de quête », `12` **titre**.
 `0` est une priorité valide : le code écrivait `priority || 9`, donc la priorité
 0 devenait 9 et le tutoriel était jeté **en premier** alors qu'il est documenté
 comme gardé en premier.
 
-`npm run check` rend la **vraie** sidebar (deux joueurs simulés, dont un chargé
-avec objectif de tutoriel) et vérifie : taille ≤ 1 200, deux `ProgressBar`, ratio
-borné et arrondi, couleurs CSS acceptées, **teinte verte pour l'XP et bleue pour
-la stamina**, et l'objectif du tutoriel toujours présent.
+**Le titre part le premier** (priorité 12, la plus sacrifiable). Il coûte
+168 caractères à lui seul et le joueur connaît le nom du jeu. Sans ça, agrandir
+les barres faisait disparaître la barre de **stamina** chez un nouveau joueur qui
+a un objectif de tutoriel **et** une quête — c'est-à-dire exactement celui qui en
+a le plus besoin. Les barres, elles, ne sont jamais sacrifiées : `npm run check`
+le vérifie sur trois joueurs simulés.
+
+Deux économies qui ne se voient pas : les séparateurs `"\n\n"` n'ont **pas de
+style** (une couleur sur des sauts de ligne coûte 29 caractères pour rien), et le
+bloc « Stat Points » n'apparaît que s'il y a des points à dépenser.
+
+`npm run check` rend la **vraie** sidebar (trois joueurs simulés : nu, chargé avec
+objectif de tutoriel, et nouveau joueur avec tutoriel **et** quête) et vérifie :
+taille ≤ 1 200, **deux `ProgressBar` dans chaque cas** (jamais une seule), ratio
+borné et arrondi, couleurs CSS acceptées, taille `width`/`height` en px,
+**teinte verte pour l'XP et bleue pour la stamina**, l'objectif du tutoriel et le
+bloc de quête toujours présents.
+
+Mesuré : **1 088** car. (joueur nu), **1 189** (chargé + tutoriel), **1 096**
+(nouveau joueur + tutoriel + quête). Vérifié par mutation : rendre le titre
+obligatoire fait tomber la barre de stamina dans le dernier cas, et la CI refuse.
 
 ### Icônes : une liste blanche, sinon « ? »
 
@@ -457,10 +479,11 @@ sérialisée d'un payload.
 
 La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
 caractères : une seule couleur par partie, `fontSize` réservé au titre, textes
-libres (fruit, style, cible de quête) bornés, **barres natives sans dégradé**
-(~79 caractères de JSON chacune), et blocs secondaires retirés **par ordre de
-priorité** si nécessaire — jamais tout le message. Mesuré : 1 106 caractères
-pour un joueur nu, 1 150 pour un joueur chargé avec objectif de tutoriel.
+libres (fruit, style, cible de quête) bornés, **barres natives 250 × 24 px sans
+dégradé** (~89 caractères de JSON chacune), et blocs secondaires retirés **par
+ordre de priorité** si nécessaire — jamais tout le message. Mesuré : 1 088
+caractères pour un joueur nu, 1 096 pour un nouveau joueur avec tutoriel et
+quête, 1 189 pour un joueur chargé.
 
 ---
 
@@ -1972,7 +1995,7 @@ La migration est **idempotente** : repasser dessus ne réécrit rien.
 
 ```js
 FA.logStatus();     // résumé lisible : packs, modules, handlers, erreurs
-FA.status();        // objet COURT : { ready, packCount, registered, missingCount, … }
+FA.status();        // objet COURT : { ready, phase, packCount, registered, missingCount, … }
 FA.reload();        // relit les Code Blocks (ré-échauffe le chunk avant)
 FA.reload(true);    // idem en forçant la réévaluation
 FA.prewarm();       // force le chargement du chunk des Code Blocks (16 getBlock)
@@ -1986,6 +2009,30 @@ normale et **381 en panne** (l'ancien en faisait 5 850). Le détail complet (les
 197 handlers, la liste par pack) s'affiche avec `FA.logStatus()`,
 qui passe par `api.log` et n'a donc pas cette limite. `FA.status(true)` rend la
 liste entière des manquants, pour un test hors jeu.
+
+### Appels pendant le démarrage : « trop tôt » n'est pas une panne
+
+Au lancement du monde, le chunk des Code Blocks arrive avec un tick de retard et
+le balayage prend plusieurs ticks : pendant cette fenêtre, un clic de capacité
+appelle un handler qui n'existe pas encore. Le chargeur levait alors une erreur
+(`InternalError` au lancement).
+
+Il distingue maintenant **deux causes** pour un handler absent :
+
+| `evaluatedOnce` | situation | comportement |
+| --- | --- | --- |
+| `false` | les packs n'ont pas encore été lus (le chargeur réessaie, `retries < 30`) | appel **ignoré**, une phrase au joueur, **aucune erreur** |
+| `true` | les packs ont été lus et le handler n'y est pas | log + **erreur levée** (détecteur de bloc manquant) |
+
+Le message au joueur est envoyé **une seule fois par joueur et par démarrage**
+(jamais pour un appel sans identifiant), et `FA.status().ignoredEarly` compte les
+appels ignorés. Une fois le chargeur résigné (30 essais, aucun bloc posé), on
+repasse par le signalement bruyant : sinon le joueur verrait « still loading »
+indéfiniment sans que personne ne comprenne.
+
+`check-blocks.mjs` vérifie les deux côtés : un appel avant chargement **ne lève
+pas** d'erreur, prévient le joueur **une seule fois**, et un handler absent
+**après** chargement lève **toujours**.
 
 ### Chargement par petits lots (mémoire)
 
@@ -2016,8 +2063,13 @@ Messages typiques :
 - `pack 3/5 MANQUANT (attendu vers z=100004)` → Code Block absent ou vide.
 - `pack 2/5 TRONQUÉ … 29000 car. reçus / 30000 attendus` → copier/coller coupé
   par la limite 32 k : reconstruis ce pack (`npm run build:blocks`).
-- `handler 'onPlayerClickGravityGrab' introuvable` → le fruit n'a pas été chargé ;
-  le cooldown est remboursé et l'erreur apparaît dans les logs.
+- `handler 'onPlayerClickGravityGrab' introuvable` → les blocs **ont été lus** et
+  ce handler n'y est pas (bloc manquant, censuré, ancienne version) : l'erreur
+  apparaît dans les logs.
+- `'onPlayerClickX' appelé avant la fin du chargement : ignoré` → le monde vient
+  de démarrer, le chunk des Code Blocks arrive un tick trop tard. Ce n'était pas
+  une panne : l'appel est ignoré et le joueur reçoit **une fois**
+  « Abilities are still loading — try again in a moment. » (voir plus bas).
 
 ---
 

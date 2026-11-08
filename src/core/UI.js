@@ -38,11 +38,14 @@ const title = "1.9em", title2 = "1.5em", text = "1.1em";
 
 /* Barres natives : une verte pour l'XP, une bleue pour la stamina. Une seule
    couleur par barre (un degrade couterait ~20 caracteres de JSON de plus pour
-   un ecart invisible dans la sidebar) et pas de largeur imposee : la barre
-   prend la largeur de la ligne. */
+   un ecart invisible dans la sidebar).
+   Taille : 250x24 px, reglee en jeu (demande 71). Sans `width`, la barre prenait
+   la largeur de la ligne et restait tres fine ; en px elle est lisible et sa
+   taille ne depend plus de la police du joueur. Cout : 26 caracteres de JSON,
+   pris dans la marge du budget. */
 const BAR_GREEN = ["#4ADE80"];
 const BAR_BLUE = ["#7DD3FC"];
-const BAR_SIZE = { height: "0.75em" };
+const BAR_SIZE = { height: "24px", width: "250px" };
 const border = "lightgray"
 
 export function updateSidebar(playerId){
@@ -108,10 +111,16 @@ function drawSidebar(playerId){
         if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority === undefined ? 9 : priority });
     };
 
+    /* Le titre est le PREMIER bloc sacrifie quand la place manque (priorite 12,
+       au-dessus de la valeur par defaut 9) : il coute 168 caracteres a lui seul,
+       et le joueur connait deja le nom du jeu. Sans ca, agrandir les barres
+       (250x24 px) faisait disparaitre la barre de STAMINA chez un nouveau
+       joueur qui a un objectif de tutoriel ET une quete — c'est-a-dire
+       exactement le joueur qui en a le plus besoin. */
     block([
         ic("fa-solid fa-skull", C.MARINE, {fontSize: title}),
         txt(" BLOCK PIRATES\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
-    ]);
+    ], true, 12);
     block([
         ic("fa-solid fa-coins", C.MONEY),
         txt(" " + money + "\n", C.MONEY),
@@ -131,18 +140,22 @@ function drawSidebar(playerId){
     block([
         txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
         bar(xpData.ratio, BAR_GREEN, BAR_SIZE),
-        txt("\n\n", C.XP),
+        txt("\n\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
     ], true, 2);
     block([
         ic("fa-solid fa-bolt", C.MARINE),
         txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
         bar(stData.ratio, BAR_BLUE, BAR_SIZE),
-        txt("\n\n", C.MARINE),
+        txt("\n\n"),
     ], true, 3);
-    block([
-        ic("fa-solid fa-star", C.SUCCESS),
-        txt(" Stat Points " + sp + "\n\n", C.SUCCESS),
-    ], true, 4);
+    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
+       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
+    if (sp > 0) {
+        block([
+            ic("fa-solid fa-star", C.SUCCESS),
+            txt(" Stat Points " + sp + "\n\n", C.SUCCESS),
+        ], true, 4);
+    }
 
     /* Objectif du tutoriel : optionnel, mais garde en premier (priorite 0). */
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;

@@ -497,6 +497,14 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   let booted = false;
   let lastLoad = 0;
   let retries = 0;
+  /* `evaluatedOnce` separe les deux causes d'un handler absent :
+       - FAUX  : les packs n'ont pas encore ete lus. Le chunk des Code Blocks
+                 arrive avec un tick de retard et le balayage prend plusieurs
+                 ticks : un appel qui tombe la est NORMAL, pas une panne ;
+       - VRAI  : on a lu les blocs et le handler n'y est pas (bloc manquant,
+                 censure, ancienne version) : la c'est un vrai bug, et le
+                 signaler bruyamment est utile. */
+  let evaluatedOnce = false;
   /* Balayage en cours : il survit d'un tick à l'autre (cf. SLOTS_PER_LOAD). */
   let scan = null;
 
@@ -533,6 +541,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         FA.packInfo = [];
         FA.errors = errors.slice();
         for (const pack of packs) if (alive()) evalPack(pack);
+        evaluatedOnce = true;
         /* Les payloads ne servent plus : on les relâche (8 x ~31 000
            caractères) pour rendre la mémoire au bac à sable. */
         for (const pack of packs) pack.payload = "";
@@ -644,6 +653,10 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       stale: FA.stale.slice(0, 4).map((s) => ({ index: s.index, z: s.z })),
       registered: Object.keys(FA.r).length,
       expected: expected.length,
+      /* "boot" = les packs ne sont pas encore lus : un handler absent est
+         normal. "ok" = lus. C'est ce qui explique un message « still loading ». */
+      phase: evaluatedOnce ? "ok" : "boot",
+      ignoredEarly: earlyCalls,
       missingCount: missing.length,
       missing: detail ? missing : missing.slice(0, MAX_NAMES),
       errors: FA.errors.slice(0, MAX_ERRORS).map(cut),
@@ -661,6 +674,29 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     return s;
   }
 
+  /* Appel arrive AVANT que les packs soient lus (demarrage du monde, chunk des
+     Code Blocks encore froid, balayage en cours). Rien n'est casse : l'evenement
+     tombe juste trop tot. On ne LEVE PAS d'erreur — c'etait elle qui remontait
+     en « InternalError » au lancement — et on previent le joueur UNE fois, pour
+     qu'il ne croie pas que son clic n'a rien fait par hasard. */
+  const toldPending = {};
+  let earlyCalls = 0;
+  function tooEarly(name, args) {
+    warn("early:" + name, `[FA] '${name}' appele avant la fin du chargement : ignore (le monde demarre).`);
+    const pid = args && typeof args[0] === "string" ? args[0] : null;
+    if (!pid || toldPending[pid]) return;
+    toldPending[pid] = true;
+    try {
+      getApi().sendMessage(pid, [
+        { str: "Abilities are still loading — ", style: { color: "#CBD5E1" } },
+        { str: "try again", style: { color: "#4ADE80", fontWeight: "bold" } },
+        { str: " in a moment.", style: { color: "#CBD5E1" } },
+      ]);
+    } catch (e) {
+      /* un joueur deconnecte entre-temps : rien a faire, et surtout pas jeter */
+    }
+  }
+
   function call(name, args) {
     let fn = FA.r?.[name];
     if (typeof fn !== "function") {
@@ -668,6 +704,16 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       fn = FA.r?.[name];
     }
     if (typeof fn !== "function") {
+      /* « Trop tot » seulement tant que le chargeur garde un espoir : il
+         reessaie (retries < 30). Une fois qu'il a abandonne (aucun bloc pose,
+         blocs tous censures…), un handler absent EST une panne : on repasse par
+         le signalement bruyant, sinon le joueur verrait « still loading »
+         indefiniment et personne ne comprendrait. */
+      if (!evaluatedOnce && retries < 30) {
+        earlyCalls++;
+        tooEarly(name, args);
+        return undefined;
+      }
       warn("missing:" + name, `[FA] handler '${name}' introuvable : Code Block non chargé (FA.status()).`);
       if (/^onPlayerClick|^onPlayerRelease|^onPlayerUsed/.test(name)) {
         throw new Error("[FA] handler manquant : " + name);
