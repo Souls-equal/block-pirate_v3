@@ -116,7 +116,7 @@ const SLOPPY_GLOBALS = [
     "startBoss", "startTutorial", "withEffectSource",
 ];
 
-async function renderSidebar(db, tutorialLine) {
+async function renderSidebar(db, tutorialLine, quest) {
     for (const n of SLOPPY_GLOBALS) globalThis[n] = () => false;
     let sidebar = null;
     globalThis.api = new Proxy(
@@ -140,7 +140,9 @@ async function renderSidebar(db, tutorialLine) {
     const { buildSync } = await import("esbuild");
     const built = buildSync({
         stdin: {
-            contents: `export * from ${JSON.stringify(join(ROOT, "src/core/UI.js"))};`,
+            contents:
+                `export * from ${JSON.stringify(join(ROOT, "src/core/UI.js"))};` +
+                `export { playerQuest, questProgress } from ${JSON.stringify(join(ROOT, "src/gameplay/quest.js"))};`,
             resolveDir: ROOT,
             loader: "js",
         },
@@ -154,6 +156,10 @@ async function renderSidebar(db, tutorialLine) {
     const url = "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64");
     const ui = await import(url);
     ui.setTutorialLineLookup(tutorialLine ? () => tutorialLine : null);
+    if (quest) {
+        ui.playerQuest.p1 = quest.id;
+        ui.questProgress.p1 = quest.progress;
+    }
     ui.updateSidebar("p1");
     return sidebar;
 }
@@ -185,20 +191,27 @@ function hueOf(hex) {
     return hue < 0 ? hue + 360 : hue;
 }
 
+const SIDEBAR_SIZES = [];
 const POOR = {};
 const RICH = { money: 1234567, lvl: 87, xp: 4321, sp: 12, team: "PIRATE" };
+/* Le pire cas RÉEL : un nouveau joueur, donc objectif de tutoriel ET première
+   quête en cours. C'est exactement celui qui a le moins de place et le plus
+   besoin de voir sa stamina. */
+const NEWBIE = { id: "skyBandit3", progress: 3 };
 const scenarios = [
-    ["joueur nu", POOR, null],
-    ["joueur charge + objectif de tutoriel", RICH, "Buy your first weapon at the Combat Teacher"],
+    ["joueur nu", POOR, null, null],
+    ["joueur charge + objectif de tutoriel", RICH, "Buy your first weapon at the Combat Teacher", null],
+    ["nouveau joueur + tutoriel + quete", POOR, "Kill 3 Sky Bandits in the Lower Skyl", NEWBIE],
 ];
-for (const [label, db, tutorialLine] of scenarios) {
-    const sidebar = await renderSidebar(db, tutorialLine);
+for (const [label, db, tutorialLine, quest] of scenarios) {
+    const sidebar = await renderSidebar(db, tutorialLine, quest);
     if (!Array.isArray(sidebar)) {
         errors.push(`${label} : aucune sidebar envoyee`);
         continue;
     }
     checked++;
     const size = JSON.stringify(sidebar).length;
+    SIDEBAR_SIZES.push(`${label} ${size}`);
     if (size > BUDGET_SIDEBAR)
         errors.push(`${label} : sidebar de ${size} car. > budget ${BUDGET_SIDEBAR}`);
 
@@ -223,9 +236,14 @@ for (const [label, db, tutorialLine] of scenarios) {
             const pb = colourProblem(b.backgroundColour);
             if (pb) errors.push(`${label} : fond de barre — ${pb}`);
         }
-        for (const key of ["width", "height"])
-            if (b[key] !== undefined && typeof b[key] !== "string")
-                errors.push(`${label} : ${key} doit etre une taille CSS ("0.75em")`);
+        /* Taille reglee en jeu (demande 71) : 250x24 px. Sans `width`, la barre
+           prenait la largeur de la ligne et restait tres fine ; on refuse donc
+           une barre qui perd sa taille en route (fit() ne doit pas la toucher). */
+        for (const key of ["width", "height"]) {
+            if (b[key] === undefined) errors.push(`${label} : barre sans ${key}`);
+            else if (typeof b[key] !== "string") errors.push(`${label} : ${key} doit etre une taille CSS ("24px")`);
+            else if (!/^\d+px$/.test(b[key])) errors.push(`${label} : ${key} = ${b[key]} (attendu en px)`);
+        }
     }
     /* Vert pour l'XP, bleu pour la stamina : c'est la demande du joueur, verifiee
        sur la teinte et non sur une constante recopiee. */
@@ -241,6 +259,14 @@ for (const [label, db, tutorialLine] of scenarios) {
         const shown = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf(head) !== -1);
         if (!shown) errors.push(`${label} : l'objectif du tutoriel est coupe alors qu'il est prioritaire`);
     }
+    /* Les deux barres sont une exigence du joueur (demande 70/71) : elles ne
+       doivent jamais etre sacrifiees, meme quand la place manque. Le titre,
+       lui, a la priorite de sacrifice la plus faible (12). */
+    if (bars.length !== 2) errors.push(`${label} : une barre a ete sacrifiee (${bars.length}/2)`);
+    if (quest) {
+        const shownQuest = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("QUEST") !== -1);
+        if (!shownQuest) errors.push(`${label} : le bloc de quete a ete coupe`);
+    }
 }
 
 if (errors.length) {
@@ -248,4 +274,5 @@ if (errors.length) {
     for (const e of errors) console.error("  - " + e);
     process.exit(1);
 }
-console.log("Textes : " + checked + " verifications (icones + 2 barres + 2 sidebars), tout est valide.");
+console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.length + " sidebars + barres), tout est valide.");
+console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");

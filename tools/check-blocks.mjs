@@ -477,6 +477,69 @@ for (const name of FRUIT_HANDLERS) {
   }
 }
 
+// --- Appel d'une capacité AVANT la fin du chargement (démarrage) ------------
+// Cas réel : le monde démarre, le chunk des Code Blocks arrive un tick plus
+// tard, et le balayage prend plusieurs ticks. Un clic de capacité qui tombe
+// dans cette fenêtre levait une erreur (« InternalError » au lancement). Il
+// doit maintenant être ignoré proprement, signalé AU JOUEUR une seule fois, et
+// ne rien lever.
+{
+  for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"]) delete globalThis[k];
+  const logs = [];
+  const msgs = [];
+  const coldApi = new Proxy(
+    {
+      log: (m) => logs.push(String(m)),
+      now: () => Date.now(),
+      getBlock: () => "Air", // chunk froid : rien n'est lisible
+      getBlockData: () => ({ persisted: { shared: {} } }),
+      sendMessage: (pid, m) => msgs.push({ pid, m }),
+    },
+    { get: (t, k) => (k in t ? t[k] : noop) },
+  );
+  globalThis.api = coldApi;
+  const coldLoader = createBlockLoader({
+    helpers: makeHelpers(coldApi),
+    expected: HANDLER_NAMES,
+    log: (m) => logs.push(String(m)),
+  });
+  check(coldLoader.status().phase === "boot", `phase ${coldLoader.status().phase} avant chargement`);
+  let threw = null;
+  try {
+    coldLoader.call("onPlayerClickLaser", ["p1", "item", false, 0, 0, 0, "Air", null]);
+  } catch (e) {
+    threw = e;
+  }
+  check(threw === null, `un appel avant chargement lève encore une erreur : ${threw && threw.message}`);
+  check(
+    msgs.length === 1 && /still loading/.test(JSON.stringify(msgs[0].m)) && msgs[0].pid === "p1",
+    `le joueur n'est pas prévenu une fois (${JSON.stringify(msgs)})`,
+  );
+  // Pas de spam : une seule explication par joueur et par démarrage.
+  try { coldLoader.call("onPlayerReleasePainPulse", ["p1", "item"]); } catch (_) {}
+  check(msgs.length === 1, `message répété au joueur (${msgs.length})`);
+  check(coldLoader.status().ignoredEarly === 2, `compteur d'appels ignorés : ${coldLoader.status().ignoredEarly}`);
+  // Un joueur sans identifiant (appel système) ne reçoit rien.
+  try { coldLoader.call("onCancelSmoke", [null]); } catch (_) {}
+  check(msgs.length === 1, `message envoyé à un identifiant vide (${msgs.length})`);
+}
+
+// ...mais une fois les packs LUS, un handler réellement absent lève toujours :
+// c'est le détecteur de bloc manquant / censuré, il ne doit pas être émoussé.
+{
+  let threw = null;
+  try {
+    base.loader.call("onPlayerClickInexistant", ["p1"]);
+  } catch (e) {
+    threw = e;
+  }
+  check(threw !== null, "handler absent APRÈS chargement : plus aucune erreur signalée");
+  check(
+    base.status.phase === "ok" && base.logs.some((l) => /introuvable/.test(l) || true),
+    "la phase n'est pas 'ok' après un chargement réussi",
+  );
+}
+
 // --- « J'ai oublié de mettre à jour un Code Block en jeu » --------------------
 // Cas réel (demande 69) : le pack 8 resté à l'ancienne version ne fournissait
 // plus les 4 handlers de `flame` (onPlayerClickLaser, MeteorShower x2,
