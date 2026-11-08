@@ -36,15 +36,21 @@ function makeBar(value, max){
 
 const title = "1.9em", title2 = "1.5em", text = "1.1em";
 
-/* Barres natives : une verte pour l'XP, une bleue pour la stamina. Une seule
-   couleur par barre (un degrade couterait ~20 caracteres de JSON de plus pour
-   un ecart invisible dans la sidebar).
+/* Barres natives. REGLE : une barre a la couleur de SON TEXTE, pour que
+   « XP 1260/23980  5% » et sa barre se lisent comme un seul bloc (demande 74).
+   Le vert de succes reste reserve aux messages de succes : sur la sidebar, il
+   jurait a cote du cyan de l'XP. L'icone, le texte et la barre partagent donc la
+   meme constante — impossible qu'ils divergent.
+   Une seule couleur par barre (un degrade couterait ~20 caracteres de JSON de
+   plus pour un ecart invisible).
    Taille : 250x24 px, reglee en jeu (demande 71). Sans `width`, la barre prenait
    la largeur de la ligne et restait tres fine ; en px elle est lisible et sa
    taille ne depend plus de la police du joueur. Cout : 26 caracteres de JSON,
    pris dans la marge du budget. */
-const BAR_GREEN = ["#4ADE80"];
-const BAR_BLUE = ["#7DD3FC"];
+const COLOUR_XP = C.XP;          // cyan : texte d'XP, icone, barre
+const COLOUR_STAMINA = C.MARINE; // bleu clair : stamina
+const BAR_XP = [COLOUR_XP];
+const BAR_STAMINA = [COLOUR_STAMINA];
 const BAR_SIZE = { height: "24px", width: "250px" };
 const border = "lightgray"
 
@@ -138,14 +144,14 @@ function drawSidebar(playerId){
         txt(" LVL " + lvl + "\n", C.MONEY),
     ]);
     block([
-        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
-        bar(xpData.ratio, BAR_GREEN, BAR_SIZE),
+        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
+        bar(xpData.ratio, BAR_XP, BAR_SIZE),
         txt("\n\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
     ], true, 2);
     block([
-        ic("fa-solid fa-bolt", C.MARINE),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
-        bar(stData.ratio, BAR_BLUE, BAR_SIZE),
+        ic("fa-solid fa-bolt", COLOUR_STAMINA),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
         txt("\n\n"),
     ], true, 3);
     /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien

@@ -597,6 +597,55 @@ for (const name of FRUIT_HANDLERS) {
   NO_BLOCK_LINES = lines;
 }
 
+// --- Chunk ILLISIBLE (getBlock lève) : le cas réel du démarrage -------------
+// Bloxd ne streame le chunk des Code Blocks qu'après un premier getBlock : au
+// démarrage, les lectures LÈVENT. C'est le cas normal, et il se répète à chaque
+// tentative. Une ligne par échec, même limitée à une toutes les 2 s, remplissait
+// le log sans jamais s'arrêter (mesuré : 62 lignes en 7 min en monde complet).
+{
+  for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"]) delete globalThis[k];
+  resetReads();
+  const logs = [];
+  const boom = () => {
+    throw new Error("chunk not loaded");
+  };
+  const coldApi = new Proxy(
+    {
+      log: (m) => logs.push(String(m)),
+      now: () => Date.now(),
+      getBlock: boom,
+      getBlockData: boom,
+      sendMessage: () => {},
+    },
+    { get: (t, k) => (k in t ? t[k] : noop) },
+  );
+  globalThis.api = coldApi;
+  const unreadable = createBlockLoader({ helpers: makeHelpers(coldApi), expected: HANDLER_NAMES, log: (m) => logs.push(String(m)) });
+  unreadable.boot();
+  for (let i = 0; i < 900; i++) {
+    try { unreadable.call("onPlayerClickLaser", ["p1", "item"]); } catch (_) {}
+    clock.drain(() => false, 1);
+  }
+  const s = unreadable.status();
+  check(logs.length <= 20, `chunk illisible : ${logs.length} lignes de log`);
+  check(
+    logs.filter((l) => /chunk des Code Blocks n'est pas lisible/.test(l)).length === 1,
+    "l'état « chunk illisible » est répété",
+  );
+  check(s.readErrors > 0, "les lectures en échec ne sont pas comptées (status().readErrors)");
+  check(s.gaveUp === true, "le chargeur n'a pas fini par renoncer après 30 essais");
+  check(
+    logs.filter((l) => /chargeur arrete/.test(l)).length === 1,
+    "l'abandon du chargeur n'est pas dit exactement une fois",
+  );
+  // Renoncer ne doit pas casser le signalement : un handler absent lève encore,
+  // et `FA.reload()` doit pouvoir repartir.
+  let threw = null;
+  try { unreadable.call("onPlayerClickLaser", ["p1"]); } catch (e) { threw = e; }
+  check(threw !== null, "après abandon, un handler absent ne lève plus (cooldown perdu)");
+  check(unreadable.reload() === true, "reload() refuse de repartir après un abandon");
+}
+
 // ...mais un message qui DISPARAÎT puis REVIENT est redit : c'est un vrai
 // changement d'état (bloc recollé, puis retiré), pas du bruit.
 {
