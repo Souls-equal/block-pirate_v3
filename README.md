@@ -1691,7 +1691,7 @@ depuis code-blocks/ (version f0f0c838).
 [FA] 4 handler(s) absent(s) : … Un Code Block est d'une ancienne version.
 ```
 
-`FA.status()` expose `release` et `stale` (`[{ index, z, release }]`). Les blocs
+`FA.status()` expose `release` et `stale` (`[{ index, z }]`). Les blocs
 d'une version antérieure à cette fonctionnalité n'ont pas de `v=` : ils restent
 lisibles, et sont simplement signalés comme périmés dès qu'un bloc de la nouvelle
 version est présent.
@@ -1972,11 +1972,44 @@ La migration est **idempotente** : repasser dessus ne réécrit rien.
 
 ```js
 FA.logStatus();     // résumé lisible : packs, modules, handlers, erreurs
-FA.status();        // objet : { ready, packCount, missing[], errors[], packs[] }
+FA.status();        // objet COURT : { ready, packCount, registered, missingCount, … }
 FA.reload();        // relit les Code Blocks (ré-échauffe le chunk avant)
 FA.reload(true);    // idem en forçant la réévaluation
 FA.prewarm();       // force le chargement du chunk des Code Blocks (16 getBlock)
 ```
+
+**`FA.status()` doit rester petit.** Bloxd refuse de renvoyer un objet trop gros
+et répond `InternalError: Result too large` — un diagnostic illisible ne sert à
+rien. Il ne contient donc que des compteurs, les 12 premiers noms manquants et
+les 5 premières erreurs (tronquées) : mesuré à **257 caractères** en marche
+normale et **381 en panne** (l'ancien en faisait 5 850). Le détail complet (les
+197 handlers, la liste par pack) s'affiche avec `FA.logStatus()`,
+qui passe par `api.log` et n'a donc pas cette limite. `FA.status(true)` rend la
+liste entière des manquants, pour un test hors jeu.
+
+### Chargement par petits lots (mémoire)
+
+Les 8 blocs pèsent ~31 000 caractères chacun. Les lire tous dans le même tick
+faisait tenir jusqu'à `SCAN_SLOTS` × 31 000 caractères en mémoire d'un coup — et
+un **ancien bloc resté en place à côté des nouveaux suffit à doubler la facture**.
+Le bac à sable de Bloxd est étroit : ce pic ressort en
+`InternalError: out of memory` **au chargement du monde**.
+
+Le balayage lit donc `SLOTS_PER_LOAD` = 3 cases par tick (24 cases → 8 ticks,
+soit ~0,4 s), et :
+
+* un bloc **en double** est signalé (`pack 1 en double (z=100022) ignoré`), non
+  retenu et non réévalué ;
+* les payloads sont **relâchés** juste après l'évaluation (232 454 caractères
+  rendus au moteur) ;
+* `FA.packInfo` ne garde plus la liste des handlers de chaque pack (5 000
+  caractères), seulement leur nombre.
+
+`check-blocks.mjs` mesure tout ça : au plus **3 lectures de blocs par tick**, un
+bloc lu **une seule fois**, `FA.status()` ≤ 1 200 caractères, aucun payload
+retenu après évaluation, et un doublon signalé sans faire perdre un handler.
+Vérifié par mutation : remettre 24 lectures par tick ou réintroduire `packs` dans
+`status()` fait échouer les trois contrôles.
 
 Messages typiques :
 
