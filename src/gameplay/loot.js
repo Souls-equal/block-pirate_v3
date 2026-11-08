@@ -159,7 +159,7 @@ export function rollMobLoot(playerId, mobId, data) {
     try {
         say(playerId, [
             ic("fa-solid fa-gem", C.MONEY),
-            bold(" Loot! ", C.SUCCESS),
+            bold(" LOOT  ", C.MONEY),
             bold(pick.label || pick.item, C.MONEY),
             txt(" dropped.", C.INFO),
         ]);

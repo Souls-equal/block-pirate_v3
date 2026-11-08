@@ -1,6 +1,6 @@
 // stats.js
 
-import { addStat, getStat, reconcileSP, setStat } from "../utils/data";
+import { addStat, confirmAction, getStat, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 import { C, say, txt, bold, ic } from "../core/theme";
 
@@ -34,12 +34,21 @@ const REGEN_MIN_INTERVAL  = 1500;
 const REGEN_BASE_START    = 5000;
 const REGEN_MIN_START     = 2500;
 
+/* CINQ STATS, CINQ ROLES DE LA PALETTE.
+   Une statistique a UNE couleur, partout : la carte de la boutique, son icone,
+   son compteur de monnaie et le message d'amelioration. Avant, Health et
+   Damage etaient deux rouges presque identiques, et Stamina/Defense deux bleus
+   presque identiques : impossible de reconnaitre une carte au premier coup
+   d'oeil. Les icones, elles, sont des icones INGAME de Bloxd (regle du projet :
+   natives d'abord), donc les cinq cartes se ressemblent sans se confondre.
+   `perPoint` est une phrase, pas un fragment : elle est lue telle quelle sous
+   le titre de la carte. */
 export const STAT_CONFIG = {
-    h:  { name: "Health",  color: "#ff8888", icon: "fa-solid fa-heart", imageColour: "#Ffe6e6", perPoint: "+20/15/10 HP (diminishing every 50 point)" },
-    d:  { name: "Damage",  color: "#ffaaaa", icon: "Diamond Sword",     imageColour: "white",   perPoint: "+20% then diminishing" },
-    s:  { name: "Stamina", color: "#aaddff", icon: "Updraft",           imageColour: "white",   perPoint: "+10 max stamina" },
-    r:  { name: "Regen",   color: "#88ff88", icon: "fa-solid fa-plus",  imageColour: "#32cd32", perPoint: "more heal and more often" },
-    df: { name: "Defense", color: "#aaaaff", icon: "Iron Chestplate",   imageColour: "white",   perPoint: "-4% then diminishing" }
+    h:  { name: "Health",  color: C.SUCCESS, icon: "Health",         imageColour: "#FEE6E6", perPoint: "+20 HP up to 50 points, then +15, then +10." },
+    d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "+20% damage on the first point, less on each next." },
+    s:  { name: "Stamina", color: C.MARINE,  icon: "Updraft",        imageColour: "white",   perPoint: "+10 max stamina, so more dashes and air jumps." },
+    r:  { name: "Regen",   color: C.XP,      icon: "Health Regen",   imageColour: C.SUCCESS, perPoint: "Heal more, and sooner after a hit." },
+    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "-4% damage taken per point, never below 20%." },
 };
 
 const STAT_ORDER = ["h", "d", "s", "r", "df"];
@@ -215,6 +224,21 @@ export function resetStats(playerId) {
 }
 
 /* SHOP UI */
+/* Une seule anatomie pour les cinq cartes ET pour la carte de reset :
+   icone + nom, la phrase « par point », l'effet actuel, puis les compteurs.
+   L'init et la mise a jour ecrivent la MEME chose (niveau 0 au depart) : plus de
+   « Current: — » provisoire qui n'a jamais ressemble a l'affichage final. */
+function statCardLines(key, level, sp) {
+    const c = STAT_CONFIG[key];
+    return [
+        ic(c.icon, c.color),
+        txt(" " + c.name + "\n", c.color),
+        txt(c.perPoint + "\n\n", C.INFO),
+        bold("\u25cf " + statEffectText(key, level), c.color),
+        txt("\nPoints: " + level + "   Stat Points available: " + sp, C.INFO),
+    ];
+}
+
 export function initUpgradeShop() {
     api.configureShopCategory("upgrade", { customTitle: "Upgrades" });
 
@@ -224,28 +248,26 @@ export function initUpgradeShop() {
         api.createShopItem("upgrade", "upg_" + key, {
             image: c.icon,
             imageColour: c.imageColour,
-            customTitle: c.name,
-            description: [
-                txt("Each point "),
-                txt(c.perPoint + "\n\n", c.color),
-                txt("Current: — | Stat Points available: 0")
-            ],
+            customTitle: [bold(c.name, c.color)],
+            description: statCardLines(key, 0, 0),
             sortPriority: prio,
-            buyButtonText: "Upgrade",
+            buyButtonText: [txt("Upgrade", c.color)],
             userInput: { type: "text", placeholderText: "Amount (default: 1)" }
         });
     }
 
     api.createShopItem("upgrade", "upg_reset", {
         image: "Moonstone Orb",
-        imageColour: "white",
-        customTitle: "Reset Stats",
+        imageColour: C.DANGER,
+        customTitle: [bold("Reset Stats", C.DANGER)],
         description: [
-            txt("Refund all spent SP.\n\n"),
-            txt("Your level is kept.", "orange")
+            ic("fa-solid fa-clock-rotate-left", C.DANGER),
+            txt(" Refund every Stat Point you spent.", C.INFO),
+            bold("\n\u25cf Your level and your items are kept.", C.SUCCESS),
+            txt("\nClick twice to confirm.", C.INFO),
         ],
         sortPriority: 0,
-        buyButtonText: "Reset"
+        buyButtonText: [txt("Reset", C.DANGER)]
     });
 }
 
@@ -254,14 +276,8 @@ export function updateUpgradePanel(playerId) {
     const sp = getStat(playerId, "sp", 0);
 
     for (const k of STAT_ORDER) {
-        const c = STAT_CONFIG[k];
         api.updateShopItemForPlayer(playerId, "upgrade", "upg_" + k, {
-            description: [
-                txt("Each point "),
-                txt(c.perPoint + "\n\n", c.color),
-                bold(statEffectText(k, u[k]) + "\n", c.color),
-                txt("Points: " + u[k] + " | Stat Points available: " + sp)
-            ]
+            description: statCardLines(k, u[k], sp)
         });
     }
 }
@@ -272,10 +288,29 @@ const STAT_BY_ITEM = { upg_h: "h", upg_d: "d", upg_s: "s", upg_r: "r", upg_df: "
 export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
     if (categoryKey !== "upgrade") return false;
 
+    /* Le reset etait la SEULE action de la boutique sans second clic : un
+       clic malheureux rendait toutes les stats du joueur. Il passe donc par la
+       meme confirmation (3 s) que tous les achats du jeu. */
     if (itemKey === "upg_reset") {
+        const spent = totalSpent(playerId);
+        if (!spent) {
+            say(playerId, [
+                ic("fa-solid fa-circle-info", C.INFO),
+                txt(" You have no Stat Point to reset.", C.INFO),
+            ]);
+            return true;
+        }
+        if (!confirmAction(playerId, "statsReset", [
+            ic("fa-solid fa-clock-rotate-left", C.DANGER),
+            txt(" Reset every stat? ", C.INFO),
+            bold(spent + " Stat Point" + (spent > 1 ? "s" : "") + " come back", C.MONEY),
+            txt(", your level and your items stay.", C.INFO),
+        ])) return true;
         const refund = resetStats(playerId);
         say(playerId, [
-            bold("Stats reset! (" + refund + " Stat Points recovered)", "lime")
+            ic("fa-solid fa-clock-rotate-left", C.SUCCESS),
+            bold(" Stats reset: ", C.SUCCESS),
+            txt("+" + refund + " Stat Point" + (refund > 1 ? "s" : "") + " back.", C.INFO),
         ]);
         return true;
     }
@@ -287,12 +322,17 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
 
     if (!upgStat(playerId, stat, amt)) {
         say(playerId, [
-            txt("Not enough Stat Points! (Have: " + getStat(playerId, "sp", 0) + ", Need: " + amt + ")", "red")
+            ic("fa-solid fa-xmark", C.DANGER),
+            txt(" You need ", C.DANGER),
+            bold(amt + " Stat Point" + (amt > 1 ? "s" : ""), C.DANGER),
+            txt(", you have " + getStat(playerId, "sp", 0) + ".", C.INFO),
         ]);
     } else {
         say(playerId, [
             ic("fa-solid fa-circle-check", C.SUCCESS),
-            bold(" " + STAT_CONFIG[stat].name + " +" + amt, C.SUCCESS)
+            txt(" " + STAT_CONFIG[stat].name + " ", C.INFO),
+            bold("+" + amt, C.SUCCESS),
+            txt(" point" + (amt > 1 ? "s" : "") + ".", C.INFO),
         ]);
     }
 

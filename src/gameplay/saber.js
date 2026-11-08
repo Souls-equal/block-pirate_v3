@@ -31,7 +31,7 @@
                 le passage s'ouvre ET la Torch est retiree. Derriere, une Cup
                 (item Bucket, donnee par un Code Block).
      3  EAU      cliquer l'eau [2534,-897,449] remplit la Cup.
-     4  OLD MAN  sans eau "I'm so thirsty...", avec l'eau il remercie et
+     4  OLD MAN  sans eau "I'm so thirsty", avec l'eau il remercie et
                 envoie vers son fils.
      5  RICH MAN il donne l'objectif (Mob Leader) et pose une fleche vers
                 Secret Island.
@@ -789,7 +789,7 @@ function pressButton(playerId, index) {
             ic("fa-solid fa-door-open", C.SUCCESS),
             txt(" All five hidden buttons are pressed: ", C.SUCCESS),
             txt("a door grinds open deeper in the jungle.", C.INFO),
-            txt("\nA marker points at it. It stays open for a minute.", "#94A3B8"),
+            txt("\nA marker points at it. It stays open for a minute.", C.INFO),
         ]);
     } else {
         soundAt(playerId, "coin", 0.6, 1.4, 20);
@@ -976,7 +976,7 @@ export function saberOldMan(playerId) {
         return true;
     }
     if (step < S.WATER) {
-        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
+        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty\u2026"));
         return true;
     }
 
@@ -985,7 +985,7 @@ export function saberOldMan(playerId) {
        VIDE ne desaltere personne, et ca ne bloque pas : le point d'eau
        remplit n'importe quel seau vide (voir fillCup). */
     if (!hasItem(playerId, ITEM_CUP_FULL)) {
-        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty..."));
+        say(playerId, speech("Water", C.MARINE, "Old Man", "I'm so thirsty\u2026"));
         return true;
     }
 
@@ -1014,8 +1014,8 @@ export function saberRichMan(playerId) {
         armSecretArrow(playerId);
         soundAt(playerId, "exp_levelup", 0.8, 1.1, 20);
         say(playerId, speech("fa-solid fa-coins", C.MONEY, "Rich Man",
-            "Thanks for helping my father, but a mob leader has stolen all my money! "
-            + "Please find and take him down as soon possible so I can reward player...",
+            "Thanks for helping my father, but a mob leader stole all my money. "
+            + "Find him and take him down, and I will pay you.",
             "A marker now points at Secret Island."));
         return true;
     }
@@ -1408,7 +1408,7 @@ function killLeader(playerId, mobId) {
             : [
                 ic("fa-solid fa-skull", C.SUCCESS),
                 txt(" The Mob Leader is down. ", C.INFO),
-                txt("Nothing left to take from him.", "#94A3B8"),
+                txt("Nothing left to take from him.", C.INFO),
             ]);
     }
     return true;

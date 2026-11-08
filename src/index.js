@@ -25,7 +25,7 @@ import { cleanup as Tt, clearAll as Ut, onCloseBoss as Bt, onPlayerKilledMobBoss
 import { bossDamageGate as bpBossGate } from "./utils/boss";
 import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoin as qt, registerRecentPlayer as Qt } from "./core/admin";
 import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberOldMan as spOldMan, saberPreventDespawn as spDespawn, saberRichMan as spRichMan, saberShanks as spShanks, spawnMobLeader as spLeader } from "./gameplay/saber";
-import { installTheme as installTheme, shout, txt } from "./core/theme";
+import { C as PAL, installTheme as installTheme, bold, ic, shout, txt } from "./core/theme";
 import { notePurchase as tutPurchase, skipTutorial as tutSkip, startTutorial as tutStart, startTutorialLoop as startTutorialLoop, tutorialJoin as tutorialJoin, tutorialLeave as tutorialLeave, tutorialObjective as tutorialObjective, tutorialShield as tutorialShield } from "./gameplay/tutorial";
 import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
@@ -754,7 +754,14 @@ onPlayerStartChargingItem = (t, itemName) => {
 let $t = 0;
 
 doPeriodicSave = () => {
-    $t++, $t % 2 == 0 && shout([ txt("if you have any problems, bugs or glitch, report it on the discord!", "orange"), txt("> " + [ "discord.", "gg", "/", w ].join(""), "lightblue") ]);
+    /* Annonce communautaire : icone d'abord, comme tous les messages du jeu,
+       et un lien ecrit comme un lien (le « > » devant ne ressemblait a rien). */
+    $t++, $t % 2 == 0 && shout([
+        ic("fa-solid fa-brands fa-discord", PAL.MARINE),
+        txt(" Found a bug or a glitch? Tell us on the Discord: ", PAL.MONEY),
+        bold([ "discord.", "gg", "/", w ].join(""), PAL.MARINE),
+        txt(".", PAL.MONEY),
+    ]);
 }, tick = t => {Mt(t);//sphere
     ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();

@@ -416,15 +416,17 @@ function questMessage(quest, resolved) {
         ? resolved.targetMob : [quest.realMob || "Mob"];
     const name = targets[0];
 
-    const n = count > 1 ? count + " " : "";
+    const n = count > 1 ? count + "x " : "";
     return {
         start: [
             ic("fa-solid fa-swords", C.INFO),
-            txt(" Eliminate " + n + name + "!", C.INFO)
+            txt(" Eliminate " + n + name + ".\n", C.INFO),
+            ic("fa-solid fa-map-marker-check", C.DANGER),
+            txt(" Follow the red arrow to the marker.", C.INFO),
         ],
         complete: [
             ic("fa-solid fa-party-horn", C.SUCCESS),
-            txt(" " + (count > 1 ? count + " " : "") + name + " defeated!", C.SUCCESS)
+            txt(" " + (count > 1 ? count + "x " : "") + name + " defeated.\n", C.SUCCESS),
         ]
     };
 }
@@ -494,7 +496,8 @@ spawnQuestMob = (playerId, questId) => {
     const quest = getQuestById(questId) || getQuestForLevel(getStat(playerId, "lvl", 1));
     if (!quest) {
         say(playerId, [
-            ic("fa-solid fa-xmark", "#ff4444"), txt(" Unknown quest / no quest for your level", "#ff4444")
+            ic("fa-solid fa-xmark", C.DANGER),
+            txt(" No quest is available at your level.", C.DANGER),
         ]);
         return false;
     }
@@ -542,9 +545,8 @@ export function startQuest(playerId) {
 
     if (!quest) {
         say(playerId, [
-            txt("Woww... ", C.DANGER),
             ic("fa-solid fa-xmark", C.DANGER),
-            txt(" No quest available...", C.DANGER)
+            txt(" No quest is available at your level. Level up and come back.", C.DANGER),
         ]);
         return;
     }
@@ -558,8 +560,9 @@ export function startQuest(playerId) {
     saveQuest(playerId, resolved, 0);
 
     say(playerId, [
-        ic("fa-solid fa-file-lines", "#00BFFF", {fontWeight: "bold"}), bold(" QUEST STARTED\n", "#00BFFF"),
-        ...msg.start
+        ic("fa-solid fa-file-lines", C.XP, { fontWeight: "bold" }),
+        bold(" QUEST STARTED\n", C.XP),
+        ...msg.start,
     ]);
 
     api.setDirectionArrow(
@@ -604,8 +607,10 @@ export function restorePlayerQuest(playerId) {
 
             const label = resolved.targetMob.join(" / ");
             say(playerId, [
-                ic("fa-solid fa-file-lines", "#00BFFF"), txt(" Quest restored!\n", "#00BFFF"),
-                txt(label + " (" + savedProgress + "/" + quest.killAmount + ")", "#FFFFFF")
+                ic("fa-solid fa-file-lines", C.XP),
+                txt(" QUEST restored: ", C.XP),
+                bold(label, C.INFO),
+                txt("  " + savedProgress + "/" + quest.killAmount + ".", C.INFO),
             ]);
             restored = true;
         } else {
@@ -644,8 +649,9 @@ export function onQuestKill(playerId, mobName) {
 
     say(playerId, [
         ic("fa-solid fa-skull", C.INFO),
-            txt(" " + progress + "/" + quest.killAmount + " ", C.INFO),
-        txt(targetLabel + " defeated", "#00FFAA")
+        txt(" " + targetLabel + "  ", C.INFO),
+        bold(progress + "/" + quest.killAmount, C.SUCCESS),
+        txt(".", C.INFO),
     ]);
 
     const playerLevel = getStat(playerId, "lvl", 1);
@@ -688,14 +694,14 @@ function completeQuest(playerId) {
         } catch (e) {}
 
         say(playerId, [
-            ic("fa-solid fa-trophy", "#FFD700", {fontWeight: "bold"}), bold(" QUEST COMPLETE!\n", "#FFD700"),
+            ic("fa-solid fa-trophy", C.MONEY, { fontWeight: "bold" }),
+            bold(" QUEST COMPLETE\n", C.MONEY),
             ...msg.complete,
-            txt("\nYou gained: ", "#B3B3B3"),
-            txt("+" + reward.money, "#ECC727"),
-            txt(" Money\n", "#ECC727"),
-            txt("And ", "#B3B3B3"),
-            txt("+" + reward.xp, "#2791EC"),
-            txt(" xp", "#2791EC")
+            txt("You gained ", C.INFO),
+            bold("+" + reward.money + " Coins", C.MONEY),
+            txt(" and ", C.INFO),
+            bold("+" + reward.xp + " XP", C.XP),
+            txt(".", C.INFO),
         ]);
 
         addXP(playerId, reward.xp);
@@ -736,7 +742,8 @@ export function resetQuest(playerId) {
     }
 
     say(playerId, [
-        ic("fa-solid fa-xmark", "#ff4444", {fontWeight: "bold"}), bold(" Quest cancelled", "#ff4444")
+        ic("fa-solid fa-xmark", C.DANGER),
+        bold(" QUEST cancelled.", C.DANGER),
     ]);
     updateSidebar(playerId);
 }

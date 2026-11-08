@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 365 233 caracteres** (71 % de la limite de 512 000 du World Code, -54 % par rapport aux sources lisibles).
+**32 fichiers, 369 014 caracteres** (72 % de la limite de 512 000 du World Code, -55 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -30,33 +30,33 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 
 | Fichier | Caracteres | Source lisible |
 | --- | --- | --- |
-| `core/admin.js` | 50 939 | 90 503 |
+| `core/admin.js` | 52 314 | 91 955 |
 | `core/ranks.js` | 2 473 | 5 269 |
-| `core/team.js` | 15 693 | 44 362 |
-| `core/theme.js` | 16 954 | 37 720 |
-| `core/UI.js` | 14 635 | 41 191 |
+| `core/team.js` | 16 331 | 47 574 |
+| `core/theme.js` | 17 175 | 38 562 |
+| `core/UI.js` | 14 513 | 42 993 |
 | `fruit/abilities.js` | 38 498 | 54 051 |
 | `fruit/fruitData.js` | 5 685 | 8 871 |
 | `fruit/func-abilities.js` | 23 532 | 39 745 |
 | `fruit/index.js` | 22 178 | 41 901 |
-| `gameplay/codes.js` | 3 861 | 6 479 |
+| `gameplay/codes.js` | 3 870 | 7 279 |
 | `gameplay/customItem.js` | 7 369 | 19 334 |
-| `gameplay/fightingStyles.js` | 19 825 | 43 029 |
-| `gameplay/loot.js` | 1 889 | 6 593 |
-| `gameplay/NPCs.js` | 7 656 | 18 764 |
-| `gameplay/quest.js` | 10 068 | 22 718 |
-| `gameplay/saber.js` | 28 993 | 79 656 |
+| `gameplay/fightingStyles.js` | 19 842 | 43 045 |
+| `gameplay/loot.js` | 1 887 | 6 591 |
+| `gameplay/NPCs.js` | 7 590 | 18 968 |
+| `gameplay/quest.js` | 10 112 | 22 866 |
+| `gameplay/saber.js` | 28 963 | 79 623 |
 | `gameplay/spawning.js` | 6 084 | 14 733 |
 | `gameplay/stamina.js` | 5 607 | 13 619 |
-| `gameplay/stats.js` | 4 605 | 10 486 |
-| `gameplay/tutorial.js` | 6 744 | 15 953 |
+| `gameplay/stats.js` | 5 381 | 12 896 |
+| `gameplay/tutorial.js` | 6 772 | 16 191 |
 | `gameplay/variations.js` | 6 376 | 20 732 |
-| `index.js` | 15 903 | 38 711 |
-| `utils/boss.js` | 7 103 | 16 494 |
-| `utils/combat.js` | 14 910 | 45 831 |
-| `utils/data.js` | 6 212 | 16 614 |
+| `index.js` | 15 968 | 38 975 |
+| `utils/boss.js` | 7 100 | 16 491 |
+| `utils/combat.js` | 15 290 | 46 717 |
+| `utils/data.js` | 6 530 | 18 087 |
 | `utils/fx.js` | 6 076 | 10 662 |
-| `utils/haki.js` | 5 214 | 13 122 |
+| `utils/haki.js` | 5 347 | 13 658 |
 | `utils/killAttribution.js` | 2 138 | 6 816 |
 | `utils/killfeed.js` | 834 | 1 159 |
 | `utils/lifeform.js` | 4 392 | 8 666 |

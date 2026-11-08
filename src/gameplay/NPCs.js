@@ -61,27 +61,33 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
     if (current === teamId) {
         say(playerId, [
             ic("fa-solid fa-circle-info", color),
-            txt(" You are already a ", "#CBD5E1"),
+            bold(" TEAM  ", color),
+            txt("You are already a ", C.INFO),
             bold(target.replace(/s$/, ""), color),
-            txt(". Nothing to change.", "#94A3B8"),
+            txt(".", C.INFO),
         ]);
         return;
     }
 
     /* Premier clic : on dit exactement ce qui va se passer. */
+    /* Le PNJ ne parle plus de lui a la troisieme personne : le message dit
+       ce que le JOUEUR obtient, et la confirmation ajoute elle-meme la phrase
+       « clique encore dans 3 s ». */
     if (!confirmAction(playerId, "team|" + teamId, [
-        ic("fa-solid fa-user-group", color),
-        txt(" " + npcName + ": double-click me and you will be switched to the ", "#CBD5E1"),
+        ic("fa-solid fa-flag", color),
+        bold(" TEAM  ", color),
+        txt("Join the ", C.INFO),
         bold(target, color),
-        txt(".", "#CBD5E1"),
-        txt("\nYou are currently " + (current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, "")) + ".", "#94A3B8"),
-        txt("\nYour weapons will be converted to " + target + " ones.", "#94A3B8"),
+        txt("? You are ", C.INFO),
+        txt(current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, ""), C.INFO),
+        txt(", and your weapons become " + target + " weapons.", C.INFO),
     ])) return;
 
     if (!applyTeamChoice(playerId, teamId)) {
         say(playerId, [
-            ic("fa-solid fa-xmark", "#EF4444"),
-            txt(" The team change failed. Try again.", "#EF4444"),
+            ic("fa-solid fa-xmark", C.DANGER),
+            bold(" TEAM  ", color),
+            txt("The team change failed. Try again.", C.DANGER),
         ]);
         return;
     }
@@ -89,9 +95,10 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
     try { api.playSound(playerId, "exp_levelup", 1, 1.1); } catch (e) {}
     say(playerId, [
         ic("fa-solid fa-flag", color),
-        txt(" You are now a ", "#CBD5E1"),
+        bold(" TEAM  ", color),
+        txt("You are now a ", C.INFO),
         bold(target.replace(/s$/, ""), color),
-        txt("!", "#CBD5E1"),
+        txt(".", C.INFO),
     ]);
 }
 
@@ -137,7 +144,8 @@ function sellHakiFragments(playerId) {
     if (!total) {
         say(playerId, [
             ic("fa-solid fa-coins", C.MONEY),
-            txt(" Haki Buyer: Bring me Haki Fragments and I will pay well for them.", C.INFO),
+            bold(" HAKI  ", C.MONEY),
+            txt("Bring me Haki Fragments and I will pay well for them.", C.INFO),
         ]);
         return;
     }
@@ -155,7 +163,7 @@ function sellHakiFragments(playerId) {
         txt(" for ", C.INFO),
         bold(price + " Coins each", C.MONEY),
         txt(" (" + total * price + " Coins total)?", C.INFO),
-        txt("\nThey are Black Carpets: any kept for the Haki Seller goes too.", "#94A3B8"),
+        txt("\nEvery Haki Fragment in your bag is sold, wherever you keep it.", C.INFO),
     ])) {
         HAKI_DEAL[playerId] = { price: price, until: now + CONFIRM_MS };
         return;
@@ -211,8 +219,8 @@ function startGarpFight(playerId) {
         txt(" Fight ", C.INFO),
         bold("GARP", "#7EC8FF"),
         txt(", the Marine Protector? ", C.INFO),
-        txt("You will be teleported into his arena and his guards will wake up.", "#94A3B8"),
-        txt("\nHe drops a Haki fragment, which the Haki Buyer will take off your hands.", "#94A3B8"),
+        txt(" You will be teleported into his arena and his guards will wake up.", C.INFO),
+        txt("\nHe drops a Haki Fragment, which the Haki Buyer will take off your hands.", C.INFO),
     ])) return;
 
     /* Pas de message ici en cas d'echec : le combat parle lui-meme

@@ -4,7 +4,7 @@ import { point, TEX } from "./fx";
 import { isMobEntityType, posOf } from "./lifeform";
 import { cancelConfirm, confirmAction, getTotalMoney, payMoney } from "./data";
 
-import { say, txt, bold, ic } from "../core/theme";
+import { C, nfmt, say, txt, bold, ic } from "../core/theme";
 /* Nom d'ITEM (interne) du pod qui arme le haki. Ce que le joueur lit est
    "Armament Haki" : le nom et la description sont poses par gameplay/customItem
    (ITEM_LOOKS), comme tous les items custom. */
@@ -17,6 +17,11 @@ export function isHakiPod(itemName) {
     return itemName === HK_CLICK;
 }
 const HK_TOLL = "Black Carpet", HK_PRICE = 14000;
+/* Nom LU PAR LE JOUEUR du meme item : il vient de ITEM_LOOKS (gameplay/
+   customItem, cle "Black Carpet"). Le messages ci-dessous ne doivent jamais
+   afficher le nom Bloxd, sinon le joueur cherche un objet qui n'existe pas dans
+   son inventaire. */
+const HK_TOLL_LABEL = "Haki Fragment";
 const HK_BOOST = 1.25;
 const HK_BLOCK = "Black Concrete", HK_SIZE = 0.4;
 const HK_CLEAR_BLOCK = "Air", HK_CLEAR_SIZE = 0.1;
@@ -164,8 +169,9 @@ export function buyArmamentHaki(playerId) {
     try { tolls = api.getInventoryItemAmount(playerId, HK_TOLL) } catch (e) { tolls = 0 }
     if (!tolls) {
         hk_say(playerId, [
-            bold("You need a Black Carpet to learn this.\n", "#FF5555"),
-            txt("You have none.", "#AAAAAA")
+            ic("fa-solid fa-hand-fist", C.DANGER),
+            bold(" HAKI  ", C.MONEY),
+            txt("You need 1 " + HK_TOLL_LABEL + " to learn this, and you have none.", C.DANGER),
         ]);
         return false;
     }
@@ -173,11 +179,11 @@ export function buyArmamentHaki(playerId) {
     const money = getTotalMoney(playerId);
     if (money < HK_PRICE) {
         hk_say(playerId, [
-            bold("Not enough Gold Coins!\n", "#FF5555"),
-            txt("Cost: ", "#AAAAAA"),
-            bold(HK_PRICE + " Gold Coins\n", "#FFD700"),
-            txt("You have: ", "#AAAAAA"),
-            bold(money + " Gold Coins", "#55FF55")
+            ic("fa-solid fa-coins", C.DANGER),
+            bold(" HAKI  ", C.MONEY),
+            txt("You need ", C.DANGER),
+            bold(nfmt(HK_PRICE - money) + " more Coins", C.DANGER),
+            txt(" (" + nfmt(money) + "/" + nfmt(HK_PRICE) + ").", C.INFO),
         ]);
         return false;
     }
@@ -186,8 +192,8 @@ export function buyArmamentHaki(playerId) {
     if (!confirmAction(playerId, "haki", [
         ic("fa-solid fa-hand-fist", "#B98CFF"),
         txt(" Learn Armament Haki for ", "#AAAAAA"),
-        bold(HK_PRICE + " Gold Coins", "#FFD700"),
-        txt(" and 1 Black Carpet.", "#AAAAAA"),
+        bold(nfmt(HK_PRICE) + " Gold Coins", C.MONEY),
+        txt(" and 1 " + HK_TOLL_LABEL + ".", C.INFO),
     ])) return false;
 
     if (!payMoney(playerId, HK_PRICE)) {
@@ -279,7 +285,11 @@ function hakiBossStart(playerId, posA, posB) {
 
     // Si un autre joueur est déjà là → refuser
     if (playersInZone.length > 0 && !playersInZone.includes(playerId)) {
-        say(playerId, "A player is already fighting the boss.");
+        say(playerId, [
+            ic("fa-solid fa-skull", C.DANGER),
+            bold(" BOSS  ", C.DANGER),
+            txt("A player is already fighting the boss.", C.INFO),
+        ]);
         return false;
     }
 

@@ -2,7 +2,7 @@
 
 import { changeMoney, getStat, setStat } from "../utils/data";
 import { applyEffect } from "../utils/combat";
-import { say, txt, bold, ic } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 
 const CATEGORY_KEY = "code"
 const CLAIMED_KEY = "codeRedeem"
@@ -62,27 +62,26 @@ addCode(
     500,
 )
 
+/* ANATOMIE DES CARTES (la meme que Settings et Upgrades) : une icone + une
+   phrase qui dit ce que ca fait, une seule ligne d'etat « ● », puis l'aide.
+   Les deux cartes de cette categorie racontaient la meme chose deux fois, avec
+   des couleurs nommees a la main (« gold », « hotpink », « orange », « aqua »)
+   qui atterrissaient toutes dans deux ou trois roles de la palette. */
 export const refreshInfoCase = (playerId) => {
-    const Redeemed = (getStat(playerId, CLAIMED_KEY, "") || "").toString()
-    const count = Redeemed ? Redeemed.split(",").length : 0
+    const redeemed = (getStat(playerId, CLAIMED_KEY, "") || "").toString()
+    const count = redeemed ? redeemed.split(",").length : 0
     api.createShopItemForPlayer(playerId, CATEGORY_KEY, "info", {
         image: "Epic Lottery Ticket",
+        imageColour: C.MONEY,
         canBuy: false,
         sortPriority: 10,
-        customTitle: [bold("How to use a code?", "gold")],
+        customTitle: [bold("How codes work", C.MONEY)],
         description: [
-            "1. Click the purple ",
-            ic("Epic Lottery Ticket"),
-            " \"Redeem a gift code\" tile.\n",
-            "2. Type (or paste) your code into the text box.\n",
-            "3. Press the ",
-            bold("Redeem", "lightgreen"),
-            " button.\n\n",
-            ic("fa-solid fa-award", "hotpink"),
-            " You get your reward instantly!\n",
-            ic("fa-solid fa-triangle-exclamation", "orange"),
-            " Note: a code only works ONCE per player.\n\n",
-            txt("You have already Redeemed " + count + " code(s) on this server.", "aqua")
+            ic("fa-solid fa-circle-info", C.MONEY),
+            txt(" A code gives its reward the moment you redeem it.", C.INFO),
+            bold("\n\u25cf One code per player, forever.", C.SUCCESS),
+            txt("\nCodes come from the Discord, and some expire.", C.INFO),
+            bold("\n\u25cf " + count + " code" + (count === 1 ? "" : "s") + " redeemed here.", C.XP),
         ]
     })
 }
@@ -96,17 +95,18 @@ export const setupCodeShop = () => {
 
     api.createShopItem(CATEGORY_KEY, "enter_code", {
         image: "Legendary Lottery Ticket",
-        imageColour: "#b347ff",
+        imageColour: C.MONEY,
         canBuy: true,
         cost: 0,
         sortPriority: 20,
-        customTitle: [bold("Redeem a gift code", "violet")],
-        buyButtonText: "Redeem",
+        customTitle: [bold("Redeem a code", C.MONEY)],
+        buyButtonText: [txt("Redeem", C.MONEY)],
         description: [
-            ic("fa-solid fa-terminal", "violet"),
-            " Type your code in the text box below, then press ",
-            bold("Redeem", "lightgreen"),
-            ".\n(Spaces are ignored, but uppercase letters matter.)"
+            ic("fa-solid fa-terminal", C.MONEY),
+            txt(" Type your code below, then press ", C.INFO),
+            bold("Redeem", C.SUCCESS),
+            txt(".", C.INFO),
+            txt("\nSpaces are ignored; letters are not case sensitive.", C.INFO),
         ],
         userInput: {
             type: "text",
@@ -146,10 +146,15 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
 
     const entered = (userInput || "").toString().trim().toUpperCase()
 
+    /* Meme anatomie pour les cinq reponses : icone + « CODE » + la phrase.
+       Avant, quatre d'entre elles commencaient par deux espaces et une
+       majuscule au hasard («  Type a code… »), et le succes etait le seul a
+       avoir droit a un point d'exclamation. */
     if (!entered) {
         api.sendOverShopInfo(playerId, [
-            ic("fa-solid fa-pen", "orange"),
-            txt("  Type a code in the text box first!", "orange")
+            ic("fa-solid fa-pen", C.DANGER),
+            bold(" CODE  ", C.MONEY),
+            txt("Type a code in the box first.", C.INFO)
         ])
         return
     }
@@ -158,18 +163,23 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
 
     if (!code) {
         api.sendOverShopInfo(playerId, [
-            ic("fa-solid fa-xmark", "red"),
-            txt("  Invalid code. Check the spelling and try again!", "red")
+            ic("fa-solid fa-xmark", C.DANGER),
+            bold(" CODE  ", C.MONEY),
+            txt("That code does not exist, or no longer does.", C.DANGER)
         ])
-        say(playerId, [bold("[Codes] ", "violet"),
-            "That code does not exist (or no longer does)."], { color: "red" })
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER),
+            bold(" CODE  ", C.MONEY),
+            txt("That code does not exist, or no longer does.", C.DANGER)
+        ])
         return
     }
 
     if (code.expiration && Date.now() > code.expiration) {
         api.sendOverShopInfo(playerId, [
-            ic("fa-solid fa-hourglass", "red"),
-            txt("  This code has expired!", "red")
+            ic("fa-solid fa-hourglass", C.DANGER),
+            bold(" CODE  ", C.MONEY),
+            txt("This code has expired.", C.DANGER)
         ])
         return
     }
@@ -177,11 +187,15 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
     const alreadyClaimed = getClaimedList(playerId)
     if (alreadyClaimed.indexOf(code.name) !== -1) {
         api.sendOverShopInfo(playerId, [
-            ic("fa-solid fa-check", "gray"),
-            txt("  You have already Redeemed this code!", "gray")
+            ic("fa-solid fa-check", C.INFO),
+            bold(" CODE  ", C.MONEY),
+            txt("You already redeemed " + code.name + ".", C.INFO)
         ])
-        say(playerId, [bold("[Codes] ", "violet"),
-            "You have already Redeemed the code " + code.name + "."], { color: "gray" })
+        say(playerId, [
+            ic("fa-solid fa-check", C.INFO),
+            bold(" CODE  ", C.MONEY),
+            txt("You already redeemed " + code.name + ".", C.INFO)
+        ])
         return
     }
 
@@ -189,18 +203,20 @@ export function handleShopCode(playerId, categoryKey, itemKey, item, userInput) 
     giveReward(playerId, code)
 
     api.sendOverShopInfo(playerId, [
-        ic("fa-solid fa-award", "hotpink"),
-        txt("  Code accepted! Reward received.", "lightgreen")
+        ic("fa-solid fa-award", C.SUCCESS),
+        bold(" CODE  ", C.MONEY),
+        txt("Accepted, reward received.", C.SUCCESS)
     ])
 
-    say(playerId,
-        [bold("[Codes] ", "violet"),
-         ic("fa-solid fa-award", "hotpink"),
-         bold(" Code " + code.name + " Redeemed! ", "lightgreen"),
-         code.reward],
-        { color: "lightgreen" })
+    say(playerId, [
+        ic("fa-solid fa-award", C.SUCCESS),
+        bold(" CODE  ", C.MONEY),
+        bold(code.name, C.MONEY),
+        txt(" accepted: ", C.SUCCESS),
+        txt(code.reward, C.INFO),
+    ])
 
-    api.sendFlyingMiddleMessage(playerId, ["CODE ACCEPTED!", code.reward], 80)
+    api.sendFlyingMiddleMessage(playerId, ["CODE ACCEPTED", code.reward], 80)
 
     refreshInfoCase(playerId)
 }

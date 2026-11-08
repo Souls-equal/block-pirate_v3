@@ -184,7 +184,8 @@ function check(playerId) {
         if (!ok) return false;
         say(playerId, [
             ic("fa-solid fa-circle-check", C.SUCCESS),
-            txt(" " + STEPS[index - 1].title + " - done.", C.SUCCESS),
+            bold(" STEP " + index + "/" + STEPS.length + "  ", C.SUCCESS),
+            txt(STEPS[index - 1].title + " done.", C.INFO),
         ]);
         if (index >= STEPS.length) return finish(playerId);
         setStat(playerId, DB_STEP, index + 1);
@@ -368,11 +369,14 @@ function remind(playerId, index) {
     lastRemind[playerId] = now;
     const step = STEPS[index - 1];
     if (!step) return;
+    /* Rappel : meme en-tete que les etapes elles-memes. « (skip:
+       skipTutorial) » est parti : c'est un nom de fonction interne, un joueur
+       ne peut pas le taper. */
     say(playerId, [
         ic("fa-solid fa-list", C.SUCCESS),
-        txt(" Tutorial " + index + "/" + STEPS.length + ": ", C.SUCCESS),
-        bold(step.short, C.SUCCESS),
-        txt("  (skip: skipTutorial)", C.INFO),
+        bold(" TUTORIAL " + index + "/" + STEPS.length + "  ", C.SUCCESS),
+        txt(step.title, C.INFO),
+        txt(" — " + step.short + ".", C.INFO),
     ]);
 }
 
