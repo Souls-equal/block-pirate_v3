@@ -358,6 +358,31 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
     }
   }
 
+  /* --- Anti-spam ---------------------------------------------------------
+     `load()` se rejoue jusqu'a 30 fois (chunk froid, blocs pas encore poses) et
+     reemet a chaque tentative les MEMES lignes : « aucun Code Block trouve »,
+     « N handler(s) absent(s) »… Un monde ou les blocs manquent produisait des
+     centaines de lignes de log pour un seul etat, et noyait le vrai message.
+
+     Regle : un message identique n'est dit qu'UNE fois. S'il disparait puis
+     revient (bloc recolle, puis retire), il est redit : c'est un vrai
+     changement d'etat, pas du bruit. `warn()` (limite a 2 s par tag) reste pour
+     le bruit transitoire, `sayOnce()` pour les constats durables. */
+  const said = {};
+  function sayOnce(key, msg) {
+    if (said[key]) return;
+    said[key] = true;
+    say(msg);
+  }
+  function sayErrors(errors) {
+    const still = {};
+    for (const e of errors) {
+      still[e] = true;
+      sayOnce("err:" + e, "[FA] " + e);
+    }
+    for (const k in said) if (k.indexOf("err:") === 0 && !still[k.slice(4)]) delete said[k];
+  }
+
   function schedule(fn, ticks) {
     try {
       if (typeof globalThis.S?.wait === "function") return globalThis.S.wait(fn, ticks);
@@ -394,7 +419,9 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
           : d?.persisted?.shared?.text || d?.persisted?.text || d?.text || null;
       return typeof text === "string" && text.length ? { z, text } : null;
     } catch (e) {
-      warn("slot:" + z, "[FA] lecture bloc z=" + z + " : " + (e?.message || e));
+      /* UN tag pour toutes les cases : avec un tag par `z`, 24 cases en echec
+         autorisaient 24 lignes toutes les 2 s. */
+      warn("slot", "[FA] lecture d'un Code Block z=" + z + " : " + (e?.message || e));
       return null;
     }
   }
@@ -459,7 +486,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       for (let i = 1; i <= total; i++) {
         if (!byIndex[i]) errors.push(`pack ${i}/${total} MANQUANT (attendu vers z=${origin()[2] + i - 1})`);
       }
-      if (oldFormat) say(`[FA] ${oldFormat} ancien(s) Code Block(s) ignoré(s).`);
+      if (oldFormat) sayOnce("old:" + oldFormat, `[FA] ${oldFormat} ancien(s) Code Block(s) ignoré(s).`);
     }
     return { byIndex, total, errors };
   }
@@ -524,7 +551,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       const { byIndex, total, errors } = finishScan(scan);
       scan = null;
       FA.errors = errors.slice();
-      for (const e of FA.errors) say("[FA] " + e);
+      sayErrors(FA.errors);
 
       const packs = [];
       for (let i = 1; i <= total; i++) {
@@ -547,6 +574,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         for (const pack of packs) pack.payload = "";
         for (const k in byIndex) byIndex[k].payload = "";
         FA.sourceHash = cacheKey;
+        sayErrors(FA.errors); // erreurs levees par l'evaluation des modules
       }
 
       /* Un Code Block recopié d'une ancienne version est invisible autrement :
@@ -576,7 +604,8 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
             .map((p) => ({ index: p.index, z: p.z, release: p.release || "" }))
         : [];
       if (FA.stale.length)
-        say(
+        sayOnce(
+          "stale:" + FA.stale.map((s) => s.index).join(",") + ":" + release,
           `[FA] ${FA.stale.length} Code Block(s) d'une AUTRE version : ` +
             FA.stale.map((s) => `pack ${s.index} (z=${s.z})`).join(", ") +
             ` — recopie-les depuis code-blocks/ (version ${release}).`,
@@ -584,12 +613,19 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
 
       const missing = expected.filter((n) => typeof FA.r[n] !== "function");
       if (missing.length) {
-        say(
-          `[FA] ${missing.length} handler(s) absent(s) : ${missing.join(", ")} (voir FA.status()).` +
+        /* Une ligne par ETAT, pas par tentative : la liste des manquants ne
+           change pas d'un essai a l'autre, il n'y a rien a repeter. On en cite
+           huit, le reste est dans `FA.status().missingCount` / logStatus(). */
+        sayOnce(
+          "missing:" + missing.join(",") + ":" + FA.stale.length,
+          `[FA] ${missing.length} handler(s) absent(s) : ${missing.slice(0, 8).join(", ")}` +
+            (missing.length > 8 ? "…" : "") +
+            ` (voir FA.status()).` +
             (FA.stale.length ? " Un Code Block est d'une ancienne version (voir la ligne ci-dessus)." : ""),
         );
       } else if (packs.length) {
-        say(
+        sayOnce(
+          "ok:" + sourceHash,
           `[FA] ${packs.length}/${total} pack(s) chargé(s), ${Object.keys(FA.r).length} handlers ` +
             `(v=${release || "?"}, ${sourceHash}).`,
         );
@@ -608,7 +644,7 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
       }
     } catch (e) {
       FA.errors.push("chargeur : " + (e?.message || e));
-      say("[FA] erreur du chargeur : " + (e?.message || e));
+      sayOnce("loader:" + (e?.message || e), "[FA] erreur du chargeur : " + (e?.message || e));
     } finally {
       lastLoad = Date.now();
       loading = false;
@@ -682,7 +718,15 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
   const toldPending = {};
   let earlyCalls = 0;
   function tooEarly(name, args) {
-    warn("early:" + name, `[FA] '${name}' appele avant la fin du chargement : ignore (le monde demarre).`);
+    /* UNE seule ligne pour tous les handlers. `warn()` est limite a 2 s mais son
+       compteur est par `tag`, et le tag contenait le nom du handler : avec 197
+       capacites, cela faisait 197 lignes autorisees toutes les 2 s. On veut
+       savoir qu'on est dans la fenetre de demarrage, pas la liste des clics. */
+    sayOnce(
+      "early",
+      "[FA] capacités utilisées avant la fin du chargement : ignorées (le monde démarre). " +
+        "Le detail est dans FA.status().ignoredEarly.",
+    );
     const pid = args && typeof args[0] === "string" ? args[0] : null;
     if (!pid || toldPending[pid]) return;
     toldPending[pid] = true;
@@ -714,7 +758,9 @@ export function createBlockLoader({ helpers, expected = [], log: customLog = nul
         tooEarly(name, args);
         return undefined;
       }
-      warn("missing:" + name, `[FA] handler '${name}' introuvable : Code Block non chargé (FA.status()).`);
+      /* Une fois par handler : le rappel toutes les 2 s redevenait du spam des
+         que plusieurs capacites etaient cliquées. */
+      sayOnce("miss:" + name, `[FA] handler '${name}' introuvable : Code Block non chargé (FA.status()).`);
       if (/^onPlayerClick|^onPlayerRelease|^onPlayerUsed/.test(name)) {
         throw new Error("[FA] handler manquant : " + name);
       }

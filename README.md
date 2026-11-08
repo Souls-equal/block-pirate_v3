@@ -2034,6 +2034,38 @@ indéfiniment sans que personne ne comprenne.
 pas** d'erreur, prévient le joueur **une seule fois**, et un handler absent
 **après** chargement lève **toujours**.
 
+### Un état = une ligne (anti-spam du log)
+
+Quand les Code Blocks ne sont pas posés, le chargeur réessaie **30 fois** (8 ticks
+par balayage + 10 entre deux, soit ~4 min) et, à chaque tentative, réémettait les
+mêmes lignes ; `tooEarly()` utilisait en plus un compteur **par nom de handler**
+(197 tags, donc 197 lignes autorisées toutes les 2 s). Mesuré : **873 lignes de
+log en ~200 s** pour un seul état, et le vrai message noyé dedans.
+
+Deux primitives, deux usages :
+
+| Primitive | Quand | Comportement |
+| --- | --- | --- |
+| `sayOnce(clé, msg)` | constat durable (erreurs de balayage, handler absent, résumé de chargement, « trop tôt ») | dit **une fois** par état |
+| `warn(tag, msg)` | bruit transitoire (lecture d'une case) | dit au plus **une fois toutes les 2 s**, et un **seul `tag`** par nature de message |
+
+Un message qui **disparaît puis revient** est redit : c'est un vrai changement
+d'état (bloc recollé, puis retiré), pas du bruit. `sayErrors()` retient donc la
+liste courante et oublie les erreurs qui ne sont plus là.
+
+Résultat mesuré, **monde sans aucun Code Block**, 900 ticks et 2 700 clics de
+capacité : **6 lignes** (dont une seule « aucun Code Block trouvé », une seule
+« N handler(s) absent(s) », une seule « capacités utilisées avant la fin du
+chargement »). En jeu, le dispatcher (`fruit/index.js`) attrape en plus
+l'exception et **plafonne à 5 logs par capacité**, en remboursant le cooldown :
+c'est pour ça que le `throw` reste, mais qu'il n'inonde plus le log.
+
+`check-blocks.mjs` exige : ≤ 20 lignes pour un monde sans bloc, chaque message
+d'état **une seule fois**, le `throw` toujours présent après l'abandon du
+chargeur (sinon le cooldown serait dépensé pour rien), et un message redit après
+disparition puis retour. Vérifié par mutation : revenir à `say()` fait monter le
+même scénario à **2 762 lignes** et la CI refuse.
+
 ### Chargement par petits lots (mémoire)
 
 Les 8 blocs pèsent ~31 000 caractères chacun. Les lire tous dans le même tick
