@@ -349,6 +349,7 @@ Une partie de message Bloxd n'a que **deux formes** utiles, et le jeu en constru
 | `txt(texte, couleur)` | `{ str, style }` | autres propriétés de style (`fontSize`, `fontWeight`) |
 | `bold(texte, couleur)` | `{ str, style: { color, fontWeight: "bold" } }` | — |
 | `ic(icone, couleur)` | `{ icon, style }` | idem `txt` |
+| `bar(ratio, couleurs)` | `{ type: "ProgressBar", progress, colours }` | `width`, `height`, `backgroundColour` |
 
 Elles vivent dans `core/theme.js` (aucun nouveau fichier : c'est déjà le module des
 messages), ne touchent ni l'API ni un état global, et renvoient **exactement** l'objet du
@@ -359,7 +360,49 @@ fusionne toujours).
 
 `npm run check` vérifie toujours les icônes : `tools/check-icons.mjs` lit **les deux
 écritures** (`icon: "…"` historique et `ic("…")`), sinon 200 icônes échapperaient au
-contrôle.
+contrôle — et, depuis les barres natives, il rend aussi la sidebar pour de vrai (voir
+plus bas).
+
+### Barres de progression : c'est Bloxd qui dessine
+
+Depuis novembre 2026, `CustomTextStyling` accepte un `ProgressBar` : le moteur
+dessine la barre, on ne fabrique plus une suite de `█`/`▒`. La sidebar s'en sert
+pour l'**XP** (verte) et la **stamina** (bleue) :
+
+```js
+bar(0.43, ["#4ADE80"], { height: "0.75em" })
+// => { type: "ProgressBar", progress: 0.43, colours: ["#4ADE80"], height: "0.75em" }
+```
+
+* `progress` est un **ratio 0..1** (borné, arrondi à 3 décimales : au-delà on
+  paie des caractères pour une différence invisible) ;
+* les couleurs sont du **CSS simple** — nom, `#hex`, `rgb()`/`hsl()` ; les
+  positions d'arrêt (`"#4ADE80 30%"`) sont permises, les autres fonctions
+  (`url()`, gradient) **refusées par Bloxd** avec une erreur ;
+* une seule couleur par barre : un dégradé coûterait ~20 caractères de JSON de
+  plus pour un écart invisible dans la sidebar.
+
+Ce sont des objets comme les autres dans le tableau de parties : `format()` et
+`fit()` les laissent **intacts** (ils n'ont ni `str` ni `icon`), et `measure()`
+les compte à leur taille réelle — d'où l'importance du budget ci-dessous.
+
+### La sidebar : budget, et l'ordre de sacrifice
+
+Chaque bloc optionnel est accepté **en s'additionnant aux précédents**
+(`chosen`), pas testé seul : sinon plusieurs blocs passaient un par un, leur
+somme dépassait, et `fit()` coupait la fin du message — le plus souvent
+l'objectif du tutoriel.
+
+Les priorités disent dans quel ordre on sacrifie : `0` tutoriel, `1` quête,
+`2` XP, `3` stamina, `4` points de stat, `8` « pas de quête », `9` par défaut.
+`0` est une priorité valide : le code écrivait `priority || 9`, donc la priorité
+0 devenait 9 et le tutoriel était jeté **en premier** alors qu'il est documenté
+comme gardé en premier.
+
+`npm run check` rend la **vraie** sidebar (deux joueurs simulés, dont un chargé
+avec objectif de tutoriel) et vérifie : taille ≤ 1 200, deux `ProgressBar`, ratio
+borné et arrondi, couleurs CSS acceptées, **teinte verte pour l'XP et bleue pour
+la stamina**, et l'objectif du tutoriel toujours présent.
 
 ### Icônes : une liste blanche, sinon « ? »
 
@@ -383,7 +426,9 @@ Code Blocks (via le patch de l'API).
 **Ajouter une icône** = ajouter son nom dans `FA_NAMES` (ou `FA_BRANDS`), sinon elle sera
 remplacée à l'affichage. `npm run check` lance **`tools/check-icons.mjs`**, qui relit la liste
 blanche et refuse toute icône du code absente : une faute de frappe casse la CI au lieu de
-produire un `?` en jeu.
+produire un `?` en jeu. Le même script rend la sidebar avec une `api` simulée pour vérifier
+les **barres** (forme, ratio, couleur CSS, teinte verte/bleue) et le **budget** : voir
+« Barres de progression » plus bas.
 
 > **À créer une fois dans le World Code** (dossier `core/`) : `theme.js` est importé par
 > `index.js`, `core/team.js`, `core/UI.js`, `fruit/index.js`, `gameplay/*` et `utils/*`.
@@ -412,8 +457,10 @@ sérialisée d'un payload.
 
 La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
 caractères : une seule couleur par partie, `fontSize` réservé au titre, textes
-libres (fruit, style, cible de quête) bornés, et blocs secondaires retirés un à
-un si nécessaire — jamais tout le message.
+libres (fruit, style, cible de quête) bornés, **barres natives sans dégradé**
+(~79 caractères de JSON chacune), et blocs secondaires retirés **par ordre de
+priorité** si nécessaire — jamais tout le message. Mesuré : 1 106 caractères
+pour un joueur nu, 1 150 pour un joueur chargé avec objectif de tutoriel.
 
 ---
 

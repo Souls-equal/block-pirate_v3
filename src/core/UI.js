@@ -10,7 +10,7 @@ import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
 import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
-import { C, fit, measure, say, txt, bold, ic } from "./theme";
+import { C, bar, fit, measure, say, txt, bold, ic } from "./theme";
 
 /* Ligne du tutoriel dans la sidebar. UI n'importe PAS gameplay/tutorial (data
    importe UI : ce serait un cycle de plus) : index.js pose la fonction, qui
@@ -22,32 +22,27 @@ export function setTutorialLineLookup(fn) {
 
 export const dCode = "7WGjmPHZrS"
 
-function makeBar(value, max, size = 18){
-    if (!Number.isFinite(value)) value = 0;
-    if (!Number.isFinite(max) || max <= 0) max = 1;
-
-    let filled = Math.floor((value / max) * size);
-    filled = Math.max(0, Math.min(size, filled));
-
-    let bar = "";
-
-    for(let i = 0; i < size; i++){
-        bar += i < filled ? "█" : "▒";
-    }
-
-    let percent = Math.floor((value / max) * 100);
-
+/* Ratio 0..1 et pourcentage. Le dessin est fait par le moteur (ProgressBar,
+   cf. `bar()` dans theme.js) : plus de suite de « █ »/« ▒ » a calculer, et un
+   rendu constant quelle que soit la police du joueur. */
+function makeBar(value, max){
+    const ok = Number.isFinite(value) && Number.isFinite(max) && max > 0;
+    const ratio = ok ? value / max : 0;
     return {
-        bar: bar,
-        percent: percent
+        ratio: ratio,
+        percent: Math.floor(Math.max(0, Math.min(1, ratio)) * 100)
     };
 }
 
-function makeXpBar(xp, xpNeeded, size = 18){
-    return makeBar(xp, xpNeeded, size);
-}
-
 const title = "1.9em", title2 = "1.5em", text = "1.1em";
+
+/* Barres natives : une verte pour l'XP, une bleue pour la stamina. Une seule
+   couleur par barre (un degrade couterait ~20 caracteres de JSON de plus pour
+   un ecart invisible dans la sidebar) et pas de largeur imposee : la barre
+   prend la largeur de la ligne. */
+const BAR_GREEN = ["#4ADE80"];
+const BAR_BLUE = ["#7DD3FC"];
+const BAR_SIZE = { height: "0.75em" };
 const border = "lightgray"
 
 export function updateSidebar(playerId){
@@ -91,13 +86,13 @@ function drawSidebar(playerId){
     const styleLabel = short(styleName || "No style", 18);
     const styleColor = (styleInfo && styleInfo.color) || "#94a3b8";
     const xpNeeded = xpToNext(lvl);
-    const xpData = makeXpBar(xp, xpNeeded);
+    const xpData = makeBar(xp, xpNeeded);
 
     const stValue = getStamina(playerId);
     const stMax = getMaxStamina(playerId);
     const stSafe = Number.isFinite(stValue) ? stValue : 0;
     const stMaxSafe = Number.isFinite(stMax) && stMax > 0 ? stMax : 100;
-    const stData = Object.assign(makeBar(stSafe, stMaxSafe), { value: stSafe, max: stMaxSafe });
+    const stData = makeBar(stSafe, stMaxSafe);
 
     const quest = playerQuest[playerId];
     const progress = questProgress[playerId] || 0;
@@ -106,7 +101,11 @@ function drawSidebar(playerId){
        pression du budget ; `priority` = ordre de sacrifice (petit = garde). */
     const blocks = [];
     const block = (parts, optional, priority) => {
-        if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority || 9 });
+        /* `priority || 9` transformait la priorite 0 en 9 : l'objectif du
+           tutoriel (« garde en premier ») passait donc en dernier, et `fit()`
+           le coupait le premier quand la sidebar debordait. 0 est une priorite
+           valide : seul `undefined` prend la valeur par defaut. */
+        if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority === undefined ? 9 : priority });
     };
 
     block([
@@ -131,12 +130,14 @@ function drawSidebar(playerId){
     ]);
     block([
         txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
-        txt(xpData.bar + "\n\n", C.XP),
+        bar(xpData.ratio, BAR_GREEN, BAR_SIZE),
+        txt("\n\n", C.XP),
     ], true, 2);
     block([
-        ic("fa-solid fa-bolt", C.XP),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.XP),
-        txt(stData.bar + "\n\n", C.XP),
+        ic("fa-solid fa-bolt", C.MARINE),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
+        bar(stData.ratio, BAR_BLUE, BAR_SIZE),
+        txt("\n\n", C.MARINE),
     ], true, 3);
     block([
         ic("fa-solid fa-star", C.SUCCESS),
@@ -169,17 +170,24 @@ function drawSidebar(playerId){
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
        sont ajoutes du plus utile au moins utile tant que ca tient, et
-       reassembles dans l'ordre d'affichage. */
-    const kept = [];
+       reassembles dans l'ordre d'affichage.
+       Les blocs acceptes s'ADDITIONNENT (`chosen`) : tester chacun contre les
+       seuls blocs obligatoires laissait passer plusieurs optionnels dont la
+       somme depassait, et `fit()` coupait alors la fin de la sidebar — le plus
+       souvent l'objectif du tutoriel, qui a pourtant la priorite la plus haute
+       (0 = garde en premier). Les barres natives, plus lourdes en JSON que les
+       anciennes suites de « █ », ont rendu le probleme visible. */
+    const chosen = [];
     for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i];
         if (b.optional) continue;
-        for (let j = 0; j < b.parts.length; j++) kept.push(b.parts[j]);
+        for (let j = 0; j < b.parts.length; j++) chosen.push(b.parts[j]);
     }
     const optional = blocks.filter((b) => b.optional).sort((a, b) => a.priority - b.priority);
     for (let i = 0; i < optional.length; i++) {
-        const trial = kept.concat(optional[i].parts);
+        const trial = chosen.concat(optional[i].parts);
         if (measure(trial) > SIDEBAR_BUDGET) continue;
+        for (let j = 0; j < optional[i].parts.length; j++) chosen.push(optional[i].parts[j]);
         optional[i].keptUnderBudget = true;
     }
 
