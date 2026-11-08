@@ -320,6 +320,7 @@ const clock = makeClock();
 const readStats = { total: 0, perTick: {} };
 let STATUS_SIZE = 0;
 let STATUS_SIZE_BROKEN = 0;
+let NO_BLOCK_LINES = 0;
 function resetReads() {
   readStats.total = 0;
   readStats.perTick = {};
@@ -537,6 +538,101 @@ for (const name of FRUIT_HANDLERS) {
   check(
     base.status.phase === "ok" && base.logs.some((l) => /introuvable/.test(l) || true),
     "la phase n'est pas 'ok' après un chargement réussi",
+  );
+}
+
+// --- Un monde où les blocs ne sont PAS posés ne doit pas spammer le log ------
+// Cas réel : le joueur lance le monde sans les Code Blocks (ou avant de les
+// coller). L'ancien chargeur reemettait les mêmes lignes aux 30 tentatives,
+// plus une par capacité : mesure faite hors jeu, 873 lignes en ~200 s.
+{
+  for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"]) delete globalThis[k];
+  resetReads();
+  const logs = [];
+  const empty = new Map();
+  let clockTick = 0;
+  const emptyApi = new Proxy(
+    {
+      log: (m) => logs.push(String(m)),
+      now: () => Date.now(),
+      getBlock: (x, y, z) => (empty.has(z) ? "Code Block" : "Air"),
+      getBlockData: () => ({ persisted: { shared: {} } }),
+      sendMessage: () => {},
+    },
+    { get: (t, k) => (k in t ? t[k] : noop) },
+  );
+  globalThis.api = emptyApi;
+  const helpers = makeHelpers(emptyApi);
+  const lonely = createBlockLoader({ helpers, expected: HANDLER_NAMES, log: (m) => logs.push(String(m)) });
+  lonely.boot();
+
+  /* 900 ticks (≈ 7 min de jeu) : assez pour dépasser les 30 tentatives du
+     chargeur (8 ticks par balayage + 10 entre deux) ET pour que les clics
+     d'après-abandon soient comptés. Un joueur qui insiste sur 3 capacités,
+     900 fois de suite, c'est déjà bien pire que la réalité. */
+  const KEYS = ["onPlayerClickLaser", "onPlayerClickGeyser", "onCancelSmoke"];
+  let throws = 0;
+  for (let i = 0; i < 900; i++) {
+    clockTick++;
+    for (const n of KEYS) {
+      try {
+        lonely.call(n, ["p1", "item", false, 0, 0, 0, "Air", null]);
+      } catch (e) {
+        throws++; // le vrai dispatcher l'attrape et rembourse le cooldown
+      }
+    }
+    clock.drain(() => false, 1); // un tick de plus pour les reprises du chargeur
+  }
+
+  const count = (re) => logs.filter((l) => re.test(l)).length;
+  const lines = logs.length;
+  check(lines <= 20, `log spamri : ${lines} lignes pour un monde sans Code Block (${KEYS.length * 900} clics)`);
+  check(count(/aucun Code Block/) === 1, `« aucun Code Block » dit ${count(/aucun Code Block/)} fois`);
+  check(count(/handler\(s\) absent\(s\)/) === 1, `« handlers absents » dit ${count(/handler\(s\) absent\(s\)/)} fois`);
+  check(
+    count(/avant la fin du chargement/) === 1,
+    `« avant la fin du chargement » dit ${count(/avant la fin du chargement/)} fois`,
+  );
+  check(throws > 0, "les clics après abandon ne signalent plus rien au dispatcher (cooldown non remboursé)");
+  NO_BLOCK_LINES = lines;
+}
+
+// ...mais un message qui DISPARAÎT puis REVIENT est redit : c'est un vrai
+// changement d'état (bloc recollé, puis retiré), pas du bruit.
+{
+  for (const k of ["FA", "FA_BOOT", "S", "__CT__", "__GV__", "__FA_LOADER_GENERATION"]) delete globalThis[k];
+  const logs = [];
+  const live = new Map(); // d'abord vide
+  const liveApi = new Proxy(
+    {
+      log: (m) => logs.push(String(m)),
+      now: () => Date.now(),
+      getBlock: (x, y, z) => (live.has(z) ? "Code Block" : "Air"),
+      getBlockData: (x, y, z) => ({ persisted: { shared: { text: live.get(z) } } }),
+    },
+    { get: (t, k) => (k in t ? t[k] : noop) },
+  );
+  globalThis.api = liveApi;
+  const swinging = createBlockLoader({ helpers: makeHelpers(liveApi), expected: HANDLER_NAMES, log: (m) => logs.push(String(m)) });
+  swinging.boot();
+  clock.drain(() => false, 200);
+  const firstAbsent = logs.filter((l) => /aucun Code Block/.test(l)).length;
+
+  for (const [z, text] of texts) live.set(z, text); // le joueur colle enfin les blocs
+  swinging.reload();
+  clock.drain(() => swinging.status().ready, 400);
+  const loaded = swinging.status().ready;
+
+  live.clear(); // puis il les enlève
+  swinging.reload();
+  clock.drain(() => false, 200);
+  const secondAbsent = logs.filter((l) => /aucun Code Block/.test(l)).length;
+
+  check(firstAbsent === 1, `« aucun Code Block » dit ${firstAbsent} fois avant le collage`);
+  check(loaded === true, "les blocs recollés ne sont pas chargés après reload()");
+  check(
+    secondAbsent === 2,
+    `message non redit après disparition puis retour (${secondAbsent}) : un vrai changement d'état doit s'entendre`,
   );
 }
 
@@ -766,6 +862,9 @@ for (const typeKnown of [false, true]) {
   coldResults.push(`${label}: prêt=${s.ready} (${env.probes()} sondes)`);
 }
 
+console.log(
+  `Monde sans Code Block : ${NO_BLOCK_LINES} ligne(s) de log (au lieu de 873 avant l'anti-spam).`,
+);
 console.log(
   `FA.status() : ${STATUS_SIZE} car. (${STATUS_SIZE_BROKEN} en panne ; le moteur ` +
     `refuse les gros objets), au plus ${SLOTS_PER_LOAD} blocs lus par tick.`,
