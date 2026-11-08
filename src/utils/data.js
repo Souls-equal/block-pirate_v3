@@ -16,7 +16,7 @@ resetPlayer = (id) => {
     api.clearInventory(id);
 }
 
-import { C, say, txt, bold, ic } from "../core/theme";
+import { C, nfmt, say, txt, bold, ic } from "../core/theme";
 export function getStat(playerId, key, def=0){
     if (!playerId) return def;
     let v;
@@ -58,8 +58,15 @@ export function getTotalMoney(playerId) {
 export function changeMoney(playerId, amount, showMessage=true){
     addStat(playerId, "money", amount);
     if (showMessage) {
-        const color = amount > 0 ? "#FFD700" : "#ff4444";
-        say(playerId,[ic("fa-solid fa-coins", C.MONEY),txt(" "+amount+" Coins", color)]);
+        /* Le signe est TOUJOURS ecrit : « 500 Coins » ne dit pas si on vient
+           d'en gagner ou d'en perdre, alors que l'icone est la meme. */
+        const gain = amount > 0;
+        say(playerId, [
+            ic("fa-solid fa-coins", gain ? C.MONEY : C.DANGER),
+            txt(" ", C.INFO),
+            bold((gain ? "+" : "") + nfmt(amount) + " Coins", gain ? C.MONEY : C.DANGER),
+            txt(".", C.INFO),
+        ]);
     }
 }
 
@@ -166,14 +173,25 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
        garde que ce que l'appelant veut vraiment attacher a l'instance. */
     const attrs = attributes && typeof attributes === "object" ? attributes : {};
     const money = getStat(playerId, "money", 0);
+    /* Il manque combien ? Le joueur doit pouvoir lire « il me manque 35 »
+       sans faire la soustraction, et la meme phrase sert partout : c'est cet
+       achat qui parle, pas le PNJ. */
     if (money < price) {
-        say(playerId,[ic("fa-solid fa-coins", C.MONEY),txt(" You don't have enough Coins: "+money+"/"+price, C.DANGER)]);
+        say(playerId, [
+            ic("fa-solid fa-coins", C.DANGER),
+            txt(" You need ", C.DANGER),
+            bold((price - money) + " more Coins", C.DANGER),
+            txt(" to buy this (" + money + "/" + price + ").", C.INFO),
+        ]);
         return;
     }
 
     const label = attrs.customDisplayName
         || (itemLabelLookup ? itemLabelLookup(playerId, item) : null)
         || item;
+    /* Prix unitaire seulement quand il y a plusieurs items : sur un bateau
+       a 5000, « (5000 each) » n'apprend rien et allonge la ligne. */
+    const each = amount > 1 ? " (" + Math.round(price / amount) + " each)" : "";
     const key = "buy|" + item + "|" + amount + "|" + price;
     if (!confirmAction(playerId, key, [
         ic("fa-solid fa-cart-shopping", C.MONEY),
@@ -181,7 +199,7 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         bold(label, C.MONEY),
         txt(" for ", C.INFO),
         bold(price + " Coins", C.MONEY),
-        txt("?", C.INFO),
+        txt(each + "?", C.INFO),
     ])) return;
 
     if (!payMoney(playerId, price)) {
@@ -198,6 +216,8 @@ export function buyItem(playerId, item, price=0, amount=1, attributes={}) {
         ic("fa-solid fa-cart-shopping", C.SUCCESS),
         txt(" You bought " + amount + "x ", C.INFO),
         bold(label, C.MONEY),
+        txt(" for ", C.INFO),
+        bold(price + " Coins", C.MONEY),
         txt(".", C.INFO),
     ]);
 }
@@ -346,10 +366,16 @@ export function addXP(playerId, amount){
         fullHeal(playerId);
         applyStatEffects(playerId);
         checkQuestValidity(playerId);
-        say(playerId,[
+        /* Le joueur doit lire DEUX choses : son nouveau niveau et ce qu'il
+           gagne. « LEVEL UP! Level 12 » ne disait ni l'un ni l'autre (l'XP
+           restant etait invisible) et finissait sans point. */
+        const gained = SP_PER_LEVEL * levelsGained;
+        say(playerId, [
             ic("fa-solid fa-sparkle", C.SUCCESS),
-        bold(" LEVEL UP! ", C.SUCCESS),
-            txt("Level "+lvl, "white")
+            bold(" LEVEL UP  ", C.SUCCESS),
+            txt("You are level ", C.INFO),
+            bold(String(lvl), C.XP),
+            txt(" (+" + gained + " Stat Point" + (gained > 1 ? "s" : "") + ").", C.INFO),
         ]);
 
         reconcileSP(playerId);
@@ -375,8 +401,10 @@ export function setLevel(playerId, newLevel, resetXP = true){
     fullHeal(playerId);
     say(playerId, [
         ic("fa-solid fa-ranking-star", C.INFO),
-        txt(" Level set to ", C.INFO),
-        bold(String(newLevel), "#00FF00")
+        bold(" LEVEL  ", C.INFO),
+        txt("You are now level ", C.INFO),
+        bold(String(newLevel), C.XP),
+        txt(".", C.INFO),
     ]);
 }
 
@@ -395,13 +423,15 @@ export function reconcileSP(playerId) {
 
     if (diff > 0) {
         say(playerId, [
-            ic("fa-solid fa-sparkle", "#00ff00", {fontWeight: "bold"}), bold(" SP recovered: ", "#00ff00"),
-            txt("+" + diff, "white")
+            ic("fa-solid fa-sparkle", C.SUCCESS),
+            bold(" STATS  ", C.SUCCESS),
+            txt("+" + diff + " Stat Point" + (diff > 1 ? "s" : "") + " recovered.", C.INFO),
         ]);
     } else {
         say(playerId, [
-            ic("fa-solid fa-triangle-exclamation", "#ff9900", {fontWeight: "bold"}), bold(" SP corrected: ", "#ff9900"),
-            txt(String(diff), "white")
+            ic("fa-solid fa-triangle-exclamation", C.MONEY),
+            bold(" STATS  ", C.MONEY),
+            txt("Your Stat Points were corrected (" + diff + ").", C.INFO),
         ]);
     }
 

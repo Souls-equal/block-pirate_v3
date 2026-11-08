@@ -789,7 +789,7 @@ function pressButton(playerId, index) {
             ic("fa-solid fa-door-open", C.SUCCESS),
             txt(" All five hidden buttons are pressed: ", C.SUCCESS),
             txt("a door grinds open deeper in the jungle.", C.INFO),
-            txt("\nA marker points at it. It stays open for a minute.", "#94A3B8"),
+            txt("\nA marker points at it. It stays open for a minute.", C.INFO),
         ]);
     } else {
         soundAt(playerId, "coin", 0.6, 1.4, 20);
@@ -1408,7 +1408,7 @@ function killLeader(playerId, mobId) {
             : [
                 ic("fa-solid fa-skull", C.SUCCESS),
                 txt(" The Mob Leader is down. ", C.INFO),
-                txt("Nothing left to take from him.", "#94A3B8"),
+                txt("Nothing left to take from him.", C.INFO),
             ]);
     }
     return true;

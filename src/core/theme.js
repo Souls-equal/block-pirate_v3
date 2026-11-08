@@ -35,7 +35,7 @@ const ROLE_OF = {
     "#dc2626": "DANGER", "#ef4444": "DANGER", "#ff4444": "DANGER", "#ff3333": "DANGER",
     "#ff5555": "DANGER", "#ff6666": "DANGER", "#f87171": "DANGER", "#e74c3c": "DANGER",
     "#ff8844": "DANGER", "#ff8855": "DANGER", "#ff6600": "DANGER", "#f59e0b": "DANGER",
-    "#ff8c00": "DANGER", "#ff9900": "DANGER", "#ffaa00": "DANGER", "#ffcc00": "DANGER",
+    "#ff8c00": "DANGER", "#ff9900": "DANGER",
     "#f97316": "DANGER", "#e67e22": "DANGER", "#d35400": "DANGER", "#c0392b": "DANGER",
     /* corail / accents chauds */
     coral: "PIRATE", "#ff7f50": "PIRATE", "#ff8a65": "PIRATE", "#f4845f": "PIRATE",
@@ -47,6 +47,12 @@ const ROLE_OF = {
     "#ffdf00": "MONEY", "#facc15": "MONEY", "#fbbf24": "MONEY", "#ffdd55": "MONEY",
     "#ecc727": "MONEY", "#fde68a": "MONEY", "#fde047": "MONEY", "#fef08a": "MONEY",
     "#ffff00": "MONEY", "#ffc107": "MONEY",
+    /* jaune franc : c'est de l'OR, pas une alerte. Avant, "#ffcc00" tombait
+       dans les rouges : le nom d'un equipage, « Crew invite », un gain d'or
+       s'affichaient en rouge de danger, alors que leur elementBgColor (le
+       meme jaune, non normalise, lui) restait dore. Deux couleurs pour la
+       meme chose. */
+    "#ffcc00": "MONEY", "#ffaa00": "MONEY",
     /* succes / verts */
     lime: "SUCCESS", lightgreen: "SUCCESS", green: "SUCCESS", springgreen: "SUCCESS",
     "#00ff00": "SUCCESS", "#0f0": "SUCCESS", "#00ff88": "SUCCESS", "#55ff55": "SUCCESS",
@@ -705,6 +711,20 @@ function segmentStyle(color, extra) {
     /* color en premier : l'ordre des cles reste celui qu'ecrivaient les
        litteraux, donc deux segments identiques restent identiques. */
     return Object.assign({ color: color }, extra);
+}
+
+/* Montants lisibles : 14000 devient « 14,000 ». Les prix, les primes et
+   l'argent du joueur se lisent d'un coup d'oeil au lieu de se compter. */
+export function nfmt(n) {
+    const value = Number(n);
+    if (!isFinite(value)) return String(n);
+    const digits = String(Math.abs(Math.round(value)));
+    let out = "";
+    for (let i = 0; i < digits.length; i++) {
+        if (i > 0 && (digits.length - i) % 3 === 0) out += ",";
+        out += digits.charAt(i);
+    }
+    return (value < 0 ? "-" : "") + out;
 }
 
 /* Texte seul. */

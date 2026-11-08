@@ -26,7 +26,7 @@ import {
     targetBlock,
 } from "./lifeform";
 import { setTimeout, nowMs, getActor, withActor } from "./timer";
-import { C, say, txt, ic } from "../core/theme";
+import { C, say, txt, bold, ic } from "../core/theme";
 import { isCrowdControlImmune } from "../core/ranks";
 export const summonOwner = {};
 /* Garde d'equipe (marines entre eux, meme crew). Posee par index.js avec
@@ -188,9 +188,10 @@ const PVP_PENDING = {}; /* victimId -> { killerId, at } */
 const PVP_SHIELD = {};  /* victimId -> { killerId: expiresAt } */
 const PVP_NOTICE = {};  /* "killer|victim" -> dernier message */
 
-function pvpSay(playerId, text, color) {
+/* Messages PvP : icone de tete + registre, comme le reste du chat. */
+function pvpSay(playerId, icon, color, parts) {
     try {
-        say(playerId, [ txt(text, color) ]);
+        say(playerId, [ic(icon, color), bold(" PVP  ", color), ...parts]);
     } catch (e) {}
 }
 
@@ -230,9 +231,17 @@ export function notePvPDeath(victimId, killerId) {
     if (!prev || prev.killerId !== killerId || now - prev.at > 2000) {
         /* Le message ne promet une protection que si elle est activee. */
         if (isPvPProtectionEnabled(victimId)) {
-            pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". 5 min of protection against them once you respawn (cancelled if you attack them).", C.DANGER);
+            pvpSay(victimId, "fa-solid fa-skull", C.DANGER, [
+                txt("Killed by ", C.DANGER),
+                bold(pvpName(killerId), C.PIRATE),
+                txt(". 5 min of protection against them once you respawn, cancelled if you attack them.", C.DANGER),
+            ]);
         } else {
-            pvpSay(victimId, "[PvP] Killed by " + pvpName(killerId) + ". Protection is disabled in your Settings.", C.DANGER);
+            pvpSay(victimId, "fa-solid fa-skull", C.DANGER, [
+                txt("Killed by ", C.DANGER),
+                bold(pvpName(killerId), C.PIRATE),
+                txt(". Protection is disabled in your Settings.", C.DANGER),
+            ]);
         }
     }
     return true;
@@ -254,7 +263,11 @@ export function grantPvPShield(victimId) {
     let shields = PVP_SHIELD[victimId];
     if (!shields) shields = PVP_SHIELD[victimId] = {};
     shields[pending.killerId] = Date.now() + PVP_PROTECT_MS;
-    pvpSay(victimId, "[PvP] Protected from " + pvpName(pending.killerId) + " for 5 minutes. Attacking them cancels it.", C.SUCCESS);
+    pvpSay(victimId, "fa-solid fa-shield", C.SUCCESS, [
+        txt("Protected from ", C.SUCCESS),
+        bold(pvpName(pending.killerId), C.PIRATE),
+        txt(" for 5 minutes. Attacking them cancels it.", C.SUCCESS),
+    ]);
     return PVP_PROTECT_MS;
 }
 
@@ -283,7 +296,11 @@ export function dropPvPShield(attackerId, victimId) {
     if (!shields) return false;
     if (!(victimId in shields)) return false;
     delete shields[victimId];
-    pvpSay(attackerId, "[PvP] Protection against " + pvpName(victimId) + " cancelled (you attacked them).", C.INFO);
+    pvpSay(attackerId, "fa-solid fa-shield-halved", C.INFO, [
+        txt("Protection against ", C.INFO),
+        bold(pvpName(victimId), C.PIRATE),
+        txt(" cancelled: you attacked them.", C.INFO),
+    ]);
     return true;
 }
 
@@ -297,7 +314,12 @@ export function pvpGuard(attackerId, victimId) {
         if (!PVP_NOTICE[key] || now - PVP_NOTICE[key] > PVP_NOTICE_MS) {
             PVP_NOTICE[key] = now;
             const left = Math.ceil((PVP_SHIELD[victimId][attackerId] - now) / 1000);
-            pvpSay(attackerId, "[PvP] " + pvpName(victimId) + " is protected from you (" + left + "s left).", C.DANGER);
+            pvpSay(attackerId, "fa-solid fa-shield-halved", C.DANGER, [
+                bold(pvpName(victimId), C.PIRATE),
+                txt(" is protected from you, ", C.DANGER),
+                bold(left + "s", C.MONEY),
+                txt(" left.", C.DANGER),
+            ]);
         }
         return true;
     }
@@ -330,7 +352,11 @@ export function tickPvPShield() {
             }
             delete shields[killerId];
             if (isAliveId(victimId)) {
-                pvpSay(victimId, "[PvP] Protection against " + pvpName(killerId) + " has expired.", C.INFO);
+                pvpSay(victimId, "fa-solid fa-clock-rotate-left", C.INFO, [
+                    txt("Protection against ", C.INFO),
+                    bold(pvpName(killerId), C.PIRATE),
+                    txt(" has expired.", C.INFO),
+                ]);
             }
         }
         if (!left) delete PVP_SHIELD[victimId];

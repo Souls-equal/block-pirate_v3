@@ -6,7 +6,11 @@ import { getRankDataForPlayer, canBypassChatRestriction } from './ranks'
 import { updateSidebar, refreshLeaderboardPlayer } from "./UI";
 import { isVanished } from "./admin";
 import { isOnlinePlayer } from "../utils/lifeform";
-import { C, say, shout, txt, bold, ic } from "./theme";
+import { C, nfmt, say, shout, txt, bold, ic } from "./theme";
+
+/* Couleur de l'equipage : l'or, celui de sa pastille de chat et de son nom sur
+   le name tag. Un seul endroit, sinon les trois divergent. */
+const CREW_COLOR = C.MONEY;
 function safeName(id) {
     if (!id) return "Unknown";
     try { return api.getEntityName(id) || "Unknown"; } catch (e) { return "Unknown"; }
@@ -134,10 +138,14 @@ setPlayerTeam = (playerId, teamId) => {
     if (oldTeam !== teamId) {
         const replacedCount = replaceTeamWeapons(playerId, teamId);
         if (replacedCount > 0) {
+            /* Meme anatomie que les messages d'equipage : icone + « TEAM » +
+               la phrase, le nom de la team dans SA couleur. */
             say(playerId, [
-                ic("fa-solid fa-swords", "#00BFFF"), txt(" Team changed! Your weapons have been updated to ", "#00BFFF"),
-                bold(getTeamData(teamId).name, getTeamData(teamId).color),
-                txt(" weapons. (" + replacedCount + " items replaced)", "#AAAAAA")
+                ic("fa-solid fa-swords", getTeamData(teamId).color),
+                bold(" TEAM  ", C.INFO),
+                txt("Your weapons are now ", C.INFO),
+                bold(getTeamData(teamId).name + " weapons", getTeamData(teamId).color),
+                txt(" (" + replacedCount + " replaced).", C.INFO),
             ]);
         }
     }
@@ -156,7 +164,7 @@ export function updateNameTag(playerId) {
             subtitle: [
                 bold(team.prefix, team.color),
                 bold(" | ", "lightgray"),
-                bold(crew, "#ffcc00"),
+                bold(crew, CREW_COLOR),
             ],
             border: { colour: team.color, applyTo: "both", style: "glow" },
             healthbar: {height:"19px", display:"always", backgroundColour:"gray" }
@@ -179,7 +187,7 @@ export function setupChatChannels(playerId) {
         {
             channelName: CHAT_CHANNEL.GLOBAL,
             elementContent: [ic("fa-solid fa-globe"), txt(" G")],
-            elementBgColor: "#2671d7"
+            elementBgColor: C.MARINE
         },
         {
             channelName: CHAT_CHANNEL.TEAM,
@@ -192,7 +200,7 @@ export function setupChatChannels(playerId) {
         channels.push({
             channelName: CHAT_CHANNEL.CREW,
             elementContent: [ic("fa-solid fa-user-group"), txt(" C")],
-            elementBgColor: "#ffcc00"
+            elementBgColor: CREW_COLOR
         });
     }
 
@@ -244,17 +252,26 @@ export function syncCrewFromDB(playerId) {
 function createCrew(playerId, name) {
 
     if (!name) {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Usage: /crew create <name>", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("Usage: /crew create <name>.", C.DANGER),
+        ]);
         return;
     }
 
     if (getCrewName(playerId)) {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" You are already in a crew. Leave it first (/crew leave).", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("You are already in a crew. Leave it first (/crew leave).", C.DANGER),
+        ]);
         return;
     }
 
     if (CREWS[name]) {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" A crew with this name already exists", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("A crew named ", C.DANGER), bold(name, C.MONEY), txt(" already exists.", C.DANGER),
+        ]);
         return;
     }
 
@@ -267,8 +284,11 @@ function createCrew(playerId, name) {
     setupChatChannels(playerId);
 
     shout([
-        txt(api.getEntityName(playerId) + " created the crew: ", "#00bfff"),
-        bold(name, "#ffffff")
+        ic("fa-solid fa-flag", CREW_COLOR),
+        bold(" CREW  ", CREW_COLOR),
+        txt(api.getEntityName(playerId) + " created the crew ", C.INFO),
+        bold(name, CREW_COLOR),
+        txt(".", C.INFO),
     ]);
 
     updateNameTag(playerId);
@@ -292,8 +312,8 @@ function joinCrew(playerId, name) {
     setupChatChannels(playerId);
 
     say(playerId, [
-        ic("fa-solid fa-circle-check", "#00ff88"), txt(" Joined crew ", "#00ff88"),
-        txt(name, "#ffffff")
+        ic("fa-solid fa-circle-check", C.SUCCESS), bold(" CREW  ", CREW_COLOR),
+        txt("You joined ", C.INFO), bold(name, CREW_COLOR), txt(".", C.INFO),
     ]);
 
     updateNameTag(playerId);
@@ -307,7 +327,10 @@ function leaveCrew(playerId) {
 
     const name = getCrewName(playerId);
     if (!name) {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" You are not in a crew", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("You are not in a crew.", C.DANGER),
+        ]);
         return;
     }
 
@@ -316,8 +339,8 @@ function leaveCrew(playerId) {
     setupChatChannels(playerId);
 
     say(playerId, [
-        ic("fa-solid fa-sign-out-alt", "#ffcc00"), txt(" You left crew ", "#ffcc00"),
-        txt(name, "#ffffff")
+        ic("fa-solid fa-sign-out-alt", C.INFO), bold(" CREW  ", CREW_COLOR),
+        txt("You left ", C.INFO), bold(name, CREW_COLOR), txt(".", C.INFO),
     ]);
 
     updateNameTag(playerId);
@@ -344,8 +367,8 @@ function disbandCrew(name) {
         setupChatChannels(id);
 
         say(id, [
-            ic("fa-solid fa-fire", "#ff4444"), txt(" Crew disbanded: ", "#ff4444"),
-            txt(name, "#ffffff")
+            ic("fa-solid fa-fire", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("Your crew ", C.INFO), bold(name, CREW_COLOR), txt(" was disbanded.", C.DANGER),
         ]);
 
         updateNameTag(id);
@@ -363,35 +386,50 @@ function invitePlayer(senderId, targetName) {
     const role = getCrewRole(senderId);
 
     if (role !== "CAPTAIN") {
-        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Only the captain can invite", "#ff4444")]);
+        say(senderId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("Only the captain can invite.", C.DANGER),
+        ]);
         return;
     }
 
     if (!targetName) {
-        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Usage: /crew invite <player>", "#ff4444")]);
+        say(senderId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("Usage: /crew invite <player>.", C.DANGER),
+        ]);
         return;
     }
 
     const targetId = api.getPlayerId(targetName);
     if (!targetId) {
-        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Player not found (or offline)", "#ff4444")]);
+        say(senderId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("No player named ", C.DANGER), bold(targetName, C.INFO), txt(" is online.", C.DANGER),
+        ]);
         return;
     }
 
     if (getCrewName(targetId)) {
-        say(senderId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Player already in a crew", "#ff4444")]);
+        say(senderId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("That player is already in a crew.", C.DANGER),
+        ]);
         return;
     }
 
     setStat(targetId, "crew:invite", crewName);
 
     say(targetId, [
-        ic("fa-solid fa-bell", "#00bfff"), txt(" Crew invite from ", "#00bfff"),
-        txt(crewName, "#ffffff"),
-        txt(" — type /crew accept " + crewName, "#888888")
+        ic("fa-solid fa-bell", CREW_COLOR), bold(" CREW  ", CREW_COLOR),
+        txt("You are invited to ", C.INFO), bold(crewName, CREW_COLOR),
+        txt(". Type ", C.INFO), bold("/crew accept " + crewName, C.SUCCESS), txt(".", C.INFO),
     ]);
 
-    say(senderId, [ic("fa-solid fa-circle-check", "#00ff88"), txt(" Invite sent", "#00ff88")]);
+    say(senderId, [
+        ic("fa-solid fa-circle-check", C.SUCCESS), bold(" CREW  ", CREW_COLOR),
+        txt("Invite sent to ", C.INFO), bold(targetName, C.INFO), txt(".", C.INFO),
+    ]);
 }
 
 /* ACCEPT */
@@ -399,7 +437,10 @@ function acceptInvite(playerId, name) {
 
     const invite = getStat(playerId, "crew:invite", null);
     if (invite !== name) {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" No invite from this crew", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("No invite from that crew.", C.DANGER),
+        ]);
         return;
     }
 
@@ -407,7 +448,10 @@ function acceptInvite(playerId, name) {
     if (ok) {
         deleteStat(playerId, "crew:invite");
     } else {
-        say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Could not join the crew (full / disbanded / already in one)", "#ff4444")]);
+        say(playerId, [
+            ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+            txt("Could not join: the crew is gone, or you are already in one.", C.DANGER),
+        ]);
     }
 }
 
@@ -444,10 +488,10 @@ export function handleChat(playerId, message, channel) {
 
     if (isVanished(playerId)) {
         say(playerId, [
-            bold("[Vanish] ", "#cef3ff"),
-            bold("Message not sent : ", "#ff4444"),
-            txt("you are vanished (fully invisible for other players).", "#ffffff"),
-            txt("\n(desactive Vanish from the admin panel to 'rejoin')", "#888888")
+            ic("Invisible", C.INFO),
+            bold(" CHAT  ", C.INFO),
+            txt("Message not sent: you are vanished, so nobody would read it.", C.DANGER),
+            txt("\nTurn Vanish off in the admin panel to talk again.", C.INFO),
         ]);
         return false;
     }
@@ -483,7 +527,7 @@ export function handleChat(playerId, message, channel) {
                 if (!canBypassChatRestriction(id)) continue;
                 try {
                     say(id, [
-                        txt("[" + tag + "] ", "#888888"),
+                        txt("[" + tag + "] ", C.INFO),
                         ...segments
                     ]);
                 } catch (e) {}
@@ -494,8 +538,8 @@ export function handleChat(playerId, message, channel) {
     const buildMsg = (msgColor) => [
         ...rankSeg,
         bold(team.prefix + " ", team.color),
-        txt(name, "#bbbbbb"),
-        txt(" : ", "#888888"),
+        bold(name, C.INFO),
+        txt(": ", C.INFO),
         txt(message, msgColor)
     ];
 
@@ -519,7 +563,7 @@ export function handleChat(playerId, message, channel) {
 
     /* GLOBAL */
     if (chan === CHAT_CHANNEL.GLOBAL) {
-        deliver(all, buildMsg("#ffffff"));
+        deliver(all, buildMsg(C.INFO));
         return false;
     }
 
@@ -547,10 +591,10 @@ export function handleChat(playerId, message, channel) {
         const role = getCrewRole(playerId);
         deliver([...crew.members].filter(id => online.has(id)), [
             ...rankSeg,
-            bold(`[CREW:${role}] `, role === "CAPTAIN" ? "#ffd700" : "#3DDC84"),
-            txt(name, "#bbbbbb"),
-            txt(" : ", "#888888"),
-            txt(message, "#ffffff")
+            bold("[Crew] ", CREW_COLOR),
+            bold(name, role === "CAPTAIN" ? CREW_COLOR : C.INFO),
+            txt(": ", C.INFO),
+            txt(message, C.INFO)
         ], "Crew " + crewName);
         return false;
     }
@@ -617,11 +661,18 @@ function warnLevelShield(attacker, target) {
     ]);
 }
 
-function warnFriendly(attacker) {
+function warnFriendly(attacker, target) {
     const now = Date.now();
     if (TEAM_NOTICE[attacker] && now - TEAM_NOTICE[attacker] < TEAM_NOTICE_MS) return;
     TEAM_NOTICE[attacker] = now;
-    say(attacker, "You can't attack your own teammates.", { color: C.MONEY });
+    /* Meme forme que l'avertissement de niveau juste au-dessus : icone, puis
+       la phrase. C'etait la seule reponse du jeu envoyee en texte nu. */
+    say(attacker, [
+        ic("fa-solid fa-shield", C.INFO),
+        txt(" You can't damage ", C.INFO),
+        bold(safeName(target), C.MONEY),
+        txt(": you are on the same team.", C.INFO),
+    ]);
 }
 
 /* Garde de zone (lobby) : posee par index.js avec idInSafeZone() de
@@ -646,14 +697,14 @@ export function canDamage(attacker, target) {
     const A = getCrewName(attacker);
     const B = getCrewName(target);
     if (A && B && A === B) {
-        warnFriendly(attacker);
+        warnFriendly(attacker, target);
         return "preventDamage";
     }
 
     const teamA = getPlayerTeam(attacker);
     const teamB = getPlayerTeam(target);
     if (teamA === "MARINES" && teamB === "MARINES") {
-        warnFriendly(attacker);
+        warnFriendly(attacker, target);
         return "preventDamage";
     }
 
@@ -691,7 +742,10 @@ export function crewCommands(playerId, command) {
             if (getCrewRole(playerId) === "CAPTAIN") {
                 disbandCrew(getCrewName(playerId));
             } else {
-                say(playerId, [ic("fa-solid fa-xmark", "#ff4444"), txt(" Only the captain can disband the crew", "#ff4444")]);
+                say(playerId, [
+                    ic("fa-solid fa-xmark", C.DANGER), bold(" CREW  ", CREW_COLOR),
+                    txt("Only the captain can disband the crew.", C.DANGER),
+                ]);
             }
             break;
         }
@@ -705,77 +759,78 @@ export function crewCommands(playerId, command) {
     return true;
 }
 
-/* CREW INFO */
+/* CREW INFO
+
+   Un seul message, comme les autres panneaux du jeu : un en-tete « CREW », la
+   liste des commandes, puis l'etat de l'equipage. Avant, les commandes
+   arrivaient dans un message, « you are not in a crew » dans un deuxieme, et
+   CHAQUE membre dans un troisieme : ouvrir /crew inondait le chat, et le
+   joueur devait recoller les morceaux. */
 function crewInfo(playerId) {
 
     const crewName = getCrewName(playerId);
+    const crew = crewName ? CREWS[crewName] : null;
+    const onlineMembers = new Set(api.getPlayerIds());
 
-    /* HELP HEADER */
-    say(playerId, [
-        ic("fa-solid fa-swords", "#ffd700", {fontWeight: "bold"}), bold(" ===== CREW COMMANDS =====\n", "#ffd700"),
+    const parts = [
+        ic("fa-solid fa-flag", CREW_COLOR),
+        bold(" CREW COMMANDS\n", CREW_COLOR),
 
-        txt("/crew create <name> ", "#ffffff"),
-        txt("- Create a crew\n", "#888888"),
+        bold("/crew create <name>", C.SUCCESS),
+        txt("  create a crew\n", C.INFO),
+        bold("/crew invite <player>", C.SUCCESS),
+        txt("  invite a player\n", C.INFO),
+        bold("/crew accept <name>", C.SUCCESS),
+        txt("  accept an invite\n", C.INFO),
+        bold("/crew leave", C.SUCCESS),
+        txt("  leave your crew\n", C.INFO),
+        bold("/crew disband", C.SUCCESS),
+        txt("  disband it (captain only)\n", C.INFO),
+    ];
 
-        txt("/crew invite <player> ", "#ffffff"),
-        txt("- Invite a player\n", "#888888"),
-
-        txt("/crew accept <name> ", "#ffffff"),
-        txt("- Accept invite\n", "#888888"),
-
-        txt("/crew leave ", "#ffffff"),
-        txt("- Leave your crew\n", "#888888"),
-
-        txt("/crew disband ", "#ffffff"),
-        txt("- Disband crew (captain only)\n\n", "#888888")
-    ]);
-
-    /* IF NO CREW */
     if (!crewName) {
-        say(playerId, [
-            ic("fa-solid fa-xmark", "#ff4444"), txt(" You are not in a crew\n", "#ff4444")
-        ]);
+        parts.push(
+            ic("fa-solid fa-circle-info", C.INFO),
+            bold(" CREW  ", CREW_COLOR),
+            txt("You are not in a crew yet.", C.INFO)
+        );
+        say(playerId, parts);
         return true;
     }
-
-    const crew = CREWS[crewName];
 
     if (!crew) {
-        say(playerId, [
-            ic("fa-solid fa-triangle-exclamation", "#ffcc00"), txt(" Crew not found in memory (rejoin to resync)\n", "#ffcc00")
-        ]);
+        parts.push(
+            ic("fa-solid fa-triangle-exclamation", C.DANGER),
+            bold(" CREW  ", CREW_COLOR),
+            txt("Your crew is not loaded: leave it and join again.", C.DANGER)
+        );
+        say(playerId, parts);
         return true;
     }
 
-    const onlineMembers = new Set(api.getPlayerIds());
     const members = [...crew.members].filter(id => id && onlineMembers.has(id));
-
     const ownerName = (crew.captainId && onlineMembers.has(crew.captainId))
         ? safeName(crew.captainId)
-        : "Unknown";
+        : "offline";
 
-    say(playerId, [
-        ic("fa-solid fa-swords", "#00bfff", {fontWeight: "bold"}), bold(" ===== YOUR CREW =====\n", "#00bfff"),
-        txt(crewName + "\n", "#ffd700"),
-
-        bold("Owner: ", "#ffffff"),
-        txt(ownerName + "\n", "#00bfff"),
-
-        bold("Online Members (" + members.length + ")\n", "#ffffff")
-    ]);
+    parts.push(
+        ic("fa-solid fa-user-group", CREW_COLOR),
+        bold(" " + crewName + "\n", CREW_COLOR),
+        txt("Owner: ", C.INFO), bold(ownerName, CREW_COLOR),
+        txt("   Online: " + members.length + "\n", C.INFO)
+    );
 
     for (const id of members) {
-
         const role = getCrewRole(id) || "MEMBER";
-        const mName = safeName(id);
-
-        say(playerId, [
-            txt("- ", "#888888"),
-            txt(mName + " ", role === "CAPTAIN" ? "#ffd700" : "#bbbbbb", {fontWeight: role === "CAPTAIN" ? "bold" : "normal"}),
-            txt(`[${role}]\n`, role === "CAPTAIN" ? "#ffd700" : "#00bfff")
-        ]);
+        const captain = role === "CAPTAIN";
+        parts.push(
+            txt(captain ? "\u25cf " : "- ", captain ? CREW_COLOR : C.INFO),
+            bold(safeName(id), captain ? CREW_COLOR : C.INFO),
+            txt(captain ? "  captain\n" : "\n", C.INFO)
+        );
     }
 
+    say(playerId, parts);
     return true;
 }
 
@@ -847,8 +902,10 @@ function giveMoney(playerId, amount) {
     setStat(playerId, "money", Math.max(0, moneyOf(playerId) + amount));
 }
 
-function bountySay(playerId, text, color) {
-    say(playerId, [ txt(text, color) ]);
+/* Messages de prime : icone de tete + registre, comme le reste du chat. Les
+   montants sont toujours en MONEY, les pseudos dans la couleur pirate. */
+function bountySay(playerId, icon, color, parts) {
+    say(playerId, [ic(icon, color), bold(" BOUNTY  ", color), ...parts]);
 }
 
 /* La prime et l'argent sont affiches dans la leaderboard : on rafraichit les
@@ -906,16 +963,26 @@ export function handleBountyKill(killerId, victimId) {
            l'argent. */
         const lastCollect = MARINE_COLLECT[pairKey];
         if (lastCollect !== undefined && now - lastCollect < BOUNTY_PAIR_MS) {
-            bountySay(killerId,
-                "Bounty already collected from " + safeName(victimId) + " recently: no payout (" + pairLeftMin(lastCollect, now) + " min left).",
-                C.INFO);
+            bountySay(killerId, "fa-solid fa-clock-rotate-left", C.INFO, [
+                txt("Already collected from ", C.INFO),
+                bold(safeName(victimId), C.PIRATE),
+                txt(" recently: no payout, ", C.INFO),
+                bold(pairLeftMin(lastCollect, now) + " min", C.MONEY),
+                txt(" left.", C.INFO),
+            ]);
             return { type: "repeat", amount: 0, bounty: victimBounty };
         }
         MARINE_COLLECT[pairKey] = now;
         const payout = Math.min(victimBounty, BOUNTY_MARINE_MAX);
         setBounty(victimId, 0);
         giveMoney(killerId, payout);
-        bountySay(killerId, "Bounty collected: $" + payout + " (" + safeName(victimId) + ")", C.MARINE);
+        bountySay(killerId, "fa-solid fa-shield", C.MARINE, [
+            txt("Collected ", C.MARINE),
+            bold("+$" + nfmt(payout), C.MONEY),
+            txt(" from ", C.MARINE),
+            bold(safeName(victimId), C.PIRATE),
+            txt(".", C.MARINE),
+        ]);
         refreshBountyUi(killerId, victimId);
         return { type: "payout", amount: payout, lost: victimBounty - payout, bounty: 0 };
     }
@@ -929,18 +996,24 @@ export function handleBountyKill(killerId, victimId) {
            gonfle sa prime en tuant le meme alt en boucle (voir plus haut). */
         const lastWeak = WEAK_MINT[pairKey];
         if (lastWeak !== undefined && now - lastWeak < BOUNTY_PAIR_MS) {
-            bountySay(killerId,
-                "Target too weak (40+ levels below) and already rewarded recently: no bounty (" + pairLeftMin(lastWeak, now) + " min left).",
-                C.INFO);
+            bountySay(killerId, "fa-solid fa-triangle-exclamation", C.INFO, [
+                txt("Target too weak and already rewarded recently: no bounty, ", C.INFO),
+                bold(pairLeftMin(lastWeak, now) + " min", C.MONEY),
+                txt(" left.", C.INFO),
+            ]);
             return { type: "weak-repeat", amount: 0, bounty: getBounty(killerId) };
         }
         const weak = Math.min(Math.floor(moneyOf(victimId) * BOUNTY_WEAK_RATE), BOUNTY_STEAL_MAX);
         if (weak <= 0) return { type: "none", amount: 0, bounty: getBounty(killerId) };
         WEAK_MINT[pairKey] = now;
         const weakBounty = addBounty(killerId, weak);
-        bountySay(killerId,
-            "Target too weak (40+ levels below): no money stolen, bounty +$" + weak + " (total $" + weakBounty + ")",
-            C.PIRATE);
+        bountySay(killerId, "fa-solid fa-triangle-exclamation", C.PIRATE, [
+            txt("Target too weak: nothing stolen, bounty ", C.PIRATE),
+            bold("+$" + nfmt(weak), C.MONEY),
+            txt(" (total ", C.PIRATE),
+            bold("$" + nfmt(weakBounty), C.MONEY),
+            txt(").", C.PIRATE),
+        ]);
         refreshBountyUi(killerId, victimId);
         return { type: "weak", amount: 0, bounty: weakBounty };
     }
@@ -951,7 +1024,13 @@ export function handleBountyKill(killerId, victimId) {
     giveMoney(victimId, -stolen);
     giveMoney(killerId, stolen);
     const bounty = addBounty(killerId, stolen);
-    bountySay(killerId, "Bounty: +$" + stolen + " (total $" + bounty + ")", C.PIRATE);
+    bountySay(killerId, "fa-solid fa-skull", C.PIRATE, [
+        txt("Stole ", C.PIRATE),
+        bold("+$" + nfmt(stolen), C.MONEY),
+        txt(" (total ", C.PIRATE),
+        bold("$" + nfmt(bounty), C.MONEY),
+        txt(").", C.PIRATE),
+    ]);
     refreshBountyUi(killerId, victimId);
     return { type: "steal", amount: stolen, bounty: bounty };
 }
@@ -1276,10 +1355,12 @@ export function unmutePlayer(playerId) {
 export function muteRefusal(playerId) {
     const info = getMuteInfo(muteNameOf(playerId)) || { by: "an admin", remaining: "unknown" };
     return [
-        ic("fa-solid fa-volume-slash", "#EF4444"),
-        bold(" You are muted", "#EF4444"),
-        txt(" (" + info.remaining + ") by ", "#CBD5E1"),
-        bold(info.by, "#FFD700"),
-        txt(" — you can play, but not talk.", "#CBD5E1"),
+        ic("fa-solid fa-volume-slash", C.DANGER),
+        bold(" CHAT  ", C.INFO),
+        txt("You are muted for ", C.DANGER),
+        bold(info.remaining, C.DANGER),
+        txt(" by ", C.INFO),
+        bold(info.by, C.MONEY),
+        txt(". You can still play, you just cannot talk.", C.INFO),
     ];
 }

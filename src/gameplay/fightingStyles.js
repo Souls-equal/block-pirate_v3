@@ -36,7 +36,7 @@ import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { eachItemSlot } from "./customItem";
 import { cancelConfirm, confirmAction, getTotalMoney, payMoney, useItemControls } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
-import { C, say, txt, bold, ic } from "../core/theme";
+import { C, nfmt, say, txt, bold, ic } from "../core/theme";
 
 const FS_DB_KEY = "fs";
 
@@ -913,7 +913,7 @@ export function buyFightingStyle(playerId, styleName) {
             say(playerId, [
                 ic("fa-solid fa-coins", "#ff5555", {fontWeight: "bold"}), bold(" Not enough Coins to learn ", "#ff5555"),
                 bold(style.name, style.color),
-                bold(": " + money + "/" + style.price, "#fbbf24"),
+                bold(": " + nfmt(money) + "/" + nfmt(style.price), C.MONEY),
             ]);
         } catch (e) {}
         return false;

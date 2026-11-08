@@ -10,7 +10,7 @@ import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
 import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
-import { C, bar, fit, measure, say, txt, bold, ic } from "./theme";
+import { C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
 
 /* Ligne du tutoriel dans la sidebar. UI n'importe PAS gameplay/tutorial (data
    importe UI : ce serait un cycle de plus) : index.js pose la fonction, qui
@@ -89,11 +89,16 @@ function drawSidebar(playerId){
     const lvl = getStat(playerId, "lvl", 1);
     const xp = getStat(playerId, "xp", 0);
     const sp = getStat(playerId, "sp", 0);
-    const fruit = short(getFruit(playerId) || "No fruit", 20);
+    /* Fruit et style : affiches SEULEMENT quand le joueur en a un. Une ligne
+       « No fruit » / « No style » ne dit rien a un debutant (il ne sait pas
+       encore ce que c'est) et prend la place d'une vraie information sur un
+       ecran deja plafonne a 1200 caracteres. */
+    const fruitName = getFruit(playerId);
+    const fruit = fruitName ? short(fruitName, 20) : "";
     const styleName = getFightingStyle(playerId);
     const styleInfo = getFightingStyleInfo(styleName);
-    const styleLabel = short(styleName || "No style", 18);
-    const styleColor = (styleInfo && styleInfo.color) || "#94a3b8";
+    const styleLabel = styleName ? short(styleName, 18) : "";
+    const styleColor = (styleInfo && styleInfo.color) || C.INFO;
     const xpNeeded = xpToNext(lvl);
     const xpData = makeBar(xp, xpNeeded);
 
@@ -125,50 +130,18 @@ function drawSidebar(playerId){
        exactement le joueur qui en a le plus besoin. */
     block([
         ic("fa-solid fa-skull", C.MARINE, {fontSize: title}),
-        txt(" BLOCK PIRATES\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
+        txt(" BLOCK PIRATES\n\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
     ], true, 12);
-    block([
-        ic("fa-solid fa-coins", C.MONEY),
-        txt(" " + money + "\n", C.MONEY),
-    ]);
-    block([
-        ic("Hunger", C.PIRATE),
-        txt(" " + fruit + "\n", C.PIRATE),
-    ]);
-    block([
-        ic("fa-solid fa-hand-fist", styleColor),
-        txt(" " + styleLabel + "\n", styleColor),
-    ]);
-    block([
-        ic("fa-solid fa-angle-double-up", C.MONEY),
-        txt(" LVL " + lvl + "\n", C.MONEY),
-    ]);
-    block([
-        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
-        bar(xpData.ratio, BAR_XP, BAR_SIZE),
-        txt("\n\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
-    ], true, 2);
-    block([
-        ic("fa-solid fa-bolt", COLOUR_STAMINA),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
-        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
-        txt("\n\n"),
-    ], true, 3);
-    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
-       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
-    if (sp > 0) {
-        block([
-            ic("fa-solid fa-star", C.SUCCESS),
-            txt(" Stat Points " + sp + "\n\n", C.SUCCESS),
-        ], true, 4);
-    }
 
-    /* Objectif du tutoriel : optionnel, mais garde en premier (priorite 0). */
+    /* ORDRE DE LECTURE : d'abord ce qu'il y a A FAIRE, puis la progression,
+       puis les ressources, et enfin l'equipement. Avant, l'objectif arrivait
+       apres l'argent et la stamina : la seule ligne qui changeait d'une minute
+       a l'autre etait celle qu'on lisait en dernier. */
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
             ic("fa-solid fa-list", C.SUCCESS),
-            txt(" " + short(tut, 40) + "\n\n", C.SUCCESS),
+            txt(" " + short(tut, 40) + "\n", C.SUCCESS),
         ], true, 0);
     }
 
@@ -176,15 +149,58 @@ function drawSidebar(playerId){
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            ic("fa-solid fa-globe", C.MARINE),
-            txt(" QUEST " + targetText + "\n", C.MARINE),
-            txt(progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n\n", C.INFO),
+            ic("fa-solid fa-globe", C.XP),
+            txt(" QUEST  " + targetText + "\n", C.XP),
+            txt(progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 18) + "\n", C.INFO),
         ], true, 1);
-    } else {
+    }
+    /* Pas de quete : AUCUNE ligne. « QUEST no active quest » ne disait rien et
+       coutait ~150 caracteres dans une sidebar plafonnee a 1 200. */
+
+    /* Progression : le niveau colle a sa barre d'XP, tous les deux en cyan
+       (l'or reste a l'argent, le vert au succes et aux points de stat). */
+    block([
+        ic("fa-solid fa-ranking-star", COLOUR_XP),
+        txt(" LVL " + lvl + "\n", COLOUR_XP),
+    ]);
+    block([
+        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
+        bar(xpData.ratio, BAR_XP, BAR_SIZE),
+        txt("\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
+    ], true, 2);
+    block([
+        ic("fa-solid fa-bolt", COLOUR_STAMINA),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
+        txt("\n"),
+    ], true, 3);
+
+    block([
+        ic("fa-solid fa-coins", C.MONEY),
+        txt(" " + nfmt(money) + "\n", C.MONEY),
+    ]);
+    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
+       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
+    if (sp > 0) {
         block([
-            ic("fa-solid fa-globe", C.MARINE),
-            txt(" QUEST  no active quest\n\n", C.INFO),
-        ], true, 8);
+            ic("fa-solid fa-star", C.SUCCESS),
+            txt(" Stat Points " + sp + "\n", C.SUCCESS),
+        ], true, 4);
+    }
+
+    /* Equipement en dernier : il ne change qu'a l'achat, et il peut disparaitre
+       sous la pression du budget sans rien faire perdre au joueur. */
+    if (fruit) {
+        block([
+            ic("fa-solid fa-sparkle", C.PIRATE),
+            txt(" " + fruit + "\n", C.PIRATE),
+        ], true, 6);
+    }
+    if (styleLabel) {
+        block([
+            ic("fa-solid fa-hand-fist", styleColor),
+            txt(" " + styleLabel + "\n", styleColor),
+        ], true, 7);
     }
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
@@ -395,12 +411,16 @@ export function joinUI(playerId) {
    ========================================================================== */
 
 const SETTINGS_CATEGORY = "settings";
-const SETTING_ARROW_COLOR = "#7DD3FC";
-const SETTING_HIDE_COLOR = "#FCA5A5";
-const SETTING_SHOW_COLOR = "#86EFAC";
-const SETTING_RESPAWN_COLOR = "#FFD166";
-const SETTING_PROTECT_COLOR = "#4ADE80";
-const SETTING_CONTROLS_COLOR = "#93C5FD";
+/* Couleurs des cartes : des ROLES de la palette, pas des teintes choisies
+   une par une. Une fleche d'ile est de l'information de navigation (bleu),
+   cacher/remettre reprend le rouge/vert de « off/on », et le respawn garde
+   l'or de l'argent qu'il coutait autrefois. */
+const SETTING_ARROW_COLOR = C.MARINE;
+const SETTING_HIDE_COLOR = C.DANGER;
+const SETTING_SHOW_COLOR = C.SUCCESS;
+const SETTING_RESPAWN_COLOR = C.MONEY;
+const SETTING_PROTECT_COLOR = C.SUCCESS;
+const SETTING_CONTROLS_COLOR = C.MARINE;
 /* Valeur affichee dans une liste vide : l'API veut au moins une option, et un
    libelle entre parentheses ne peut pas etre confondu avec une ile. */
 const EMPTY_CHOICE = "(nothing left)";
@@ -425,7 +445,7 @@ function islandTheme(name) {
     const style = ISLAND_STYLE[name];
     if (style) return style;
     const initials = String(name).split(/\s+/).map(function (w) { return w[0] || ""; }).join("").toUpperCase();
-    return { code: (initials.slice(0, 2) || "IL"), color: "#94A3B8" };
+    return { code: (initials.slice(0, 2) || "IL"), color: C.INFO };
 }
 
 /* Identifiant stable d'une fleche : une ile = une fleche, donc la masquer ne
@@ -562,6 +582,17 @@ function createSettingsItems(playerId) {
     const hidden = hiddenIslandNames(playerId);
     const all = islandArrowsEnabled(playerId);
     const protect = pvpProtectionEnabled(playerId);
+    const byButtons = getControlMode(playerId) === "buttons";
+
+    /* ANATOMIE COMMUNE DES CARTES DE REGLAGE (et de toutes les boutiques) :
+       titre, puis dans la description :
+         1. une icone + une phrase qui dit CE QUE CA FAIT ;
+         2. une ligne d'etat « ● … » : une seule, celle qui change ;
+         3. une phrase d'aide en gris (INFO), pour l'action elle-meme.
+       Avant, chaque carte racontait ca dans son ordre et sa couleur : la ligne
+       d'etat etait tantot avant, tantot apres, et deux cartes se terminaient
+       par une phrase plus foncee que les autres (illisible sur le fond sombre).
+       Le gris « INFO » est la couleur des explications, partout. */
 
     /* Interrupteur general. */
     try {
@@ -575,12 +606,11 @@ function createSettingsItems(playerId) {
             buyButtonText: [txt(all ? "Hide all" : "Show all", SETTING_ARROW_COLOR)],
             description: [
                 ic("fa-solid fa-map-marker-check", SETTING_ARROW_COLOR),
-                " One arrow per island, each in its own colour.",
+                txt(" One arrow per island, in the colour of that island.", C.INFO),
                 shown.length > 0
-                    ? bold("\n● " + shown.length, "#4ADE80")
-                    : bold("\n● 0", "#888888"),
-                txt(" of " + total + " islands shown.", "#94A3B8"),
-                txt("\nPick the islands you need below.", "#CBD5E1"),
+                    ? bold("\n● " + shown.length + " of " + total + " arrows shown", C.SUCCESS)
+                    : bold("\n● No arrow shown", C.DANGER),
+                txt("\nPick the islands you need below.", C.INFO),
             ],
         });
     } catch (e) {}
@@ -598,10 +628,10 @@ function createSettingsItems(playerId) {
             userInput: { type: "dropdown", dropdownOptions: shown.length ? shown : [EMPTY_CHOICE] },
             description: [
                 ic("fa-solid fa-eye-slash", SETTING_HIDE_COLOR),
-                " Remove one arrow from your screen.",
-                txt("\nShown now: ", "#94A3B8"),
-                txt(shown.length ? shown.join(", ") : "nothing", SETTING_SHOW_COLOR),
-                txt("\nThe island moves to the other list.", "#888888"),
+                txt(" Remove one arrow from your screen.", C.INFO),
+                bold("\n● Shown now: ", C.INFO),
+                txt(shown.length ? shown.join(", ") : "nothing", C.SUCCESS),
+                txt("\nThe island moves to the other list.", C.INFO),
             ],
         });
     } catch (e) {}
@@ -619,10 +649,10 @@ function createSettingsItems(playerId) {
             userInput: { type: "dropdown", dropdownOptions: hidden.length ? hidden : [EMPTY_CHOICE] },
             description: [
                 ic("fa-solid fa-eye", SETTING_SHOW_COLOR),
-                " Bring one arrow back.",
-                txt("\nHidden now: ", "#94A3B8"),
-                txt(hidden.length ? hidden.join(", ") : "nothing", SETTING_HIDE_COLOR),
-                txt("\nThe island moves to the other list.", "#888888"),
+                txt(" Bring one arrow back on your screen.", C.INFO),
+                bold("\n● Hidden now: ", C.INFO),
+                txt(hidden.length ? hidden.join(", ") : "nothing", C.DANGER),
+                txt("\nThe island moves to the other list.", C.INFO),
             ],
         });
     } catch (e) {}
@@ -630,7 +660,6 @@ function createSettingsItems(playerId) {
     /* Choix des commandes (demande 77). Le mobile n'a pas de clavier : on ne lui
        propose rien, il reste en « items » sans pouvoir en sortir. */
     if (!isMobilePlayer(playerId)) {
-        const byButtons = getControlMode(playerId) === "buttons";
         try {
             api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_controls", {
                 image: byButtons ? "Swap Orb" : "Snowdash",
@@ -638,20 +667,20 @@ function createSettingsItems(playerId) {
                 canBuy: true,
                 cost: 0,
                 sortPriority: 30,
-                customTitle: [bold(byButtons ? "Controls [BUTTONS]" : "Controls [ITEMS]", SETTING_CONTROLS_COLOR)],
+                customTitle: [bold("Controls [" + (byButtons ? "BUTTONS" : "ITEMS") + "]", SETTING_CONTROLS_COLOR)],
                 buyButtonText: [txt(byButtons ? "Use items" : "Use buttons", SETTING_CONTROLS_COLOR)],
                 description: [
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
-                    byButtons
-                        ? " Keyboard: Fruit Abilities and Fighting Style Capacities in your hand open the keys."
-                        : " Items: one item per ability, dash on right click.",
-                    bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), "#4ADE80"),
                     txt(byButtons
-                        ? " — Q dash; Z X C V F abilities; Z X style attacks."
-                        : " — click an ability item to use it; right click to dash.", "#94A3B8"),
+                        ? " Keyboard: the items in your hand open the keys."
+                        : " Items: one item per ability.", C.INFO),
+                    bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), C.SUCCESS),
+                    txt(byButtons
+                        ? " — Q dash, Z X C V F fruit, Z X style."
+                        : " — click an ability item, right click to dash.", C.INFO),
                     txt(byButtons
                         ? "\nSwitch back if you prefer items."
-                        : "\nSwitch if you prefer the keyboard.", "#888888"),
+                        : "\nSwitch if you prefer the keyboard.", C.INFO),
                 ],
             });
         } catch (e) {}
@@ -668,9 +697,9 @@ function createSettingsItems(playerId) {
             buyButtonText: [txt("Respawn", SETTING_RESPAWN_COLOR)],
             description: [
                 ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
-                " Kill yourself and respawn.",
-                txt("\nStuck in a block, under the map, in a wall?", "#CBD5E1"),
-                txt("\nClick two time to respawn.", "#313D50"),
+                txt(" Kill yourself and come back at your spawn.", C.INFO),
+                bold("\n● Stuck in a block, or under the map?", C.INFO),
+                txt("\nClick twice to confirm. Refused within 10 seconds of a hit from a player.", C.INFO),
             ],
         });
     } catch (e) {}
@@ -682,17 +711,17 @@ function createSettingsItems(playerId) {
             canBuy: true,
             cost: 0,
             sortPriority: 10,
-            customTitle: [bold(protect ? "PvP Protection [ON]" : "PvP Protection [OFF]", SETTING_PROTECT_COLOR)],
+            customTitle: [bold("PvP Protection [" + (protect ? "ON" : "OFF") + "]", SETTING_PROTECT_COLOR)],
             buyButtonText: [txt(protect ? "Disable" : "Enable", SETTING_PROTECT_COLOR)],
             description: [
                 ic("fa-solid fa-shield-halved", SETTING_PROTECT_COLOR),
-                " The shield you get after being killed by a player.",
+                txt(" A 5-minute shield after a player kills you.", C.INFO),
                 protect
-                    ? bold("\n● ON ", "#4ADE80")
-                    : bold("\n● OFF ", "#888888"),
+                    ? bold("\n● ON", C.SUCCESS)
+                    : bold("\n● OFF", C.DANGER),
                 txt(protect
-                    ? "— 5 minutes during which your killer cannot hit you. It drops if you attack them."
-                    : "— you accept every hit again, killer included.", "#94A3B8"),
+                    ? " — your killer cannot hit you; it drops if you hit them."
+                    : " — you accept every hit again, your killer included.", C.INFO),
             ],
         });
     } catch (e) {}
@@ -755,8 +784,8 @@ function setIslandShown(playerId, name, want) {
 
     if (isShown === want) {
         settingsSay(playerId, [
-            ic("fa-solid fa-circle-info", "#94A3B8"),
-            txt(" " + name + (want ? " is already shown." : " is already hidden."), "#94A3B8"),
+            ic("fa-solid fa-circle-info", C.INFO),
+            txt(" " + name + (want ? " is already shown." : " is already hidden."), C.INFO),
         ]);
         return false;
     }
@@ -783,7 +812,7 @@ function setIslandShown(playerId, name, want) {
         ic("fa-solid fa-map-marker-check", theme.color),
         bold(" " + name + " ", theme.color),
         txt(want ? "arrow shown." : "arrow hidden.", theme.color),
-        txt(onlyOne ? " The other islands stay hidden." : "", "#94A3B8"),
+        txt(onlyOne ? " The other islands stay hidden." : "", C.INFO),
     ]);
     return true;
 }
@@ -794,8 +823,8 @@ function setIslandShown(playerId, name, want) {
 function toggleControlMode(playerId) {
     if (isMobilePlayer(playerId)) {
         settingsSay(playerId, [
-            ic("fa-solid fa-circle-info", "#94A3B8"),
-            txt(" Touch screens always use items: your dash is the Dash item.", "#94A3B8"),
+            ic("fa-solid fa-circle-info", C.INFO),
+            txt(" Touch screens always use items: your dash is the Dash item.", C.INFO),
         ]);
         return;
     }
@@ -809,7 +838,7 @@ function toggleControlMode(playerId) {
         bold(buttons ? " Keyboard controls." : " Item controls.", SETTING_CONTROLS_COLOR),
         txt(buttons
             ? " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash."
-            : " One item per ability, and right click to dash.", "#94A3B8"),
+            : " One item per ability, and right click to dash.", C.INFO),
     ]);
 }
 
@@ -822,7 +851,7 @@ function togglePvPProtection(playerId) {
         bold(want ? " PvP protection enabled." : " PvP protection disabled.", SETTING_PROTECT_COLOR),
         txt(want
             ? " You get 5 minutes against your killer when you respawn."
-            : " You accept every hit, killer included.", "#94A3B8"),
+            : " You accept every hit, killer included.", C.INFO),
     ]);
 }
 
@@ -838,8 +867,8 @@ function settingsRespawn(playerId) {
         } catch (e) {}
         if (attackerIsPlayer) {
             settingsSay(playerId, [
-                ic("fa-solid fa-triangle-exclamation", "#EF4444"),
-                bold(" You are in a fight: no respawn right now.", "#EF4444"),
+                ic("fa-solid fa-triangle-exclamation", C.DANGER),
+                bold(" You are in a fight: no respawn right now.", C.DANGER),
             ]);
             return;
         }
@@ -847,9 +876,9 @@ function settingsRespawn(playerId) {
 
     if (!confirmAction(playerId, "respawn", [
         ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
-        txt(" Respawn now? ", "#CBD5E1"),
-        bold("You will die", "#EF4444"),
-        txt(" and come back at your spawn.", "#CBD5E1"),
+        txt(" Respawn now? ", C.INFO),
+        bold("You will die", C.DANGER),
+        txt(" and come back at your spawn.", C.INFO),
     ])) return;
 
     let killed = false;
@@ -861,14 +890,14 @@ function settingsRespawn(playerId) {
 
     if (!killed) {
         settingsSay(playerId, [
-            ic("fa-solid fa-circle-xmark", "#EF4444"),
-            bold(" Respawn failed. Try again in a moment.", "#EF4444"),
+            ic("fa-solid fa-circle-xmark", C.DANGER),
+            bold(" Respawn failed. Try again in a moment.", C.DANGER),
         ]);
         return;
     }
     settingsSay(playerId, [
         ic("fa-solid fa-user-clock", SETTING_RESPAWN_COLOR),
-        bold(" Respawning…", SETTING_RESPAWN_COLOR),
+        bold(" Respawning.", SETTING_RESPAWN_COLOR),
     ]);
 }
 
@@ -885,8 +914,8 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         case "set_arrows_hide": {
             const name = resolveIslandName(userInput);
             if (!name) { settingsSay(playerId, [
-                ic("fa-solid fa-circle-info", "#94A3B8"),
-                txt(" Every island is already hidden.", "#94A3B8"),
+                ic("fa-solid fa-circle-info", C.INFO),
+                txt(" Every island is already hidden.", C.INFO),
             ]); return true; }
             setIslandShown(playerId, name, false);
             return true;
@@ -894,8 +923,8 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         case "set_arrows_show": {
             const name = resolveIslandName(userInput);
             if (!name) { settingsSay(playerId, [
-                ic("fa-solid fa-circle-info", "#94A3B8"),
-                txt(" Every island is already shown.", "#94A3B8"),
+                ic("fa-solid fa-circle-info", C.INFO),
+                txt(" Every island is already shown.", C.INFO),
             ]); return true; }
             setIslandShown(playerId, name, true);
             return true;

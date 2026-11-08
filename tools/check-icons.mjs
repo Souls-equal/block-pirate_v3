@@ -165,6 +165,8 @@ const LITERALS = new Set();
 let ATTACK_TYPE_COUNT = 0;
 /* Nombre de noms d'items declares : affiche dans le bilan. */
 let ITEM_LOOKS_COUNT = 0;
+/* Nombre de noms techniques interdits dans les textes : affiche dans le bilan. */
+let ITEM_TECH_COUNT = 0;
 
 /* ==========================================================================
    0. Les trois listes du projet doivent etre EXACTEMENT les listes officielles
@@ -630,6 +632,150 @@ if (!controlsMatch) {
 }
 
 /* ==========================================================================
+   3d. L'interface : une seule anatomie pour les messages et les boutiques
+   ==========================================================================
+   Le jeu parle au joueur par trois canaux seulement : le chat (say/shout), les
+   cartes de boutique, et les deux textes colles a l'ecran (sidebar, milieu).
+   Ces trois canaux ont UNE forme, verifiee ici :
+
+     - un message commence par une ICONE (sa couleur dit le role : rouge =
+       erreur, vert = succes, or = argent, cyan = quete) ;
+     - une carte de boutique a une image, un titre, une description qui
+       commence par une icone, et un texte de bouton ;
+     - aucun texte montre au joueur ne contient le NOM TECHNIQUE d'un item
+       renomme (« Black Carpet » au lieu de « Haki Fragment »).
+
+   Sans ca, chaque nouveau message invente sa presentation : c'est exactement
+   ce qui s'etait passe (messages sans icone, reponses en texte nu). */
+
+/* Les arguments de premier niveau d'un appel, separes par les virgules qui ne
+   sont ni dans une chaine, ni dans un tableau/objet. */
+function topLevelArgs(body) {
+    const out = [];
+    let depth = 0;
+    let start = 0;
+    let i = 0;
+    while (i < body.length) {
+        const ch = body[i];
+        if (ch === '"') {
+            i++;
+            while (i < body.length && body[i] !== '"') {
+                if (body[i] === "\\") i++;
+                i++;
+            }
+        } else if (ch === "(" || ch === "[" || ch === "{") depth++;
+        else if (ch === ")" || ch === "]" || ch === "}") depth--;
+        else if (ch === "," && depth === 0) {
+            out.push(body.slice(start, i));
+            start = i + 1;
+        }
+        i++;
+    }
+    out.push(body.slice(start));
+    return out;
+}
+
+/* Le corps d'un appel : de la parenthese ouvrante a la fermante correspondante,
+   chaines comprises. */
+function callBody(src, openIndex) {
+    let depth = 1;
+    let i = openIndex + 1;
+    while (i < src.length && depth > 0) {
+        const ch = src[i];
+        if (ch === '"') {
+            i++;
+            while (i < src.length && src[i] !== '"') {
+                if (src[i] === "\\") i++;
+                i++;
+            }
+        } else if (ch === "(" || ch === "[" || ch === "{") depth++;
+        else if (ch === ")" || ch === "]" || ch === "}") depth--;
+        i++;
+    }
+    return src.slice(openIndex + 1, i - 1);
+}
+
+{
+    const itemSrc = readFileSync(join(ROOT, "src/gameplay/customItem.js"), "utf8");
+    const looksAt = itemSrc.indexOf("export const ITEM_LOOKS = {");
+    const looksEnd = itemSrc.indexOf("\n};", looksAt);
+    const body = itemSrc.slice(looksAt, looksEnd);
+    /* Noms TECHNIQUES a ne jamais montrer : ceux que le nom affiche ne contient
+       pas. « Boat » -> « Normal Boat » contient le mot, donc « Normal Boat »
+       reste utilisable ; « Black Carpet » -> « Haki Fragment » n'a plus rien en
+       commun, donc le nom technique est interdit dans un texte. */
+    const forbidden = [];
+    const reEntry = /"([^"]+)"\s*:\s*\{([^{}]*)\}/g;
+    let entry;
+    while ((entry = reEntry.exec(body))) {
+        const shown = /displayName:\s*"([^"]*)"/.exec(entry[2]);
+        if (shown && shown[1].indexOf(entry[1]) === -1) forbidden.push([entry[1], shown[1]]);
+    }
+    ITEM_TECH_COUNT = forbidden.length;
+
+    const MESSAGE_CALL = /\b(say|shout)\s*\(/g;
+    const SHOP_CALL = /\b(createShopItem|createShopItemForPlayer|updateShopItemForPlayer)\s*\(/g;
+    for (const file of files) {
+        const src = readFileSync(file, "utf8");
+        const where = relative(ROOT, file);
+        let m;
+        while ((m = MESSAGE_CALL.exec(src))) {
+            /* say(pid, [ … ]) : le message est le premier argument qui est un
+               tableau. Les autres formes (message construit a la main, appele
+               par un helper) ne sont pas inspectables ici. */
+            const raw = callBody(src, m.index + m[0].length - 1);
+            const args = topLevelArgs(raw).map((a) => a.trim()).filter((a) => a.charAt(0) === "[")[0];
+            if (!args) continue;
+            checked++;
+            /* Exception documentee : les tags du STAFF (« [Admin] », « [Owner] »)
+               sont un prefixe de moderation, pas un message de jeu. */
+            const first = /^\[\s*([A-Za-z_$][\w$]*)\s*\(/.exec(args);
+            const token = first ? first[1] : "";
+            const staff = /^\[\s*(bold|txt)\(\s*"\[/.test(args);
+            if (token !== "ic" && !staff)
+                errors.push(where + " : message " + m[1] + "() sans icone en tete");
+            for (const [tech, shown] of forbidden) {
+                if (args.indexOf('"' + tech) === -1) continue;
+                errors.push(where + " : le texte dit \"" + tech + "\" (nom technique) au lieu de \"" + shown + "\"");
+            }
+        }
+        while ((m = SHOP_CALL.exec(src))) {
+            const args = callBody(src, m.index + m[0].length - 1);
+            const at = args.indexOf("{");
+            if (at < 0) continue;
+            const obj = callBody(args, at);
+            /* `image` est le nom REEl de l'item dessine dans la case : c'est la
+               seule place ou le nom technique a le droit d'apparaitre. */
+            const text = obj.replace(/image:[^,\n]*/g, "");
+            checked++;
+            /* `updateShopItemForPlayer` ne renvoie qu'un fragment (la
+               description) : il ne peut pas porter les autres champs. */
+            if (m[1] !== "updateShopItemForPlayer") {
+                for (const key of ["image", "customTitle", "description"]) {
+                    if (obj.indexOf(key + ":") === -1)
+                        errors.push(where + " : carte de boutique sans " + key + " (" + m[1] + ")");
+                }
+                /* Le code de Bloxd est minifie par endroits : `canBuy:!1` est
+                   la meme chose que `canBuy: false`. */
+                const notBuyable = /canBuy\s*:\s*(false|!1|0)/.test(obj);
+                if (!notBuyable && obj.indexOf("buyButtonText:") === -1)
+                    errors.push(where + " : carte achetable sans buyButtonText (" + m[1] + ")");
+            }
+            const desc = /description:\s*\[/.exec(obj);
+            if (desc) {
+                const after = obj.slice(desc.index + desc[0].length).trimStart();
+                if (after.indexOf("ic(") !== 0)
+                    errors.push(where + " : description de carte qui ne commence pas par une icone");
+            }
+            for (const [tech, shown] of forbidden) {
+                if (text.indexOf('"' + tech) === -1) continue;
+                errors.push(where + " : carte de boutique qui dit \"" + tech + "\" au lieu de \"" + shown + "\"");
+            }
+        }
+    }
+}
+
+/* ==========================================================================
    4. Ce que safeIcon renvoie VRAIMENT
    ==========================================================================
    Le tableau de bord des icones ne suffit pas : c'est `safeIcon()` qui decide
@@ -676,3 +822,4 @@ console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_S
 console.log("  Boutons PC : dash " + entries.dash.length + " | capacites " + entries.ability.length + " | style " + entries.style.length + " (icones, touches, ids).");
 console.log("  Capacites classees : " + ATTACK_TYPE_COUNT + " (16 types d'attaque, icones verifiees).");
 console.log("  Noms d'items : " + ITEM_LOOKS_COUNT + " (nom + description, aucun renommage au give).");
+console.log("  Interface : messages a icone, cartes de boutique completes, " + ITEM_TECH_COUNT + " noms techniques interdits dans les textes.");
