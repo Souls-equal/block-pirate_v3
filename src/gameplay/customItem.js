@@ -38,12 +38,14 @@ export const ITEM_LOOKS = {
     },
 
     /* COMMANDES (demandes 76 et 77). Trois items dont le nom Bloxd ne dit rien
-       au joueur. Le code les reconnait par leur nom d'item ("Snowdash",
+       au joueur. Le code les reconnait par leur nom d'item ("Moonstone Dust",
        "Swap Orb", "Void Net") et JAMAIS par ce qui est ecrit ici : renommer
        une entree ne casse donc aucun test ni aucun choix de commande.
-         - Snowdash : le dash du mobile, seul moyen de dasher a l'ecran ;
+         - Moonstone Dust : le dash du mobile, seul moyen de dasher a l'ecran.
+           C'est une MATIERE (aucun effet propre) : un item qui propulse tout
+           seul ferait un second dash impossible a annuler sur mobile ;
          - Swap Orb / Void Net : ouvrent les touches du mode « boutons ». */
-    "Snowdash": {
+    "Moonstone Dust": {
         displayName: "Dash",
         description: "Click to dash forward. It costs stamina and cannot be dropped.",
     },

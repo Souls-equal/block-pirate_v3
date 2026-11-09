@@ -683,7 +683,7 @@ function createSettingsItems(playerId) {
     if (!isMobilePlayer(playerId)) {
         try {
             api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_controls", {
-                image: byButtons ? "Swap Orb" : "Snowdash",
+                image: byButtons ? "Swap Orb" : "Moonstone Dust",
                 imageColour: SETTING_CONTROLS_COLOR,
                 canBuy: true,
                 cost: 0,
