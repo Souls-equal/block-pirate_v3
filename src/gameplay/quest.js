@@ -1,6 +1,6 @@
 // quest.js
 
-import { addStat, addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data";
+import { addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data";
 import { updateSidebar } from "../core/UI";
 import { computeQuestReward, spawnEnemy } from "./spawning";
 import { C, say, txt, bold, ic } from "../core/theme";
@@ -719,31 +719,3 @@ export function saveQuest(playerId, quest, progress) {
     setStat(playerId, "questProgress", progress || 0);
 }
 
-export function loadQuest(playerId) {
-    return {
-        id: getStat(playerId, "questId", null),
-        progress: getStat(playerId, "questProgress", 0)
-    };
-}
-
-/* RESET / CANCEL */
-export function resetQuest(playerId) {
-    const quest = playerQuest[playerId];
-    const qid = quest ? quest.id : null;
-
-    delete playerQuest[playerId];
-    delete questProgress[playerId];
-
-    deleteStat(playerId, "questId");
-    deleteStat(playerId, "questProgress");
-
-    if (qid) {
-        try { api.clearDirectionArrow(playerId, qid); } catch (e) {}
-    }
-
-    say(playerId, [
-        ic("fa-solid fa-xmark", C.DANGER),
-        bold(" QUEST cancelled.", C.DANGER),
-    ]);
-    updateSidebar(playerId);
-}

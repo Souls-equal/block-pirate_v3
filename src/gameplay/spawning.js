@@ -1,7 +1,6 @@
 //spawning.js
 
-import { updateSidebar } from "../core/UI";
-import { addStat, addXP, changeMoney, getStat, setStat, xpToNext } from "../utils/data";
+import { addXP, changeMoney, getStat } from "../utils/data";
 import { C, say, txt, bold, ic } from "../core/theme";
 import { forgetBossMob, rollMobLoot } from "./loot";
 import { playerIdForDbId } from "../utils/killAttribution";
@@ -53,8 +52,6 @@ export function computeQuestReward(killAmount, level, rank) {
 }
 
 const mobData = {};
-/* export pour debug / fix */
-export function _getMobDataMap(){ return mobData; }
 
 /* Un mob despawné n'est plus lisible (getEntityName / getMobSetting throw),
    or l'event de kill peut arriver APRÈS onMobDespawned. On garde donc les

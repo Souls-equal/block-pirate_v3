@@ -95,8 +95,6 @@ function hk_puff(pid, on) {
     try { api.broadcastSound("cannonFire3", on ? 0.55 : 0.3, on ? 1.5 : 1.9, { playerIdOrPos: pid, maxHearDist: 22 }) } catch (e) {}
 }
 
-export function isArmamentHakiActive(pid) { return hkArmed[pid] === 1 }
-
 export function setArmamentHaki(pid, on) {
     if (!hk_has(pid)) return false;
     if (on && !hasArmamentHaki(pid)) return false;
@@ -105,12 +103,6 @@ export function setArmamentHaki(pid, on) {
     hk_look(pid, !!on);
     hk_puff(pid, !!on);
     return true;
-}
-
-export function resetArmamentHakiVisual(pid) {
-    if (!hk_has(pid)) return false;
-    delete hkArmed[pid];
-    return hk_look(pid, false);
 }
 
 export function hakiBoost(attackerId, amt) {

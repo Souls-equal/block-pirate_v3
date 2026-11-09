@@ -224,13 +224,6 @@ export function trySpendStamina(playerId, amount) {
     return true;
 }
 
-export function addStamina(playerId, amount) {
-    const p = ensureState(playerId);
-    p.st = Math.min(getMaxFor(p), p.st + amount);
-    syncAirJumpGate(playerId);
-    notify(playerId);
-}
-
 /* HOOKS (appelés depuis index.js) */
 export function staminaJoin(playerId) {
     players[playerId] = { st: STAMINA_CONFIG.max, lastSpend: 0, bonusMax: 0, lastDisp: null,

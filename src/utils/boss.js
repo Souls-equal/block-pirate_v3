@@ -449,11 +449,6 @@ export function disarmBossGate(mobId) {
   return true;
 }
 
-export function bossGateForTest(mobId) {
-  const g = mobId ? GATES[mobId] : null;
-  return g ? { max: g.max, tiers: g.tiers.slice(), until: g.until } : null;
-}
-
 function bossNameOf(mobId) {
   let name = null;
   try { name = api.getMobSetting(mobId, "name", false); } catch (e) { name = null; }

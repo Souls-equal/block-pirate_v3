@@ -117,15 +117,6 @@ export function blockKillCredit(targetId) {
     return true;
 }
 
-/* Meme chose pour une liste d'ids (le clear ramasse mobs et entites d'un
-   coup). Renvoie le nombre de cibles verrouillees. */
-export function blockKillCreditAll(ids) {
-    if (!ids || !ids.length) return 0;
-    let n = 0;
-    for (let i = 0; i < ids.length; i++) if (blockKillCredit(ids[i])) n++;
-    return n;
-}
-
 export function releaseKill(targetId) {
     const e = CLAIMED[targetId];
     if (e && e.credited) return;

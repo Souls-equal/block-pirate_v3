@@ -160,18 +160,6 @@ export function isOwner(playerId) {
     return getPermissionLevel(playerId) >= PERMISSION_LEVELS.OWNER;
 }
 
-export function isAdmin(playerId) {
-    return getPermissionLevel(playerId) >= PERMISSION_LEVELS.ADMIN;
-}
-
-export function isDev(playerId) {
-    return getPermissionLevel(playerId) >= PERMISSION_LEVELS.DEV;
-}
-
-export function isMod(playerId) {
-    return getPermissionLevel(playerId) >= PERMISSION_LEVELS.MOD;
-}
-
 /* Droit de LECTURE de tous les canaux (moderation). Il ne donne jamais le
    droit d'ecrire dans un canal dont on n'est pas membre (voir handleChat). */
 export function canReadAllChannels(playerId) {

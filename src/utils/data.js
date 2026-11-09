@@ -382,11 +382,6 @@ export function addXP(playerId, amount){
     }
 }
 
-/* GET LEVEL */
-export function getLevel(playerId){
-    return getStat(playerId, "lvl", 1);
-}
-
 /* SET LEVEL */
 export function setLevel(playerId, newLevel, resetXP = true){
     newLevel = Math.max(1, Math.floor(newLevel));

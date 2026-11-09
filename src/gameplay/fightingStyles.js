@@ -625,7 +625,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_combat_smash",
                 name: "Ground Smash",
                 itemType: "Orange Paintball Explosive Item",
-                legacyItemType: "Orange Sticky Paintball Explosive Item",
                 cooldown: 6500,
                 description: "Smash the ground with both fists, blasting and launching all nearby enemies.",
                 handler: onPlayerClickCombatSmash,
@@ -634,7 +633,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_combat_grab",
                 name: "Grapple Rush",
                 itemType: "Brown Paintball Explosive Item",
-                legacyItemType: "Red Quick Paintball Explosive Item",
                 cooldown: 8500,
                 description: "Dash forward, grab an enemy in your path and slam them down with a heavy overhead punch.",
                 handler: onPlayerClickCombatGrab,
@@ -653,7 +651,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_dark_flying_kick",
                 name: "Flying Kick",
                 itemType: "Black Paintball Explosive Item",
-                legacyItemType: "Black Quick Paintball Explosive Item",
                 cooldown: 6500,
                 description: "Leap forward in a blazing curved trajectory and unleash a massive kick upon landing.",
                 handler: onPlayerClickFlyingKick,
@@ -662,7 +659,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_dark_breakdance",
                 name: "Breakdance",
                 itemType: "Purple Paintball Explosive Item",
-                legacyItemType: "Orange Seeking Paintball Explosive Item",
                 cooldown: 9000,
                 description: "Spin upside-down on your hands, damaging and knocking back all enemies around you.",
                 handler: onPlayerClickBreakdance,
@@ -681,7 +677,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_electric_stomp",
                 name: "Stomp",
                 itemType: "Yellow Paintball Explosive Item",
-                legacyItemType: "Yellow Sticky Paintball Explosive Item",
                 cooldown: 8000,
                 description: "Launch into the air, slam back into the ground and trigger a large electric explosion.",
                 handler: onPlayerClickElectricStomp,
@@ -690,7 +685,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_electric_tackle",
                 name: "Electrical Tackle",
                 itemType: "Lime Sticky Paintball Explosive Item",
-                legacyItemType: "Cyan Quick Paintball Explosive Item",
                 cooldown: 9500,
                 description: "Dash forward leaving a high-voltage electric trail for 6s that shocks foes every 1s.",
                 handler: onPlayerClickElectricTackle,
@@ -709,7 +703,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_water_steam_fist",
                 name: "Steam-Charged Fist",
                 itemType: "Blue Paintball Explosive Item",
-                legacyItemType: "Blue Sticky Paintball Explosive Item",
                 cooldown: 8000,
                 description: "Fire a wide hydro-steam beam that drags foes into a massive knockback explosion at the end.",
                 handler: onPlayerClickSteamFist,
@@ -718,7 +711,6 @@ export const FIGHTING_STYLES = {
                 id: "fs_water_deadly_shower",
                 name: "Deadly Shower",
                 itemType: "Light Gray Seeking Paintball Explosive Item",
-                legacyItemType: "Light Blue Seeking Paintball Explosive Item",
                 cooldown: 9000,
                 description: "Shoot a focused water beam that calls down a rapid torrential barrage on the target zone.",
                 handler: onPlayerClickDeadlyShower,
@@ -1095,15 +1087,6 @@ export function handleFightingStyleClick(playerId, rightClick, x, y, z, blockNam
             if (style.abilities[i].itemType === itemName) {
                 matched = style.abilities[i];
                 break;
-            }
-        }
-        if (!matched) {
-            for (let i = 0; i < style.abilities.length; i++) {
-                const ab = style.abilities[i];
-                if (ab.legacyItemType && ab.legacyItemType === itemName) {
-                    matched = ab;
-                    break;
-                }
             }
         }
     }

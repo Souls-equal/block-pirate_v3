@@ -1022,6 +1022,3 @@ export const onPlayerClickDragonTwister = shim("onPlayerClickDragonTwister");
 export const onPlayerClickDraconicAscent = shim("onPlayerClickDraconicAscent");
 
 loader = createBlockLoader({ helpers: HELPERS, expected: EXPECTED, log });
-export const reloadFruitBlocks = loader.reload;
-export const fruitBlocksStatus = loader.status;
-export const logFruitBlocksStatus = loader.logStatus;
