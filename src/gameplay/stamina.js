@@ -23,6 +23,41 @@ export const STAMINA_CONFIG = {
 /* ÉTAT PAR JOUEUR */
 const players = {};
 
+/* UN JOUEUR PEUT PARTIR AU MILIEU D'UN TICK. Toute fonction de l'API qui prend
+   un playerId leve alors une ApiError (« player not found »), y compris
+   setClientOptions sur un joueur deconnecte. C'est un evenement NORMAL, pas un
+   bug : on ne le loggue pas (sinon un depart, ou une capacite utilisee juste
+   avant de partir, remplit la console). On verifie donc la presence avec une
+   liste rafraichie au plus toutes les 250 ms, et on ignore en silence.
+
+   `isOnline()` renvoie true si la liste n'est pas lisible : mieux vaut tenter
+   l'appel que bloquer un joueur vivant. */
+let onlineIds = null;
+let onlineAt = 0;
+
+function isOnline(playerId) {
+    if (!playerId) return false;
+    const now = Date.now();
+    if (!onlineIds || now - onlineAt > 250) {
+        try {
+            const ids = api.getPlayerIds() || [];
+            const set = {};
+            for (const id of ids) set[id] = true;
+            onlineIds = set;
+            onlineAt = now;
+        } catch (e) {
+            onlineIds = null;
+        }
+    }
+    if (!onlineIds) return true;
+    return onlineIds[playerId] === true;
+}
+
+/* Derniere valeur d'airJumpCount envoyee a chaque joueur : on n'appelle
+   setClientOptions que si elle change vraiment (un appel par tick et par
+   joueur pour rien etait la principale source d'erreurs). */
+const gateValue = {};
+
 let lastTickAt = 0;
 let loopTimer = null;
 let displayHook = null;
@@ -49,8 +84,11 @@ function notify(playerId, force) {
     const key = dispKey(p);
     if (!force && key === p.lastDisp) return;
     p.lastDisp = key;
+    if (!isOnline(playerId)) return;
+    /* La sidebar peut echouer une fois (chunk pas encore charge au join) : on
+       reessaie, mais on n'ecrit rien dans la console — le tick suivant suffit. */
     try { displayHook(playerId); }
-    catch (e) { try { api.log("[stamina] sidebar hook error: " + e); } catch (e2) {} }
+    catch (e) {}
 }
 
 function airJumpsForMax(max) {
@@ -61,11 +99,20 @@ function airJumpsForMax(max) {
 }
 
 function syncAirJumpGate(playerId) {
+    if (!playerId) return;
     const p = players[playerId];
     let allow = (!p || p.st > 0) ? airJumpsForMax(getMaxFor(p)) : 0;
     allow = safeInt(allow, 0, 50);
-    try { api.setClientOptions(playerId, { airJumpCount: allow }); }
-    catch (e) { try { api.log("[stamina] gate error (" + allow + "): " + e); } catch (e2) {} }
+    if (gateValue[playerId] === allow) return;
+    if (!isOnline(playerId)) return;
+    try {
+        api.setClientOptions(playerId, { airJumpCount: allow });
+        gateValue[playerId] = allow;
+    } catch (e) {
+        /* Joueur parti, ou client pas encore pret : on reessaiera au prochain
+           changement de stamina. Aucun log. */
+        delete gateValue[playerId];
+    }
 }
 
 function ensureState(playerId) {
@@ -89,11 +136,12 @@ function startImpulseLoop() {
     if (loopTimer) return;
     loopTimer = setInterval(() => {
         if (!STAMINA_CONFIG.enabled) return;
-        let ids = [];
-        try { ids = api.getPlayerIds() || []; } catch (e) { return; }
 
-        for (const pid of ids) {
-            if (!players[pid]) continue;
+        /* On parcourt NOTRE etat, pas api.getPlayerIds() : un joueur qui vient
+           de partir est encore dans la liste du moteur pendant un tick, et
+           chaque appel le concernant leverait une ApiError. */
+        for (const pid in players) {
+            if (!isOnline(pid)) { delete players[pid]; continue; }
             const p = players[pid];
 
             let vy = null;
@@ -187,6 +235,11 @@ export function addStamina(playerId, amount) {
 export function staminaJoin(playerId) {
     players[playerId] = { st: STAMINA_CONFIG.max, lastSpend: 0, bonusMax: 0, lastDisp: null,
                           prevVy: null, prevAir: false, armed: true };
+    delete gateValue[playerId];
+    /* Le joueur vient d'arriver : la liste des presents en cache ne le connait
+       peut-etre pas encore (elle vit 250 ms). */
+    onlineIds = null;
+    onlineAt = 0;
     startImpulseLoop();
     syncAirJumpGate(playerId);
     notify(playerId, true);
@@ -195,6 +248,11 @@ export function staminaJoin(playerId) {
 export function staminaLeave(playerId) {
     delete players[playerId];
     delete dashUntil[playerId];
+    delete gateValue[playerId];
+    /* La liste des joueurs en ligne est perimee : on la relit au prochain
+       appel plutot que de garder un partant dedans. */
+    onlineIds = null;
+    onlineAt = 0;
 }
 
 export function tickStamina() {
@@ -203,9 +261,9 @@ export function tickStamina() {
     if (now - lastTickAt < STAMINA_CONFIG.tickMs) return;
     lastTickAt = now;
 
-    for (const playerId of api.getPlayerIds()) {
+    for (const playerId in players) {
         const p = players[playerId];
-        if (!p) continue;
+        if (!isOnline(playerId)) { delete players[playerId]; continue; }
         const max = getMaxFor(p);
         if (p.st >= max) continue;
         if (now - p.lastSpend < STAMINA_CONFIG.regenDelayMs) continue;
@@ -313,15 +371,14 @@ function dashAnim(playerId) {
    de stamina. « Moonstone Dust » (une matiere, donc sans effet) ne fait rien
    par lui-meme : seul notre dash existe, avec son cout et son animation.
 
+   L'item est a USAGE UNIQUE et n'est jamais rendu au joueur : un ancien
+   « Snowdash » qui traine dans un inventaire ou dans le Moonstone Chest est
+   du reliquat sans effet (il ne declenche plus rien), on ne le ramasse pas.
+
    L'item n'est jamais nomme au moment du give : son nom et sa description
    viennent de ITEM_LOOKS, dans gameplay/customItem.js (regle de la demande 63). */
 
 export const DASH_ITEM = "Moonstone Dust";
-
-/* Ancien item de dash. Il ne peut pas etre lache (onPlayerDropItem le refuse)
-   et ne sert plus a rien : sans ce balayage, chaque ancien joueur garderait un
-   slot occupe pour toujours, inventaire ET Moonstone Chest. */
-const LEGACY_DASH_ITEM = "Snowdash";
 
 const DASH_RETRY_TICKS = 100; // ~5 s
 const DASH_RETRY_MAX = 60;    // ~5 min
@@ -335,28 +392,6 @@ export function dashItemAmount(playerId) {
 
 export function hasDashItem(playerId) {
     return dashItemAmount(playerId) > 0;
-}
-
-/* Retire les anciens items de dash, ou qu'ils soient. Appele au join : un
-   joueur qui revient d'une version precedente ne garde pas de relique. */
-export function dropLegacyDashItem(playerId) {
-    let dropped = 0;
-    for (let slot = 0; slot < 51; slot++) {
-        let item = null;
-        try { item = api.getItemSlot(playerId, slot); } catch (e) { item = null; }
-        if (!item || item.name !== LEGACY_DASH_ITEM) continue;
-        try { api.setItemSlot(playerId, slot, "Air"); dropped++; } catch (e) {}
-    }
-    let chest = null;
-    try { chest = api.getMoonstoneChestItems(playerId); } catch (e) { chest = null; }
-    if (chest && chest.length) {
-        for (let slot = 0; slot < chest.length; slot++) {
-            const item = chest[slot];
-            if (!item || item.name !== LEGACY_DASH_ITEM) continue;
-            try { api.setMoonstoneChestItemSlot(playerId, slot, "Air"); dropped++; } catch (e) {}
-        }
-    }
-    return dropped;
 }
 
 /* Bloxd ne signale pas un inventaire plein : on verifie donc la presence. */

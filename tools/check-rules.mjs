@@ -573,36 +573,62 @@ const installed = await (async () => {
     check(stamina.handleDashItemClick("pDash", "Snowdash") === false, "item de dash : l'ancien item declenche encore un dash");
     check(stamina.handleDashItemClick("pDash", "Moonstone Dust") === true, "item de dash : le clic sur l'item ne declenche pas le dash");
 
-    /* Balayage : l'ancien item disparait, les autres restent. */
-    const inv = [
-        { name: "Snowdash", amount: 1 },
-        { name: "Moonstone Dust", amount: 3 },
-        { name: "Stone Sword", amount: 1 },
-    ];
-    const chest = [
-        { name: "Snowdash", amount: 1 },
-        { name: "Boat", amount: 1 },
-    ];
-    const cleared = [];
-    installApi({
-        getItemSlot: (pid, slot) => inv[slot] || null,
-        setItemSlot: (pid, slot, name) => {
-            cleared.push({ where: "inventory", slot, name });
-            inv[slot] = name === "Air" ? null : { name };
-        },
-        getMoonstoneChestItems: () => chest,
-        setMoonstoneChestItemSlot: (pid, slot, name) => {
-            cleared.push({ where: "moonstone", slot, name });
-            chest[slot] = name === "Air" ? null : { name };
-        },
-    });
-    const removed = stamina.dropLegacyDashItem("pDash");
-    check(removed === 2, `item de dash : ${removed} ancien(s) item(s) retire(s) au lieu de 2`);
-    check(!inv.some((it) => it && it.name === "Snowdash"), "item de dash : un ancien item reste dans l'inventaire");
-    check(!chest.some((it) => it && it.name === "Snowdash"), "item de dash : un ancien item reste dans le Moonstone Chest");
-    check(inv.some((it) => it && it.name === "Moonstone Dust"), "item de dash : le balayage a retire le nouvel item");
-    check(inv.some((it) => it && it.name === "Stone Sword"), "item de dash : le balayage a touche un autre item");
-    check(cleared.length === 2, `item de dash : ${cleared.length} ecriture(s) au lieu de 2`);
+    /* L'item est a usage unique : aucun balayage des anciens items au join.
+       Un « Snowdash » residuel ne declenche plus rien (verifie dessus) et ne
+       coute donc rien de plus qu'un slot que le joueur peut jeter. */
+    check(typeof stamina.dropLegacyDashItem === "undefined", "item de dash : le balayage des anciens items est de retour");
+
+    /* ── AUCUN LOG QUAND UN JOUEUR PART ────────────────────────────────────
+       Un depart au milieu d'un tick fait lever les fonctions de l'API
+       (setClientOptions sur un joueur deconnecte, sidebar d'un joueur qui n'a
+       plus de session...). C'est normal : la stamina ne doit RIEN ecrire dans
+       la console pour autant. On compte les api.log. */
+    {
+        const logs = [];
+        let live = ["pLive"];
+        installApi({
+            log: (msg) => logs.push(String(msg)),
+            getPlayerIds: () => live.slice(),
+            getInventoryItemAmount: () => 1,
+            setClientOptions: () => {
+                /* Le moteur refuse un joueur qui n'est plus la. */
+                throw new Error("player not found");
+            },
+        });
+        stamina.setStaminaUpdateHook(() => {
+            throw new Error("sidebar: no such player");
+        });
+
+        stamina.staminaJoin("pLive");
+        stamina.trySpendStamina("pLive", 13);
+        stamina.tickStamina();
+
+        /* Maintenant il part : plus personne dans la liste du moteur, mais son
+           etat est encore la le temps d'un tick. */
+        live = [];
+        stamina.trySpendStamina("pLive", 13);
+        stamina.tickStamina();
+        stamina.staminaLeave("pLive");
+
+        check(logs.length === 0, `stamina : ${logs.length} log(s) pendant un depart (${logs[0] || ""})`);
+        stamina.setStaminaUpdateHook(null);
+    }
+
+    /* ── LA PORTE DES AIR-JUMPS N'EST ENVOYEE QUE SI ELLE CHANGE ───────────
+       C'etait l'appel le plus frequent du jeu (a chaque changement de
+       stamina) : sans cache, une seule erreur de l'API se repetait sans fin. */
+    {
+        const calls = [];
+        installApi({
+            getPlayerIds: () => ["pGate"],
+            setClientOptions: (pid, opts) => calls.push(opts.airJumpCount),
+        });
+        stamina.staminaJoin("pGate");
+        check(calls.length === 1, `stamina : ${calls.length} envoi(s) de airJumpCount au join au lieu de 1`);
+        stamina.trySpendStamina("pGate", 13);
+        check(calls.length === 1, "stamina : airJumpCount renvoye alors qu'il n'a pas change");
+        stamina.staminaLeave("pGate");
+    }
 }
 
 /* ==========================================================================
