@@ -529,6 +529,20 @@ function saveHiddenIslands(playerId, hidden) {
     catch (e) { return false; }
 }
 
+/* Une ile est-elle visible pour ce joueur ? Sert au panneau ET a l'ancien
+   format d'items (un bouton par ile, voir handleSettingsShop). */
+function islandArrowVisible(playerId, name) {
+    if (!islandArrowsEnabled(playerId)) return false;
+    return !hiddenIslands(playerId)[islandTheme(name).code];
+}
+
+/* Cle de l'ancien format : un item par ile ("isle_ju"). On garde la lecture :
+   un client qui a encore ces items en boutique doit pouvoir cliquer dessus,
+   sinon le clic ne fait rien du tout. Aucun nouvel item n'est cree avec. */
+function islandItemKey(name) {
+    return "isle_" + islandTheme(name).code.toLowerCase();
+}
+
 /* Les deux listes du panneau : ce qui est affiche, ce qui est cache. */
 function shownIslandNames(playerId) {
     const all = islandArrowsEnabled(playerId);
@@ -951,6 +965,17 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         case "set_controls": toggleControlMode(playerId); return true;
         case "set_info": createSettingsItems(playerId); return true;
         default: break;
+    }
+
+    /* ANCIENNE UI : le panneau a deja eu un item par ile ("isle_ju", "isle_pv").
+       Un client qui les affiche encore doit obtenir le meme effet qu'avant :
+       on bascule l'ile au lieu de laisser le clic sans reponse. Les items
+       actuels (set_arrows_show / set_arrows_hide) ne passent jamais ici. */
+    for (const name of islandNames()) {
+        if (islandItemKey(name) === itemKey) {
+            setIslandShown(playerId, name, !islandArrowVisible(playerId, name));
+            return true;
+        }
     }
 
     return false;

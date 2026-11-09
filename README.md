@@ -2217,7 +2217,7 @@ Le code ne contient plus rien qui ne serve au jeu tel qu'il tourne aujourd'hui.
 | Ce qui a été retiré | Pourquoi |
 | --- | --- |
 | Pseudos écrits en dur (`K4miNoK4mi`, `Yanick2010`, `EPICOO00000`, `Chillguy45`) | Un pseudo n'est pas une règle : trois exemptions traînaient dans `index.js` (commandes, changement de bloc), une dans `UI.js` (vol rapide), une dans `admin.js` (débannissement automatique). |
-| Migration des anciens items au join | Fruits, armes d'équipe, paintballs, ancien format d'îles : plus aucune table d'anciens noms. |
+| Migration des anciens items au join | Fruits, armes d'équipe, paintballs : plus aucune table d'anciens noms. |
 | Exports que personne n'appelait | Une trentaine, dont les helpers de debug (`_getMobDataMap`, `bossGateForTest`, `fruitBlocksStatus`, `reloadFruitBlocks`). |
 
 Ce qui reste, et pourquoi :
@@ -2233,6 +2233,12 @@ Ce qui reste, et pourquoi :
 - **Les rangs** restent dans `RANKS` / `STAFF` (`core/ranks.js`), une seule table. C'est le
   seul endroit où un pseudo apparaît, et c'est une donnée, pas une exception dans une
   condition.
+- **L'ancienne UI du panneau Settings est conservée.** Le panneau a déjà eu un item par
+  île (`isle_ju`, `isle_pv`…). Ces items ne sont plus créés, mais un client qui les a
+  encore en boutique doit pouvoir cliquer dessus : `handleSettingsShop` reconnaît encore
+  leurs clés et bascule l'île, exactement comme les items actuels
+  (`set_arrows_show` / `set_arrows_hide`). Supprimer cette lecture laissait le clic sans
+  réponse — d'où le test de régression dans `check-rules`.
 
 `npm run check-rules` refuse désormais un pseudo de la table `STAFF` recopié ailleurs :
 ajouter une exemption par nom fait échouer la CI.
