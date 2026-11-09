@@ -15,7 +15,7 @@ import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { isBossMob as isBossMob } from "./gameplay/loot";
 import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { STAMINA_CONFIG as tt, DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, ensureDashItem as ensureDash, handleDashItemClick as dashItemClick, hasDashItem as hasDash, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { STAMINA_CONFIG as tt, DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, dropLegacyDashItem as dropOldDash, ensureDashItem as ensureDash, handleDashItemClick as dashItemClick, hasDashItem as hasDash, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { claimKill as mt, creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -200,8 +200,9 @@ ct((t, r, a) => {
             RETIRES de l'inventaire : ils ne servent plus a rien et
             encombraient 5 slots.
    MOBILE : pas de clavier, donc pas de boutons. Les items de capacites
-            restent, et un item « Snowdash » sert de dash (son effet par
-            defaut est annule dans onPlayerAltAction, voir plus bas).
+            restent, et un item « Moonstone Dust » (une matiere inerte) sert
+            de dash : son clic est traite par onPlayerClick, et son action
+            secondaire est refusee dans onPlayerAltAction.
 
    Les keycodes sont ceux du clavier QWERTY ; Bloxd remappe tout seul pour un
    AZERTY (c'est la meme touche physique).
@@ -390,7 +391,12 @@ onPlayerSelectInventorySlot = (t, slot) => {
        capacite). Lire api.isMobile plus tard donnerait « PC » a tout le monde. */
     Gt("device", () => setupDevice(t)),
     Qt(t), Gt("fruit", () => y(t)), Gt("codes", () => X(t)), Gt("admin", () => Rt(t)),
-    Gt("haki", () => Ht(t)), Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
+    Gt("haki", () => Ht(t)),
+    /* L'item de dash a change de nom : les anciens (« Snowdash ») sont retires
+       avant que les items ne soient relus, sinon ils gardent un slot pour
+       toujours (ils ne peuvent pas etre laches). */
+    Gt("dashMigration", () => dropOldDash(t)),
+    Gt("items", () => z(t)), Gt("joinUI", () => M(t)),
     Gt("nametag", () => m(t)), Gt("weapons", () => i(t)), Gt("chat", () => e(t)),
     Gt("leaderboard", () => S(t)), Gt("sidebar", () => K(t)), Gt("quest", () => T(t)), Gt("saber", () => spJoin(t)),
     Gt("crew", () => o(t)), Gt("stamina", () => at(t)), Gt("initStats", () => Q(t)),
@@ -525,10 +531,11 @@ onPlayerStartChargingItem = (t, itemName) => {
     } catch (e) {
         m = null;
     }
-    /* L'item de dash (mobile). « Snowdash » propulse deja le joueur : on annule
-       cet effet par defaut avec preventAction, et on fait NOTRE dash (cout en
-       stamina, animation, verrou anti-coup de poing). Sur PC cet item est
-       retire ; un item residuel ne doit pas propulser non plus. */
+    /* L'item de dash. « Moonstone Dust » n'a aucun effet propre : preventAction
+       n'annule donc rien d'utile, il empeche seulement de le lancer (ou de
+       l'utiliser) par erreur. Le dash, lui, vient de notre code : cout en
+       stamina, animation, verrou anti-coup de poing. Sur PC cet item est
+       retire ; un item residuel ne doit rien declencher non plus. */
     let held = null;
     try { held = api.getHeldItem(t); } catch (e) { held = null; }
     const heldItem = held && held.name;

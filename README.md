@@ -819,7 +819,7 @@ ici créerait le cycle `customItem → data`).
 | Item technique | Nom affiché | Description |
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
-| `Snowdash` | **Dash** | le dash du mobile |
+| `Moonstone Dust` | **Dash** | le dash du mobile (matière inerte, aucun effet propre) |
 | `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
 | `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
@@ -2024,7 +2024,7 @@ comportement historique.
 | **Mobile** | item **`Dash`** | un item par capacité | M1 à main nue |
 
 - **Le mobile n'a pas le choix** : pas de clavier, donc jamais de boutons, et le
-  dash passe **toujours** par l'item (`Snowdash`, affiché **`Dash`** avec sa
+  dash passe **toujours** par l'item (`Moonstone Dust`, affiché **`Dash`** avec sa
   description dans `ITEM_LOOKS`). Un réglage en base ne le change pas, et
   l'item de Settings n'est même pas créé sur un écran tactile.
 - **La bascule est immédiate** : `setControlMode()` écrit la clé `ctl`, puis
@@ -2068,10 +2068,13 @@ partage rien.
 
 Trois détails qui comptent :
 
-1. **`Snowdash` garde son effet par défaut ?** Non : son clic (`onPlayerClick`)
-   comme son action secondaire (`onPlayerAltAction`) renvoie `preventAction` et
-   appelle **notre** `tryDash` — coût en stamina, animation, verrou anti-coup de
-   poing. C'est le même dash que sur PC, pas le propulseur de Bloxd.
+1. **L'item de dash n'a aucun effet propre.** C'est une **matière**
+   (`Moonstone Dust`) : son clic (`onPlayerClick`) appelle **notre** `tryDash` —
+   coût en stamina, animation, verrou anti-coup de poing — et son action
+   secondaire (`onPlayerAltAction`) est refusée. C'était tout l'intérêt du
+   changement : `Snowdash` propulsait le joueur **de lui-même**, et sur mobile ce
+   dash-là ne peut pas être annulé, d'où un second dash gratuit. Les anciens
+   items `Snowdash` sont retirés au join (inventaire **et** Moonstone Chest).
 2. **Le `Void Net` fait le coup de poing.** En main, `onPlayerClick` appelle
    directement `handleFightingStyleM1(…, allowHeldItem = true)` : le filet
    n'empêche pas le M1 du style, il le déclenche. Sans lui, la main nue fait le

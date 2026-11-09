@@ -302,14 +302,26 @@ function dashAnim(playerId) {
 /* ── DASH : une touche sur PC, un item sur mobile (demande 75) ───────────────
    PC     : bouton personnalise « dash » (api.setClientOption customButtons,
             KeyQ) -> onPlayerPressedButton -> tryDash.
-   MOBILE : l'item Bloxd « Snowdash » propulse deja le joueur vers l'avant. On
-            garde NOTRE dash (cout en stamina, animation, verrou anti-coup de
-            poing) et on annule l'effet par defaut de l'item en renvoyant
-            « preventAction » depuis onPlayerAltAction (voir index.js).
+   MOBILE : un item dans l'inventaire, tenu en main puis touche : il n'a pas de
+            clic droit, c'est le seul moyen de dasher a l'ecran. Le clic passe
+            par onPlayerClick -> handleDashItemClick -> tryDash.
+
+   L'item doit etre INERTE. « Snowdash » ne l'etait pas : il propulse le joueur
+   tout seul, et sur mobile ce dash-la ne peut pas etre annule (le
+   « preventAction » d'onPlayerAltAction n'arrete que l'action secondaire, pas
+   l'effet de l'item). Le joueur partait donc deux fois, ou partait sans payer
+   de stamina. « Moonstone Dust » (une matiere, donc sans effet) ne fait rien
+   par lui-meme : seul notre dash existe, avec son cout et son animation.
+
    L'item n'est jamais nomme au moment du give : son nom et sa description
    viennent de ITEM_LOOKS, dans gameplay/customItem.js (regle de la demande 63). */
 
-export const DASH_ITEM = "Snowdash";
+export const DASH_ITEM = "Moonstone Dust";
+
+/* Ancien item de dash. Il ne peut pas etre lache (onPlayerDropItem le refuse)
+   et ne sert plus a rien : sans ce balayage, chaque ancien joueur garderait un
+   slot occupe pour toujours, inventaire ET Moonstone Chest. */
+const LEGACY_DASH_ITEM = "Snowdash";
 
 const DASH_RETRY_TICKS = 100; // ~5 s
 const DASH_RETRY_MAX = 60;    // ~5 min
@@ -323,6 +335,28 @@ export function dashItemAmount(playerId) {
 
 export function hasDashItem(playerId) {
     return dashItemAmount(playerId) > 0;
+}
+
+/* Retire les anciens items de dash, ou qu'ils soient. Appele au join : un
+   joueur qui revient d'une version precedente ne garde pas de relique. */
+export function dropLegacyDashItem(playerId) {
+    let dropped = 0;
+    for (let slot = 0; slot < 51; slot++) {
+        let item = null;
+        try { item = api.getItemSlot(playerId, slot); } catch (e) { item = null; }
+        if (!item || item.name !== LEGACY_DASH_ITEM) continue;
+        try { api.setItemSlot(playerId, slot, "Air"); dropped++; } catch (e) {}
+    }
+    let chest = null;
+    try { chest = api.getMoonstoneChestItems(playerId); } catch (e) { chest = null; }
+    if (chest && chest.length) {
+        for (let slot = 0; slot < chest.length; slot++) {
+            const item = chest[slot];
+            if (!item || item.name !== LEGACY_DASH_ITEM) continue;
+            try { api.setMoonstoneChestItemSlot(playerId, slot, "Air"); dropped++; } catch (e) {}
+        }
+    }
+    return dropped;
 }
 
 /* Bloxd ne signale pas un inventaire plein : on verifie donc la presence. */

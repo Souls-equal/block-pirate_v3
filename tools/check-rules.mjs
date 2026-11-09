@@ -20,6 +20,9 @@
 //   5. ZERO EMOJI. Aucun caractere pictographique dans les sources : un emoji
 //      s'affiche en carre vide ou casse la mise en page du chat. Les signes
 //      typographiques (✦, ●, ─) ne sont PAS des emoji et restent autorises.
+//   6. ITEM DE DASH. L'item du dash mobile doit etre INERTE (une matiere) : un
+//      item qui propulse tout seul fait un second dash que le mobile ne peut
+//      pas annuler. L'ancien item est retire au join, inventaire ET coffre.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -552,6 +555,57 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   6. ITEM DE DASH
+   ==========================================================================
+   Le dash mobile passe par un item tenu en main. Cet item doit etre une
+   MATIERE : « Snowdash » propulsait le joueur de lui-meme, et ce dash-la ne
+   peut pas etre annule sur mobile — le joueur partait deux fois, ou partait
+   sans payer de stamina. On verifie donc le nom retenu, le fait qu'un ancien
+   nom soit ignore, et le balayage des anciens items au join. */
+
+{
+    const stamina = await loadModules("gameplay/stamina.js");
+
+    check(stamina.DASH_ITEM === "Moonstone Dust", `item de dash : « ${stamina.DASH_ITEM} » au lieu de « Moonstone Dust »`);
+    check(stamina.DASH_ITEM !== "Snowdash", "item de dash : « Snowdash » est revenu (item qui se deplace tout seul)");
+
+    /* Le clic ne reconnait QUE l'item de dash. */
+    check(stamina.handleDashItemClick("pDash", "Snowdash") === false, "item de dash : l'ancien item declenche encore un dash");
+    check(stamina.handleDashItemClick("pDash", "Moonstone Dust") === true, "item de dash : le clic sur l'item ne declenche pas le dash");
+
+    /* Balayage : l'ancien item disparait, les autres restent. */
+    const inv = [
+        { name: "Snowdash", amount: 1 },
+        { name: "Moonstone Dust", amount: 3 },
+        { name: "Stone Sword", amount: 1 },
+    ];
+    const chest = [
+        { name: "Snowdash", amount: 1 },
+        { name: "Boat", amount: 1 },
+    ];
+    const cleared = [];
+    installApi({
+        getItemSlot: (pid, slot) => inv[slot] || null,
+        setItemSlot: (pid, slot, name) => {
+            cleared.push({ where: "inventory", slot, name });
+            inv[slot] = name === "Air" ? null : { name };
+        },
+        getMoonstoneChestItems: () => chest,
+        setMoonstoneChestItemSlot: (pid, slot, name) => {
+            cleared.push({ where: "moonstone", slot, name });
+            chest[slot] = name === "Air" ? null : { name };
+        },
+    });
+    const removed = stamina.dropLegacyDashItem("pDash");
+    check(removed === 2, `item de dash : ${removed} ancien(s) item(s) retire(s) au lieu de 2`);
+    check(!inv.some((it) => it && it.name === "Snowdash"), "item de dash : un ancien item reste dans l'inventaire");
+    check(!chest.some((it) => it && it.name === "Snowdash"), "item de dash : un ancien item reste dans le Moonstone Chest");
+    check(inv.some((it) => it && it.name === "Moonstone Dust"), "item de dash : le balayage a retire le nouvel item");
+    check(inv.some((it) => it && it.name === "Stone Sword"), "item de dash : le balayage a touche un autre item");
+    check(cleared.length === 2, `item de dash : ${cleared.length} ecriture(s) au lieu de 2`);
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 
@@ -562,5 +616,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash).`,
 );
