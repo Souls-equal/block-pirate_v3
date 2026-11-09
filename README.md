@@ -1582,6 +1582,31 @@ et il est throttlé (1 s) quand la zone entière est solide : aucun coût dans l
 Shambles utilise `ct_open` de la même façon pour sa traction — la cible s'arrête au ras du
 mur au lieu d'entrer dedans.
 
+### La stamina ne loggue jamais un départ
+
+Chaque fonction de l'API qui prend un `playerId` lève une erreur quand le joueur n'est
+plus là — `setClientOptions` compris. La stamina appelait donc `setClientOptions` à chaque
+changement de valeur (regen, dash, air-jump), sans vérifier que le joueur était encore
+connecté : un départ, ou une capacité utilisée juste avant de partir, écrivait
+`[stamina] gate error (1): …` dans la console. La sidebar, elle, pouvait échouer une fois
+au join (`[stamina] sidebar hook error: …`).
+
+Les deux logs sont **supprimés** :
+
+- la valeur d'`airJumpCount` est **mémorisée par joueur** : l'API n'est appelée que
+  lorsqu'elle change vraiment (c'était l'appel le plus fréquent du jeu) ;
+- la présence du joueur est vérifiée sur une liste rafraîchie au plus toutes les 250 ms
+  (`isOnline`), et un refus de l'API est **ignoré en silence** — il est réessayé au
+  prochain changement d'état, pas dans la console ;
+- la boucle physique et la régénération parcourent l'état des joueurs suivis au lieu de
+  `api.getPlayerIds()` : plus d'appel sur un id périmé ;
+- au leave, `staminaLeave` efface l'état, le verrou de dash, la dernière valeur de porte
+  et la liste des présents.
+
+`tools/check-rules.mjs` rejoue le départ : `setClientOptions` qui lève et sidebar qui
+échoue, puis **zéro** `api.log` attendu (mutation testée : remettre un log fait échouer la
+CI).
+
 ### Un boss ne prend AUCUN crowd control
 
 Sorti de son arène, un boss ne peut plus poursuivre personne : poser un Control Domain
@@ -2073,8 +2098,10 @@ Trois détails qui comptent :
    coût en stamina, animation, verrou anti-coup de poing — et son action
    secondaire (`onPlayerAltAction`) est refusée. C'était tout l'intérêt du
    changement : `Snowdash` propulsait le joueur **de lui-même**, et sur mobile ce
-   dash-là ne peut pas être annulé, d'où un second dash gratuit. Les anciens
-   items `Snowdash` sont retirés au join (inventaire **et** Moonstone Chest).
+   dash-là ne peut pas être annulé, d'où un second dash gratuit. L'item est à
+   **usage unique** et n'est jamais rendu : un ancien `Snowdash` qui traîne dans
+   un inventaire est un reliquat inerte (il ne déclenche plus rien), on ne le
+   ramasse pas au join.
 2. **Le `Void Net` fait le coup de poing.** En main, `onPlayerClick` appelle
    directement `handleFightingStyleM1(…, allowHeldItem = true)` : le filet
    n'empêche pas le M1 du style, il le déclenche. Sans lui, la main nue fait le
