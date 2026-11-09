@@ -192,6 +192,16 @@ export const ITEM_COLOR = {
 const KEEP_AS_IS = {};
 for (const k in ITEM_COLOR) KEEP_AS_IS[ITEM_COLOR[k].toLowerCase()] = ITEM_COLOR[k];
 
+/* Deuxieme exception, aussi assumee : les TEINTES DE LA SIDEBAR D'AVANT
+   (demande 88). Le joueur a demande de retrouver l'interface d'origine, pas
+   une version repeinte : #00BFFF (titre, quete) et #FF8C00 (niveau) etaient
+   dans la palette comme bleu clair et rouge de danger. Personne d'autre ne
+   les utilise dans le projet, donc les garder ne change rien ailleurs — ca
+   evite juste que la sidebar se recolorie toute seule au premier appel de
+   themeColor(). */
+const LEGACY_TINTS = { "#00bfff": "#00BFFF", "#ff8c00": "#FF8C00" };
+for (const k in LEGACY_TINTS) KEEP_AS_IS[k] = LEGACY_TINTS[k];
+
 /* Couleur -> couleur de la palette. Renvoie l'entree inchangee si illisible. */
 export function themeColor(value) {
     if (typeof value !== "string" || !value) return value;
