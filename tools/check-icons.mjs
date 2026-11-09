@@ -289,7 +289,7 @@ async function renderSidebar(db, tutorialLine, quest) {
     const ui = await import(url);
     ui.setTutorialLineLookup(tutorialLine ? () => tutorialLine : null);
     if (quest) {
-        ui.playerQuest.p1 = quest.id;
+        ui.playerQuest.p1 = { targetMob: quest.targetMob, killAmount: quest.killAmount, island: quest.island };
         ui.questProgress.p1 = quest.progress;
     }
     ui.updateSidebar("p1");
@@ -332,7 +332,11 @@ const RICH = {
 /* Le pire cas RÉEL : un nouveau joueur, donc objectif de tutoriel ET première
    quête en cours. C'est exactement celui qui a le moins de place et le plus
    besoin de voir sa stamina. */
-const NEWBIE = { id: "skyBandit3", progress: 3 };
+/* Objet de quete COMPLET, comme en jeu : `playerQuest[pid]` porte la quete
+   resolue, pas seulement son identifiant. Une quete sans cible rendait la
+   sidebar artificiellement plus legere (la ligne « QUEST  <cible> » manquait),
+   donc le pire cas reel n'etait jamais mesure. */
+const NEWBIE = { targetMob: ["Sky Bandit"], killAmount: 5, island: "Jungle", progress: 3 };
 const scenarios = [
     ["joueur nu", POOR, null, null],
     ["joueur charge + objectif de tutoriel", RICH, "Buy your first weapon at the Combat Teacher", null],
@@ -438,14 +442,23 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
     const lvlAt = at("LVL");
     const moneyAt = at("");
 
-    /* 1. Le titre est le premier bloc quand il tient dans le budget. */
-    if (sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("BLOCK PIRATES") !== -1)) {
+    /* 1. Le titre : PREMIER bloc, et ECRIT EN GROS (demande 88 — « celle ou il
+          y avait BlockPirate ecrit en gros en haut »). Il ne doit plus etre le
+          premier sacrifie par le budget : un joueur charge qui perd son titre
+          ne reconnait plus son interface. */
+    const titlePart = sidebar.find((p) => typeof p.str === "string" && p.str.indexOf("BLOCK PIRATES") !== -1);
+    checked++;
+    if (!titlePart) {
+        errors.push(`${label} : le titre « BLOCK PIRATES » a ete coupe`);
+    } else {
         checked++;
+        if (!titlePart.style || !titlePart.style.fontSize)
+            errors.push(`${label} : le titre n'est plus ecrit en gros (aucun fontSize)`);
         for (let i = 0; i < sidebar.length; i++) {
             const p = sidebar[i];
             if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
             if (p.str.indexOf("BLOCK PIRATES") === -1)
-                errors.push(`${label} : un bloc passe avant le titre (« ${p.str.trim().slice(0, 20) } »)`);
+                errors.push(`${label} : un bloc passe avant le titre (« ${p.str.trim().slice(0, 20)} »)`);
             break;
         }
     }
@@ -476,19 +489,26 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
         if (tutAt !== -1 && lastBar !== -1 && tutAt < lastBar)
             errors.push(`${label} : l'objectif du tutoriel n'est pas sous les barres`);
     }
-    /* 4. La quete est le DERNIER bloc affiche : rien apres elle. */
+    /* 4. La quete est le DERNIER bloc affiche : apres son titre, il ne reste
+          que SES lignes de detail (cible, progression, ile) — aucune icone,
+          c'est-a-dire aucun autre bloc. Un bloc a icone apres la quete = un
+          bloc qui a ete pousse sous elle. */
     if (quest) {
         const questAt = at("QUEST");
         checked++;
         if (questAt !== -1) {
+            let details = 0;
             for (let i = questAt + 1; i < sidebar.length; i++) {
                 const p = sidebar[i];
-                if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
-                /* le detail de la quete (« 3/5 (60%) Jungle ») suit son titre */
-                if (p.str.indexOf("QUEST") !== -1) continue;
-                if (/^\d+\/.*\(\d+%\)/.test(p.str.trim())) continue;
-                errors.push(`${label} : un bloc est affiche apres la quete (« ${p.str.trim().slice(0, 20)} »)`);
+                if (!p) continue;
+                if (p.icon) {
+                    errors.push(`${label} : le bloc « ${p.icon} » est affiche apres la quete`);
+                    continue;
+                }
+                if (typeof p.str !== "string" || !p.str.trim()) continue;
+                details++;
             }
+            if (details > 4) errors.push(`${label} : ${details} lignes de detail apres la quete (attendu 3 au plus)`);
         }
     }
 }

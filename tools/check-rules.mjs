@@ -726,6 +726,24 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   9. LES TEINTES DE LA SIDEBAR D'AVANT
+   ==========================================================================
+   La sidebar a retrouve ses couleurs d'origine (demande 88). Deux d'entre elles
+   sont hors palette — le cyan #00BFFF du titre et de la quete, l'orange #FF8C00
+   du niveau — et le passage a la palette les ramenait sur MARINE / DANGER :
+   l'interface se recolorait toute seule, sans qu'aucune ligne de UI.js ne
+   change. On verifie donc le RESULTAT de themeColor(), pas la constante. */
+
+{
+    const theme = await loadModules("core/theme.js");
+    check(theme.themeColor("#00BFFF") === "#00BFFF", `sidebar : le cyan du titre derive vers ${theme.themeColor("#00BFFF")}`);
+    check(theme.themeColor("#FF8C00") === "#FF8C00", `sidebar : l'orange du niveau derive vers ${theme.themeColor("#FF8C00")}`);
+    /* Et la palette continue de faire son travail partout ailleurs. */
+    check(theme.themeColor("#ff4444") === theme.C.DANGER, "palette : un rouge de danger n'est plus ramene sur DANGER");
+    check(theme.themeColor("#00ffff") === theme.C.XP, "palette : un cyan n'est plus ramene sur XP");
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 

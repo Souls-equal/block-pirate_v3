@@ -47,6 +47,14 @@ const title = "1.9em", title2 = "1.5em", text = "1.1em";
    la largeur de la ligne et restait tres fine ; en px elle est lisible et sa
    taille ne depend plus de la police du joueur. Cout : 26 caracteres de JSON,
    pris dans la marge du budget. */
+/* Deux teintes d'AVANT, gardees telles quelles (demande 88) : le cyan du
+   titre et de la quete, l'orange du niveau. Elles sont declarees dans
+   KEEP_AS_IS (theme.js), sinon le passage a la palette les ramenerait sur
+   MARINE (#7dd3fc) et DANGER (#ef4444) — c'est-a-dire a l'interface de la
+   refonte 81 que le joueur vient de refuser. */
+const LEGACY_TITLE = "#00BFFF"; // cyan d'origine : titre et quete
+const LEGACY_LEVEL = "#FF8C00"; // orange d'origine : niveau
+
 const COLOUR_XP = C.XP;          // cyan : texte d'XP, icone, barre
 const COLOUR_STAMINA = C.MARINE; // bleu clair : stamina
 const BAR_XP = [COLOUR_XP];
@@ -122,35 +130,40 @@ function drawSidebar(playerId){
         if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority === undefined ? 9 : priority });
     };
 
-    /* Le titre est le PREMIER bloc sacrifie quand la place manque (priorite 12,
-       au-dessus de la valeur par defaut 9) : il coute 168 caracteres a lui seul,
-       et le joueur connait deja le nom du jeu. Sans ca, agrandir les barres
-       (250x24 px) faisait disparaitre la barre de STAMINA chez un nouveau
-       joueur qui a un objectif de tutoriel ET une quete — c'est-a-dire
-       exactement le joueur qui en a le plus besoin. */
-    block([
-        ic("fa-solid fa-skull", C.MARINE, {fontSize: title}),
-        txt(" BLOCK PIRATES\n\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
-    ], true, 12);
-
     /* ══════════════════════════════════════════════════════════════════════
-       ORDRE DE LA SIDEBAR (choix du joueur) : le titre, l'equipe, puis les
-       stats en haut, les barres au milieu, et la QUETE TOUT EN BAS.
+       STYLE DE LA SIDEBAR D'AVANT (demande 88)
 
-       Ce qui a change par rapport a la demande 81 : les objectifs (tutoriel et
-       quete) etaient en HAUT, au-dessus du niveau. Ils sont maintenant les
-       derniers blocs affiches — c'est la seule chose qui bouge, et c'est
-       volontaire : on lit sa progression d'abord, ce qu'il reste a faire
-       ensuite.
+       L'ordre reste celui de la demande 87 (titre, equipe, stats, barres,
+       equipement, QUETE TOUT EN BAS) ; ce qui revient, c'est le VISAGE d'avant :
+       le grand « BLOCK PIRATES » cyan, l'or pour l'argent, l'orange du niveau,
+       le cyan de l'XP, le bleu pale de la stamina, la quete en cyan, et une
+       ligne vide entre les sections pour que ca respire.
+
+       Deux teintes restent hors palette et c'est voulu : #00BFFF (titre et
+       quete) et #FF8C00 (niveau). Ce sont celles d'avant. Elles sont declarees
+       dans KEEP_AS_IS (theme.js) pour que le passage a la palette ne les
+       ramene pas sur MARINE / DANGER. Les autres sont a un cheveu de la
+       palette et la reprennent : #00FFFF -> C.XP, #aaddff -> C.MARINE,
+       #FFDD00 -> C.MONEY, #E84759 -> C.PIRATE.
 
        Une barre garde TOUJOURS sa ligne de chiffres juste au-dessus d'elle :
-       c'est elle qui porte la couleur de la barre (cyan pour l'XP, bleu marine
-       pour la stamina). Sans ce couple, la barre serait un rectangle muet.
+       c'est cette couleur-la qu'elle reprend (demande 74), et les deux vivent
+       dans le MEME bloc pour que le budget ne puisse pas les separer.
        ══════════════════════════════════════════════════════════════════════ */
 
-    /* 1. IDENTITE : equipe et equipage, juste sous le titre. C'est la seule
-       ligne qui dit AUJOURD'HUI a qui on parle. Rien avant le choix de
-       l'equipe (« No Team » ne dit rien et coute de la place). */
+    /* 0. LE TITRE, en gros — le bandeau d'avant, celui qui donne son visage a
+       la sidebar.
+       Il n'est plus le premier sacrifie : le joueur vient justement de demander
+       a le retrouver. Ordre de sacrifice des blocs secondaires, du premier au
+       dernier : points de stat (13), fruit (10), style (9), titre (8). Le titre
+       tient donc plus longtemps que l'equipement, qui ne change qu'a l'achat. */
+    block([
+        txt("╔ BLOCK PIRATES ╗\n\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title}),
+    ], true, 8);
+
+    /* 1. IDENTITE : equipe et equipage, juste sous le titre (ajout de la 87).
+       C'est la seule ligne qui dit AUJOURD'HUI a qui on parle. Rien avant le
+       choix de l'equipe (« No Team » ne dit rien et coute de la place). */
     const teamData = getTeamData(getPlayerTeam(playerId));
     const crewName = getCrewName(playerId);
     if (teamData.id !== "NONE" || crewName) {
@@ -160,79 +173,82 @@ function drawSidebar(playerId){
             identity.push(txt(" " + teamData.name, teamData.color));
         }
         if (crewName) {
-            if (identity.length) identity.push(txt("  ", C.INFO));
-            identity.push(ic("fa-solid fa-user-group", C.MONEY));
-            identity.push(txt(" " + short(crewName, 14), C.MONEY));
+            identity.push(txt((identity.length ? "  " : "") + short(crewName, 14) + "\n", C.MONEY));
+        } else {
+            identity.push(txt("\n"));
         }
-        identity.push(txt("\n"));
         block(identity, true, 5);
     }
 
-    /* 2. LES STATS, en haut : niveau, argent, points a depenser. */
+    /* 2. LES STATS, en haut : niveau, argent, points a depenser. Le niveau
+       reprend son orange et son icone d'avant, l'argent son or. */
     block([
-        ic("fa-solid fa-ranking-star", COLOUR_XP),
-        txt(" LVL " + lvl + "\n", COLOUR_XP),
+        ic("fa-solid fa-angle-double-up", LEGACY_LEVEL, {fontSize: title2}),
+        txt(" LVL " + lvl + "\n\n", LEGACY_LEVEL, {fontSize: title2}),
     ]);
     block([
-        ic("fa-solid fa-coins", C.MONEY),
-        txt(" " + nfmt(money) + "\n", C.MONEY),
+        ic("fa-solid fa-coins", C.MONEY, {fontSize: title2}),
+        txt(" " + nfmt(money) + "\n\n", C.MONEY, {fontSize: title2}),
     ]);
     /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
        et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
     if (sp > 0) {
         block([
-            ic("fa-solid fa-star", C.SUCCESS),
-            txt(" Stat Points " + sp + "\n", C.SUCCESS),
-        ], true, 4);
+            ic("fa-solid fa-star", C.MONEY),
+            txt(" Stat Points " + sp + "\n\n", C.MONEY),
+        ], true, 13);
     }
 
-    /* 3. LES BARRES, au milieu : chiffres puis barre, XP et stamina a la suite.
-       Le niveau colle a sa barre d'XP, tous les deux en cyan (l'or reste a
-       l'argent, le vert au succes et aux points de stat). */
+    /* 3. LES BARRES, au milieu, dans la disposition d'avant : la ligne de
+       chiffres, puis la barre juste en dessous. L'XP est cyan comme son texte,
+       la stamina bleu pale comme le sien (demande 74). */
     block([
-        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
+        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
         bar(xpData.ratio, BAR_XP, BAR_SIZE),
         txt("\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
     ], true, 2);
     block([
-        ic("fa-solid fa-bolt", COLOUR_STAMINA),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        ic("fa-solid fa-bolt", C.MARINE),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
         bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
-        txt("\n"),
+        txt("\n\n"),
     ], true, 3);
 
-    /* 4. EQUIPEMENT : il ne change qu'a l'achat, et il peut disparaitre sous la
-       pression du budget sans rien faire perdre au joueur. */
+    /* 4. EQUIPEMENT : fruit puis style de combat. L'icone « Hunger » est celle
+       d'avant : une icone du jeu, pas une icone Font Awesome. */
     if (fruit) {
         block([
-            ic("fa-solid fa-sparkle", C.PIRATE),
-            txt(" " + fruit + "\n", C.PIRATE),
-        ], true, 6);
+            ic("Hunger", undefined, {fontSize: title2}),
+            txt(" " + fruit + "\n", C.PIRATE, {fontWeight: "bold", fontSize: title2}),
+        ], true, 10);
     }
     if (styleLabel) {
         block([
             ic("fa-solid fa-hand-fist", styleColor),
             txt(" " + styleLabel + "\n", styleColor),
-        ], true, 7);
+        ], true, 9);
     }
 
-    /* 5. LA QUETE, TOUT EN BAS — objectif de tutoriel puis quete en cours.
+    /* 5. LA QUETE, TOUT EN BAS — objectif de tutoriel puis quete en cours, dans
+       la mise en page d'avant : « QUEST » en cyan, la cible en clair, la
+       progression et l'ile en dessous.
        Leurs priorites restent les plus fortes (0 et 1) : ils sont affiches en
        dernier mais ne sont jamais sacrifies par le budget. */
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
             ic("fa-solid fa-list", C.SUCCESS),
-            txt(" " + short(tut, 40) + "\n", C.SUCCESS),
+            txt(" " + short(tut, 40) + "\n\n", C.SUCCESS),
         ], true, 0);
     }
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            ic("fa-solid fa-globe", C.XP),
-            txt(" QUEST  " + targetText + "\n", C.XP),
-            txt(progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 18) + "\n", C.INFO),
+            ic("fa-solid fa-globe", LEGACY_TITLE, {fontSize: title2}),
+            txt(" QUEST\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title2}),
+            txt(targetText + "\n", C.INFO, {fontWeight: "bold"}),
+            txt(progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n", C.INFO),
         ], true, 1);
     }
     /* Pas de quete : AUCUNE ligne. « QUEST no active quest » ne disait rien et
