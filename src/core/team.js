@@ -59,20 +59,6 @@ const TEAM_WEAPON_TIER = {
     "M1911": "ADVANCED",
 };
 
-/* Anciens noms affiches : un item achete avant la centralisation porte encore
-   son nom dans ses attributs. On le reconnait pour le convertir quand meme, et
-   le nom est alors repris par la table de customItem. Cette liste ne contient
-   QUE des noms qui ne sont plus produits par les tables : un nom encore actif
-   ("Basic Sword") n'a rien a y faire, sinon chaque changement de team
-   reecrirait l'item pour rien. */
-const LEGACY_TEAM_WEAPON = {
-    "Basic Dagger": "BASIC",
-    "Basic Spear": "BASIC",
-    "Advanced Sword": "ADVANCED",
-    "Flintlock": "ADVANCED",
-    "Advanced Spear": "ADVANCED",
-};
-
 const TEAM_WEAPON_ITEM = {
     BASIC: { PIRATES: "Wood Sword", MARINES: "Wood Spear", DEFAULT: "Wood Sword" },
     ADVANCED: { PIRATES: "Stone Sword", MARINES: "M1911", DEFAULT: "Stone Spear" },
@@ -82,17 +68,14 @@ function replaceTeamWeapons(playerId, newTeam) {
     let replacedCount = 0;
 
     scanAllItems(playerId, (item, where, slot) => {
-        const legacyName = item.attributes?.customDisplayName;
-        const tier = TEAM_WEAPON_TIER[item.name] || LEGACY_TEAM_WEAPON[legacyName];
+        const tier = TEAM_WEAPON_TIER[item.name];
         if (!tier) return;
 
         const target = TEAM_WEAPON_ITEM[tier][newTeam] || TEAM_WEAPON_ITEM[tier].DEFAULT;
         if (!target) return;
 
-        /* Meme item ET nom deja centralise : rien a faire. Un item qui porte
-           encore un ancien nom, lui, est reecrit meme a item egal, sinon ses
-           attributs garderaient le nom de l'ancienne team. */
-        if (target === item.name && !LEGACY_TEAM_WEAPON[legacyName]) return;
+        /* Deja le bon item : rien a faire. */
+        if (target === item.name) return;
 
         const customAttributes = convertWeaponAttributes(
             item.attributes?.customAttributes,
@@ -1366,10 +1349,6 @@ export function unmuteName(name, silent) {
     const id = muteIdOfName(name);
     if (id) muteDbDel(id, "mt");
     return !silent ? wasThere : false;
-}
-
-export function unmutePlayer(playerId) {
-    return unmuteName(muteNameOf(playerId));
 }
 
 /* Ce qu'on repond au joueur qui essaie de parler. */

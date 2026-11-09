@@ -77,11 +77,6 @@ export function getFruitInfo(t) {
         };
   return null;
 }
-export function getRarityFromFruitName(t) {
-  const e = getFruitInfo(t);
-  return e ? e.rarity : null;
-}
-
 /* Description "par defaut" d'un fruit : c'est elle qui s'affiche dans le
    tooltip de l'item, et celle que l'on enregistre comme description de base
    (voir itemJoin dans gameplay/customItem.js). */
@@ -1249,24 +1244,6 @@ export function rollFruit(t, e = 1) {
     };
   })(t);
   return r ? (E(t, o, r), o) : null;
-}
-export function onBlockBreak(t, e, o, r, n) {
-  const i = `${e},${o},${r}`;
-  y.has(i) && pickupFruit(t, e, o, r);
-}
-export function onBlockInteract(t, e, o, r, n) {
-  const i = `${e},${o},${r}`;
-  y.has(i) && pickupFruit(t, e, o, r);
-}
-export function getAllFruits() {
-  return Array.from(y.values());
-}
-export function getFruitAtPosition(t, e, o) {
-  const r = `${t},${e},${o}`;
-  return y.get(r);
-}
-export function hasFruit(t, e) {
-  return h.get(t) === e;
 }
 export { getFruitDataFromItem as getItemData };
 export function getFruitDataFromItem(t) {

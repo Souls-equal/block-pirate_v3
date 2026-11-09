@@ -11,8 +11,8 @@ export const FRUIT_RARITIES = [
 /* Noms d'items RÉELS (ceux que le joueur tient en main). Le nom Roleplay
    (rpName) est l'identifiant interne : c'est lui qui relie un fruit à ses
    capacités (FRUIT_ABILITIES), et lui qui est enregistré en base. Changer
-   un itemName est donc sans risque pour les joueurs — voir la migration
-   dans gameplay/customItem.js (migrateFruitItems). */
+   un itemName ne touche donc pas la base : l'item est écrit au moment où il
+   est donné (fruitItemAttributes, dans fruit/index.js). */
 export const FRUITS_BY_RARITY = {
     Common: [
         { itemName: "Boulder Bass",            rpName: "Rocket",  rpDesc: "Propel yourself with explosive force." },
@@ -67,49 +67,6 @@ export const FRUITS_BY_RARITY = {
     ],
 };
 
-/* ANCIENS items de fruits (blocks). Ils ne servent plus qu'à la migration
-   des inventaires : au join, un fruit encore stocké sous son ancien nom
-   est réécrit avec son nouvel item, son enchant et sa description.
-   Volontairement SÉPARÉ de FRUITS_BY_RARITY : ces noms sont des blocs
-   de construction ordinaires (Stone, Glass, Ice...), on ne les convertit
-   donc QUE si l'item porte les attributs d'un fruit. */
-export const LEGACY_FRUIT_ITEMS = {
-    "Bone Block": "Rocket", "Leather Block": "Spin", "Plum Block": "Blade",
-    "Watermelon": "Spring", "Beetroot Block": "Bomb", "Diorite": "Smoke",
-    "Fat Cactus": "Spike", "Mango Block": "Flame", "Ice": "Ice", "Sand": "Sand",
-    "Obsidian": "Dark", "Brown Mushroom Block": "Eagle", "Block of Diamond": "Diamond",
-    "Pear Block": "Light", "Engraved Granite": "Rubber", "Glass": "Ghost",
-    "Magma": "Magma", "Ice Bricks": "Quakes", "Banana Block": "Buddha",
-    "Cherry Block": "Love", "Bookshelf": "Creation", "Block of Coal": "Spider",
-    "Potato Block": "Song", "Corn Block": "Phoenix", "Bread Block": "Portal",
-    "Diamond Ore": "Lightning", "Pumpkin": "Pain", "Block of Moonstone": "Blizzard",
-    "Moonstone Ore": "Gravity", "Engraved Andesite": "Mammoth", "Carrot Block": "T-Rex",
-    "Bedrock": "Dought", "Red Mushroom Block": "Shadow", "Block of Iron": "Venom",
-    "Apple Block": "Gas", "Chili Pepper Block": "Spirit", "Snow": "Tiger",
-    "Custom Lobby Block": "Yeti", "Snowy Messy Stone": "Kitsune", "Stone": "Control",
-    "Pine Cone Block": "Dragon",
-};
-
-/* item -> fruit (noms actuels ET anciens) */
-export function getFruitItemName(rpName) {
-    for (const rarity in FRUITS_BY_RARITY) {
-        for (const fruit of FRUITS_BY_RARITY[rarity]) {
-            if (fruit.rpName === rpName) return fruit.itemName;
-        }
-    }
-    return null;
-}
-
-export function getFruitRpNameForItem(itemName) {
-    if (!itemName) return null;
-    for (const rarity in FRUITS_BY_RARITY) {
-        for (const fruit of FRUITS_BY_RARITY[rarity]) {
-            if (fruit.itemName === itemName) return fruit.rpName;
-        }
-    }
-    return LEGACY_FRUIT_ITEMS[itemName] || null;
-}
-
 export function getRarityColor(rarityName) {
     const rarity = FRUIT_RARITIES.find(function(r) { return r.name === rarityName; });
     return rarity ? rarity.color : "#FFFFFF";
@@ -118,18 +75,4 @@ export function getRarityColor(rarityName) {
 export function getRarityEnchantTier(rarityName) {
     const rarity = FRUIT_RARITIES.find(function(r) { return r.name === rarityName; });
     return rarity ? rarity.enchantmentTier : "Tier 1";
-}
-
-/* Accepte un nom Roleplay OU un nom d'item (actuel) : sert à l'admin
-   « Give Fruit » et à la recherche de fruit. */
-export function getFruitInfo(fruitName) {
-    for (const rarity in FRUITS_BY_RARITY) {
-        const fruits = FRUITS_BY_RARITY[rarity];
-        for (const fruit of fruits) {
-            if (fruit.rpName === fruitName || fruit.itemName === fruitName) {
-                return { ...fruit, rarity: rarity };
-            }
-        }
-    }
-    return null;
 }

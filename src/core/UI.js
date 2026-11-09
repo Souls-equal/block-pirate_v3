@@ -1,14 +1,14 @@
 // UI.js
 
-import { addStat, applyControls, confirmAction, getControlMode, isMobilePlayer, setControlMode, getStat, setStat, xpToNext } from "../utils/data";
+import { applyControls, confirmAction, getControlMode, isMobilePlayer, setControlMode, getStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName, getPlayerTeam, getTeamData } from "./team";
 import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
+import { isOwner } from "./ranks";
 import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
-import { isPvPProtectionEnabled } from "../utils/combat";
 import { getLastDamager } from "../utils/killAttribution";
 import { C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
 
@@ -387,8 +387,9 @@ export function joinUI(playerId) {
     try { setupSettingsShop(playerId); } catch (e) {}
 
     /* Confort du proprietaire du monde, sans effet sur le jeu (ni fleche, ni
-       avantage en combat) : vol plus rapide et coordonnees affichees. */
-    if (api.getEntityName(playerId) === "K4miNoK4mi") {
+       avantage en combat) : vol plus rapide et coordonnees affichees. Le rang
+       decide, pas un pseudo ecrit dans le code. */
+    if (isOwner(playerId)) {
         try {
             api.setClientOptions(playerId, {
                 "flySpeedMultiplier": 2,
@@ -526,11 +527,6 @@ function saveHiddenIslands(playerId, hidden) {
     }
     try { api.setPlayerDbValue(playerId, "arrowOff", list.join(",")); return true; }
     catch (e) { return false; }
-}
-
-export function islandArrowVisible(playerId, name) {
-    if (!islandArrowsEnabled(playerId)) return false;
-    return !hiddenIslands(playerId)[islandTheme(name).code];
 }
 
 /* Les deux listes du panneau : ce qui est affiche, ce qui est cache. */
@@ -957,21 +953,7 @@ export function handleSettingsShop(playerId, categoryKey, itemKey, item, userInp
         default: break;
     }
 
-    /* Ancien format (un item par ile, "isle_ju") : le client peut encore
-       l'afficher, on le fait basculer plutot que de ne rien faire. */
-    for (const name of islandNames()) {
-        if (islandItemKey(name) === itemKey) {
-            setIslandShown(playerId, name, !islandArrowVisible(playerId, name));
-            return true;
-        }
-    }
     return false;
-}
-
-/* Ancien format d'item (un bouton par ile) : garde pour resoudre un clic
-   laisse en place par un client plus vieux que la mise a jour. */
-function islandItemKey(name) {
-    return "isle_" + islandTheme(name).code.toLowerCase();
 }
 
 /* Variation vue par joueur : permet de reagir a un saut de variation meme

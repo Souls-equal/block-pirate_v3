@@ -2123,7 +2123,7 @@ inconnue ne casse rien : elle s'afficherait « ? », d'où la vérification.
 
 ---
 
-## Fruits : nouveaux items (poissons) et migration des inventaires
+## Fruits : nouveaux items (poissons)
 
 Les fruits ne sont plus des blocs mais des **poissons**. Seul `itemName` a changé :
 le `rpName` (`Rocket`, `Control`, `Dragon`…) reste l'identifiant interne, donc la
@@ -2196,30 +2196,46 @@ Un **bloc de fruit** apparaît tout seul dans le monde. Le joueur le clique et r
 > jamais posé (l'appel levait une erreur, loggée en `[fruit][err]`) et jamais retiré (bloc fantôme
 > définitif). Les deux appels sont maintenant dans le bon ordre.
 
-### La migration, au join
+### Aucune migration ne tourne au join
 
-`migrateFruitItems()` (`src/gameplay/customItem.js`) passe l'inventaire **et** le
-Moonstone Chest à chaque connexion (puis une seconde fois 2 s plus tard, le temps
-que le chunk soit lisible) et réécrit chaque fruit avec :
+Les fruits sont devenus des poissons **avant** ce nettoyage : plus rien ne
+convertit d'ancien item. `migrateFruitItems()` et `LEGACY_FRUIT_ITEMS` ont été
+supprimés, comme toutes les autres tables d'anciens noms (armes d'équipe,
+paintballs du Fighting Style, ancien format d'îles des Settings).
 
-* son **nouvel item** (`Bone Block` → `Boulder Bass`) ;
-* son **nom affiché** (`Rocket`) ;
-* sa **description complète** (`● Common Fruit ●`, la phrase du fruit, l'aide
-  « Sneak + Click ») ;
-* son **enchant** (`Tier 1` à `Tier 5` selon la rareté), dans
-  `customAttributes.enchantmentTier` — c'est là que le moteur le lit ;
-* son `uniqueRollId` d'origine, conservé s'il existe.
-
-**Ce qui n'est jamais converti :** un item n'est reconnu comme fruit que s'il porte
-`customAttributes.isFruitBlock` / `fruitRpName`. Les anciens noms sont des blocs de
-construction ordinaires (`Stone`, `Glass`, `Ice`, `Snow`…) : convertir « au nom »
-transformerait un stack de 64 Stone en fruits de Control. Un stack sans attributs
-reste donc un stack, et l'ancien nom redevient un bloc normal (ses `setItemStat`
-sont remis à zéro au join).
-
-La migration est **idempotente** : repasser dessus ne réécrit rien.
+Concrètement : un fruit est écrit **au moment où il est donné**
+(`fruitItemAttributes`), avec son nom, sa description et son enchant. Un item
+très ancien encore en inventaire reste tel quel — c'est un objet que le joueur
+peut jeter, pas une dette du code.
 
 ---
+
+## Rien de temporaire dans le code
+
+Le code ne contient plus rien qui ne serve au jeu tel qu'il tourne aujourd'hui.
+
+| Ce qui a été retiré | Pourquoi |
+| --- | --- |
+| Pseudos écrits en dur (`K4miNoK4mi`, `Yanick2010`, `EPICOO00000`, `Chillguy45`) | Un pseudo n'est pas une règle : trois exemptions traînaient dans `index.js` (commandes, changement de bloc), une dans `UI.js` (vol rapide), une dans `admin.js` (débannissement automatique). |
+| Migration des anciens items au join | Fruits, armes d'équipe, paintballs, ancien format d'îles : plus aucune table d'anciens noms. |
+| Exports que personne n'appelait | Une trentaine, dont les helpers de debug (`_getMobDataMap`, `bossGateForTest`, `fruitBlocksStatus`, `reloadFruitBlocks`). |
+
+Ce qui reste, et pourquoi :
+
+- **Le confort du propriétaire** (`UI.js`) est décidé par le **rang** : `isOwner(playerId)`
+  donne le vol rapide et les coordonnées visibles. Aucun effet sur le jeu — ni flèche,
+  ni avantage en combat — et changer de propriétaire ne touche plus au code.
+- **Les trapdoors se posent toujours** (`onPlayerChangeBlock`) : ce ne sont pas des blocs
+  de construction, la règle est la même pour tout le monde. Seuls les fruits, les items de
+  style et les items de commande sont bloqués.
+- **Les commandes d'équipage** (`/crew …`) passent par `crewCommands` pour tout le monde :
+  les permissions sont à l'intérieur, pas dans une liste de pseudos.
+- **Les rangs** restent dans `RANKS` / `STAFF` (`core/ranks.js`), une seule table. C'est le
+  seul endroit où un pseudo apparaît, et c'est une donnée, pas une exception dans une
+  condition.
+
+`npm run check-rules` refuse désormais un pseudo de la table `STAFF` recopié ailleurs :
+ajouter une exemption par nom fait échouer la CI.
 
 ## Migration depuis l'ancien système
 

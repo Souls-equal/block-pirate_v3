@@ -22,7 +22,10 @@
 //      typographiques (✦, ●, ─) ne sont PAS des emoji et restent autorises.
 //   6. ITEM DE DASH. L'item du dash mobile doit etre INERTE (une matiere) : un
 //      item qui propulse tout seul fait un second dash que le mobile ne peut
-//      pas annuler. L'ancien item est retire au join, inventaire ET coffre.
+//      pas annuler.
+//   7. AUCUN PSEUDO DANS LA LOGIQUE. Les pseudos du staff vivent dans la table
+//      STAFF (core/ranks.js) et nulle part ailleurs : une exemption par nom
+//      (« ce joueur peut poser des traps ») est une regle qui n'existe pas.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -632,6 +635,31 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   7. AUCUN PSEUDO DANS LA LOGIQUE
+   ==========================================================================
+   Les noms de la table STAFF ne doivent apparaitre que dans core/ranks.js.
+   Ailleurs, une decision se prend sur le RANG (isOwner, hasPermission…), jamais
+   sur un pseudo : sinon retirer un admin demande de modifier du code de jeu. */
+
+{
+    const ranksSrc = readFileSync(join(SRC, "core/ranks.js"), "utf8");
+    const table = ranksSrc.slice(ranksSrc.indexOf("export const STAFF = {"));
+    const names = [];
+    for (const m of table.matchAll(/"([^"]+)"\s*:\s*"[A-Z]+"/g)) names.push(m[1]);
+    check(names.length > 0, "aucun pseudo lu dans la table STAFF");
+
+    for (const file of FILES) {
+        const name = rel(file);
+        if (name === "src/core/ranks.js") continue;
+        const text = readFileSync(file, "utf8");
+        for (const pseudo of names) {
+            const at = text.indexOf('"' + pseudo + '"');
+            if (at >= 0) errors.push(`${name} : pseudo « ${pseudo} » en dur (utiliser le rang)`);
+        }
+    }
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 
@@ -642,5 +670,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur).`,
 );

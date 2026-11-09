@@ -103,12 +103,6 @@ const SAVE_EVERY_TICKS = 200; /* 10 s a 20 tps */
 
 const lastSaved = {};   /* playerId -> "x,y,z" deja ecrit (evite les ecritures inutiles) */
 const notice = {};     /* anti-spam des messages */
-let hooks = null;
-
-/* Injection de dependances (evite les imports circulaires avec team/UI). */
-export function setVariationHooks(h) {
-    hooks = h || null;
-}
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -355,15 +349,9 @@ function applyTeam(playerId, teamId) {
     } catch (e) {}
     if (!ok) {
         ok = put(playerId, "team", teamId);
-        try {
-            if (savedTeamHook) savedTeamHook(playerId);
-        } catch (e) {}
     }
     return ok;
 }
-
-let savedTeamHook = null;
-export function setTeamAppliedHook(fn) { savedTeamHook = fn; }
 
 /* Choix de la team dans le hub : on enregistre, puis on envoie dans la mer 1. */
 export function chooseTeam(playerId, teamId) {
