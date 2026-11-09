@@ -425,9 +425,10 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
     }
 
     /* ══════════════════════════════════════════════════════════════════════
-       ORDRE DE LA SIDEBAR (choix du joueur)
+       ORDRE DE LA SIDEBAR (la mise en page d'origine, demande 89)
 
-         titre -> equipe/equipage -> stats -> barres -> equipement -> QUETE
+         titre -> argent -> fruit -> style -> niveau
+                -> XP -> stamina -> points de stat -> QUETE
 
        La quete est en dernier bloc : c'est la demande explicite (« la quete
        tout en bas, absolument »). Elle reste prioritaire au budget (elle n'est
@@ -463,14 +464,20 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
         }
     }
 
-    /* 2. L'equipe passe avant les stats et avant les barres. */
+    /* 2. AUCUNE ligne d'equipe ni d'equipage (demande 89). L'equipe se lit
+          deja a deux endroits : la couleur du name tag et celle du classement
+          du lobby. Ce bloc `db` est justement un joueur qui a une equipe et un
+          equipage : si quelque chose s'affiche, c'est que la ligne est revenue.
+          On cherche les noms (et pas une icone : le drapeau sert ailleurs). */
     if (db.team) {
-        const teamAt = at("Pirates") === -1 ? at("Marines") : at("Pirates");
         checked++;
-        if (teamAt === -1) errors.push(`${label} : la ligne d'equipe a disparu`);
-        else {
-            if (lvlAt !== -1 && teamAt > lvlAt) errors.push(`${label} : l'equipe est sous le niveau (attendu au-dessus)`);
-            if (lastBar !== -1 && teamAt > lastBar) errors.push(`${label} : l'equipe est sous les barres`);
+        const crew = db["crew:name"];
+        for (const p of sidebar) {
+            const s = p && typeof p.str === "string" ? p.str : "";
+            if (s.indexOf("Pirates") !== -1 || s.indexOf("Marines") !== -1)
+                errors.push(`${label} : l'equipe est revenue dans la sidebar (« ${s.trim().slice(0, 20)} »)`);
+            if (crew && s.indexOf(crew.slice(0, 8)) !== -1)
+                errors.push(`${label} : l'equipage est revenu dans la sidebar (« ${s.trim().slice(0, 20)} »)`);
         }
     }
 

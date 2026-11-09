@@ -2,7 +2,7 @@
 
 import { applyControls, confirmAction, getControlMode, isMobilePlayer, setControlMode, getStat, xpToNext } from "../utils/data";
 import { playerQuest, questProgress } from "../gameplay/quest";
-import { getCrewName, getPlayerTeam, getTeamData } from "./team";
+import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
 import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
@@ -34,7 +34,7 @@ function makeBar(value, max){
     };
 }
 
-const title = "1.9em", title2 = "1.5em", text = "1.1em";
+const title = "1.9em", title2 = "1.5em";
 
 /* Barres natives. REGLE : une barre a la couleur de SON TEXTE, pour que
    « XP 1260/23980  5% » et sa barre se lisent comme un seul bloc (demande 74).
@@ -130,98 +130,58 @@ function drawSidebar(playerId){
         if (parts && parts.length) blocks.push({ parts: parts, optional: !!optional, priority: priority === undefined ? 9 : priority });
     };
 
-    /* ══════════════════════════════════════════════════════════════════════
-       STYLE DE LA SIDEBAR D'AVANT (demande 88)
+    /* ==========================================================================
+       LA SIDEBAR D'ORIGINE, A L'IDENTIQUE (demande 89)
 
-       L'ordre reste celui de la demande 87 (titre, equipe, stats, barres,
-       equipement, QUETE TOUT EN BAS) ; ce qui revient, c'est le VISAGE d'avant :
-       le grand « BLOCK PIRATES » cyan, l'or pour l'argent, l'orange du niveau,
-       le cyan de l'XP, le bleu pale de la stamina, la quete en cyan, et une
-       ligne vide entre les sections pour que ca respire.
+       Le joueur a demande de la remettre telle qu'elle etait, sans la ligne
+       d'equipe : celle-ci faisait doublon avec la couleur du name tag et celle
+       du classement du lobby, ou l'equipe se lit deja. L'ordre est donc
+       exactement celui du depart :
 
-       Deux teintes restent hors palette et c'est voulu : #00BFFF (titre et
-       quete) et #FF8C00 (niveau). Ce sont celles d'avant. Elles sont declarees
-       dans KEEP_AS_IS (theme.js) pour que le passage a la palette ne les
-       ramene pas sur MARINE / DANGER. Les autres sont a un cheveu de la
-       palette et la reprennent : #00FFFF -> C.XP, #aaddff -> C.MARINE,
-       #FFDD00 -> C.MONEY, #E84759 -> C.PIRATE.
+           titre  ->  argent  ->  fruit  ->  style  ->  niveau
+                  ->  XP  ->  stamina  ->  points de stat  ->  quete
 
-       Une barre garde TOUJOURS sa ligne de chiffres juste au-dessus d'elle :
-       c'est cette couleur-la qu'elle reprend (demande 74), et les deux vivent
-       dans le MEME bloc pour que le budget ne puisse pas les separer.
-       ══════════════════════════════════════════════════════════════════════ */
+       Le fruit et le style restent a leur place d'origine (entre l'argent et
+       le niveau) : c'est la que le joueur les a toujours vus.
 
-    /* 0. LE TITRE, en gros — le bandeau d'avant, celui qui donne son visage a
-       la sidebar.
-       Il n'est plus le premier sacrifie : le joueur vient justement de demander
-       a le retrouver. Ordre de sacrifice des blocs secondaires, du premier au
-       dernier : points de stat (13), fruit (10), style (9), titre (8). Le titre
-       tient donc plus longtemps que l'equipement, qui ne change qu'a l'achat. */
+       Cinq choses ne bougent pas, parce qu'elles ont ete demandees apres et
+       qu'elles ne changent pas la mise en page :
+         - les barres natives 250x24 px (demandes 70 et 72) ;
+         - une barre a la couleur de SON texte, juste sous sa ligne de chiffres
+           (demande 74) ;
+         - la quete tout en bas (demande 87) ;
+         - deux teintes d'origine gardees telles quelles : #00BFFF (titre,
+           quete) et #FF8C00 (niveau). Elles sont declarees dans KEEP_AS_IS
+           (theme.js), sinon le passage a la palette les ramene sur MARINE et
+           DANGER — c'est-a-dire a l'interface de la refonte 81 ;
+         - aucune ligne inutile : pas de « No fruit », pas de « QUEST no active
+           quest », pas d'equipe. Chacune coutait 80 a 150 caracteres dans une
+           sidebar plafonnee a 1 200.
+
+       Budget : le bloc secondaire sacrifie en premier est celui des points de
+       stat (13), puis le fruit (10), le style (9) et enfin le titre (8).
+       ========================================================================== */
+
+    /* LE TITRE, en gros : c'est lui qui donne son visage a la sidebar. */
     block([
         txt("╔ BLOCK PIRATES ╗\n\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title}),
     ], true, 8);
 
-    /* 1. IDENTITE : equipe et equipage, juste sous le titre (ajout de la 87).
-       C'est la seule ligne qui dit AUJOURD'HUI a qui on parle. Rien avant le
-       choix de l'equipe (« No Team » ne dit rien et coute de la place). */
-    const teamData = getTeamData(getPlayerTeam(playerId));
-    const crewName = getCrewName(playerId);
-    if (teamData.id !== "NONE" || crewName) {
-        const identity = [];
-        if (teamData.id !== "NONE") {
-            identity.push(ic("fa-solid fa-flag", teamData.color));
-            identity.push(txt(" " + teamData.name, teamData.color));
-        }
-        if (crewName) {
-            identity.push(txt((identity.length ? "  " : "") + short(crewName, 14) + "\n", C.MONEY));
-        } else {
-            identity.push(txt("\n"));
-        }
-        block(identity, true, 5);
-    }
-
-    /* 2. LES STATS, en haut : niveau, argent, points a depenser. Le niveau
-       reprend son orange et son icone d'avant, l'argent son or. */
-    block([
-        ic("fa-solid fa-angle-double-up", LEGACY_LEVEL, {fontSize: title2}),
-        txt(" LVL " + lvl + "\n\n", LEGACY_LEVEL, {fontSize: title2}),
-    ]);
+    /* L'ARGENT. */
     block([
         ic("fa-solid fa-coins", C.MONEY, {fontSize: title2}),
         txt(" " + nfmt(money) + "\n\n", C.MONEY, {fontSize: title2}),
     ]);
-    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
-       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
-    if (sp > 0) {
-        block([
-            ic("fa-solid fa-star", C.MONEY),
-            txt(" Stat Points " + sp + "\n\n", C.MONEY),
-        ], true, 13);
-    }
 
-    /* 3. LES BARRES, au milieu, dans la disposition d'avant : la ligne de
-       chiffres, puis la barre juste en dessous. L'XP est cyan comme son texte,
-       la stamina bleu pale comme le sien (demande 74). */
-    block([
-        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
-        bar(xpData.ratio, BAR_XP, BAR_SIZE),
-        txt("\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
-    ], true, 2);
-    block([
-        ic("fa-solid fa-bolt", C.MARINE),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
-        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
-        txt("\n\n"),
-    ], true, 3);
-
-    /* 4. EQUIPEMENT : fruit puis style de combat. L'icone « Hunger » est celle
-       d'avant : une icone du jeu, pas une icone Font Awesome. */
+    /* LE FRUIT, avec l'icone « Hunger » du jeu (pas une icone Font Awesome). */
     if (fruit) {
         block([
             ic("Hunger", undefined, {fontSize: title2}),
-            txt(" " + fruit + "\n", C.PIRATE, {fontWeight: "bold", fontSize: title2}),
+            txt(" " + fruit + "\n\n", C.PIRATE, {fontWeight: "bold", fontSize: title2}),
         ], true, 10);
     }
+
+    /* LE STYLE DE COMBAT. */
     if (styleLabel) {
         block([
             ic("fa-solid fa-hand-fist", styleColor),
@@ -229,11 +189,41 @@ function drawSidebar(playerId){
         ], true, 9);
     }
 
-    /* 5. LA QUETE, TOUT EN BAS — objectif de tutoriel puis quete en cours, dans
-       la mise en page d'avant : « QUEST » en cyan, la cible en clair, la
-       progression et l'ile en dessous.
-       Leurs priorites restent les plus fortes (0 et 1) : ils sont affiches en
-       dernier mais ne sont jamais sacrifies par le budget. */
+    /* LE NIVEAU : icone et libelle en orange, valeur en gras. */
+    block([
+        ic("fa-solid fa-angle-double-up", LEGACY_LEVEL, {fontSize: title2}),
+        txt(" LVL: " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold", fontSize: title2}),
+    ]);
+
+    /* L'XP : la ligne de chiffres, puis sa barre juste en dessous. Un seul
+       saut de ligne apres la barre (et non une ligne vide) : la barre native
+       fait 24 px de haut, elle se separe deja du bloc suivant. */
+    block([
+        txt("XP: " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
+        bar(xpData.ratio, BAR_XP, BAR_SIZE),
+        txt("\n"),
+    ], true, 2);
+
+    /* LA STAMINA, meme disposition. */
+    block([
+        ic("fa-solid fa-bolt", C.MARINE),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
+        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
+        txt("\n"),
+    ], true, 3);
+
+    /* LES POINTS DE STAT, seulement s'il y en a : « Stat Points 0 » ne disait
+       rien et coutait ~150 caracteres. */
+    if (sp > 0) {
+        block([
+            ic("fa-solid fa-star", C.MONEY),
+            txt(" Stat Points ", C.INFO),
+            txt(String(sp) + "\n\n", C.INFO, {fontWeight: "bold"}),
+        ], true, 13);
+    }
+
+    /* L'OBJECTIF DU TUTORIEL, juste avant la quete. Priorite 0 : garde en
+       premier, jamais sacrifie par le budget. */
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
@@ -241,18 +231,19 @@ function drawSidebar(playerId){
             txt(" " + short(tut, 40) + "\n\n", C.SUCCESS),
         ], true, 0);
     }
+
+    /* LA QUETE, TOUT EN BAS, dans sa mise en page d'origine : « QUEST » en
+       cyan, la cible en clair, puis la progression et l'ile. */
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
             ic("fa-solid fa-globe", LEGACY_TITLE, {fontSize: title2}),
             txt(" QUEST\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title2}),
-            txt(targetText + "\n", C.INFO, {fontWeight: "bold"}),
-            txt(progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n", C.INFO),
+            txt(targetText + "\n" + progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n", C.INFO, {fontWeight: "bold"}),
         ], true, 1);
     }
-    /* Pas de quete : AUCUNE ligne. « QUEST no active quest » ne disait rien et
-       coutait ~150 caracteres dans une sidebar plafonnee a 1 200. */
+    /* Pas de quete : AUCUNE ligne. */
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
        sont ajoutes du plus utile au moins utile tant que ca tient, et
