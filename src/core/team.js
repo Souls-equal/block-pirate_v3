@@ -164,6 +164,11 @@ export function updateNameTag(playerId) {
 }
 
 /* CHAT CHANNEL UI */
+/* Couleur du bouton « Global » du chat : le bleu fonce d'origine (#2671d7).
+   Elle ne passe PAS par themeColor() : la palette ramenerait ce bleu sur
+   MARINE (#7dd3fc), c'est-a-dire au bleu clair qui l'avait remplace. */
+const GLOBAL_CHAT_COLOR = "#2671d7";
+
 export const CHAT_CHANNEL = {
     GLOBAL: "GLOBAL",
     TEAM: "TEAM",
@@ -178,7 +183,7 @@ export function setupChatChannels(playerId) {
         {
             channelName: CHAT_CHANNEL.GLOBAL,
             elementContent: [ic("fa-solid fa-globe"), txt(" G")],
-            elementBgColor: C.MARINE
+            elementBgColor: GLOBAL_CHAT_COLOR
         },
         {
             channelName: CHAT_CHANNEL.TEAM,

@@ -419,6 +419,78 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
         const shownQuest = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("QUEST") !== -1);
         if (!shownQuest) errors.push(`${label} : le bloc de quete a ete coupe`);
     }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       ORDRE DE LA SIDEBAR (choix du joueur)
+
+         titre -> equipe/equipage -> stats -> barres -> equipement -> QUETE
+
+       La quete est en dernier bloc : c'est la demande explicite (« la quete
+       tout en bas, absolument »). Elle reste prioritaire au budget (elle n'est
+       jamais coupee), mais elle s'AFFICHE en dernier. On verifie l'ordre reel
+       du tableau envoye au client, pas l'intention du code.
+       ══════════════════════════════════════════════════════════════════════ */
+    const at = (needle) => sidebar.findIndex((p) => p && typeof p.str === "string" && p.str.indexOf(needle) !== -1);
+    const lastBar = (() => {
+        for (let i = sidebar.length - 1; i >= 0; i--) if (sidebar[i] && sidebar[i].type === "ProgressBar") return i;
+        return -1;
+    })();
+    const lvlAt = at("LVL");
+    const moneyAt = at("");
+
+    /* 1. Le titre est le premier bloc quand il tient dans le budget. */
+    if (sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("BLOCK PIRATES") !== -1)) {
+        checked++;
+        for (let i = 0; i < sidebar.length; i++) {
+            const p = sidebar[i];
+            if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
+            if (p.str.indexOf("BLOCK PIRATES") === -1)
+                errors.push(`${label} : un bloc passe avant le titre (« ${p.str.trim().slice(0, 20) } »)`);
+            break;
+        }
+    }
+
+    /* 2. L'equipe passe avant les stats et avant les barres. */
+    if (db.team) {
+        const teamAt = at("Pirates") === -1 ? at("Marines") : at("Pirates");
+        checked++;
+        if (teamAt === -1) errors.push(`${label} : la ligne d'equipe a disparu`);
+        else {
+            if (lvlAt !== -1 && teamAt > lvlAt) errors.push(`${label} : l'equipe est sous le niveau (attendu au-dessus)`);
+            if (lastBar !== -1 && teamAt > lastBar) errors.push(`${label} : l'equipe est sous les barres`);
+        }
+    }
+
+    /* 3. Les DEUX barres viennent apres les stats et avant la quete. */
+    checked++;
+    if (lvlAt !== -1 && lastBar !== -1 && lvlAt > lastBar)
+        errors.push(`${label} : le niveau est sous les barres (les stats doivent etre en haut)`);
+    if (quest) {
+        const questAt = at("QUEST");
+        if (questAt !== -1 && lastBar !== -1 && questAt < lastBar)
+            errors.push(`${label} : la quete n'est pas sous les barres`);
+    }
+    if (tutorialLine) {
+        const head = tutorialLine.slice(0, 20);
+        const tutAt = at(head);
+        if (tutAt !== -1 && lastBar !== -1 && tutAt < lastBar)
+            errors.push(`${label} : l'objectif du tutoriel n'est pas sous les barres`);
+    }
+    /* 4. La quete est le DERNIER bloc affiche : rien apres elle. */
+    if (quest) {
+        const questAt = at("QUEST");
+        checked++;
+        if (questAt !== -1) {
+            for (let i = questAt + 1; i < sidebar.length; i++) {
+                const p = sidebar[i];
+                if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
+                /* le detail de la quete (« 3/5 (60%) Jungle ») suit son titre */
+                if (p.str.indexOf("QUEST") !== -1) continue;
+                if (/^\d+\/.*\(\d+%\)/.test(p.str.trim())) continue;
+                errors.push(`${label} : un bloc est affiche apres la quete (« ${p.str.trim().slice(0, 20)} »)`);
+            }
+        }
+    }
 }
 
 /* ==========================================================================

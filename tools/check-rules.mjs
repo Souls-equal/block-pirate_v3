@@ -418,6 +418,7 @@ const installed = await (async () => {
     db.p3 = { lvl: 50, team: "MARINES", "crew:name": "Marines Elite", "crew:role": "CAPTAIN" };
 
     const officials = { p1: "K4miNoK4mi", p2: "Pirate", p3: "Marine" };
+    const chatChannels = [];
     globalThis.api = new Proxy(
         {
             now: () => Date.now(),
@@ -432,6 +433,9 @@ const installed = await (async () => {
             getPlayerIds: () => Object.keys(db),
             getEntityType: () => "Player",
             getEntityName: (id) => officials[id] || String(id),
+            setClientOption: (pid, option, value) => {
+                if (option === "chatChannels") chatChannels.push({ pid, channels: value });
+            },
         },
         { get: (t, k) => (k in t ? t[k] : () => undefined) },
     );
@@ -464,6 +468,20 @@ const installed = await (async () => {
     handleChat("p2", "channel test", "SOMETHING_ELSE");
     const globalLeak = sent.filter((e) => e.pid === "p3");
     check(globalLeak.length === 0, "chat : un canal inconnu est retombe dans le global");
+
+    /* e) Les boutons de canal gardent leurs couleurs : le Global retrouve le
+          bleu fonce d'origine (#2671d7), pas le bleu clair de la palette
+          (MARINE), et l'equipage garde la sienne. Un canal ajoute a la main
+          sans couleur s'affiche gris : on verifie ce que le client recoit. */
+    chatChannels.length = 0;
+    installed.setupChatChannels("p2");
+    const sentChannels = chatChannels.length ? chatChannels[chatChannels.length - 1].channels : [];
+    const globalBtn = sentChannels.find((c) => c.channelName === installed.CHAT_CHANNEL.GLOBAL);
+    const crewBtn = sentChannels.find((c) => c.channelName === installed.CHAT_CHANNEL.CREW);
+    check(!!globalBtn, "chat : le bouton du canal Global n'est pas envoye au client");
+    if (globalBtn) check(globalBtn.elementBgColor === "#2671d7", `chat : le canal Global n'est plus en bleu fonce (#2671d7) mais en ${globalBtn.elementBgColor}`);
+    check(!!crewBtn, "chat : le bouton du canal Equipage manque pour un joueur en equipage");
+    if (crewBtn) check(String(crewBtn.elementBgColor).toLowerCase() !== "#2671d7", "chat : l'equipage a herite du bleu du Global");
 }
 
 /* ==========================================================================
@@ -718,5 +736,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI, chat Global en bleu fonce).`,
 );

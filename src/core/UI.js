@@ -133,64 +133,23 @@ function drawSidebar(playerId){
         txt(" BLOCK PIRATES\n\n", C.MARINE, {fontWeight: "bold", fontSize: title}),
     ], true, 12);
 
-    /* ORDRE DE LECTURE : d'abord ce qu'il y a A FAIRE, puis la progression,
-       puis les ressources, et enfin l'equipement. Avant, l'objectif arrivait
-       apres l'argent et la stamina : la seule ligne qui changeait d'une minute
-       a l'autre etait celle qu'on lisait en dernier. */
-    const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
-    if (tut) {
-        block([
-            ic("fa-solid fa-list", C.SUCCESS),
-            txt(" " + short(tut, 40) + "\n", C.SUCCESS),
-        ], true, 0);
-    }
+    /* ══════════════════════════════════════════════════════════════════════
+       ORDRE DE LA SIDEBAR (choix du joueur) : le titre, l'equipe, puis les
+       stats en haut, les barres au milieu, et la QUETE TOUT EN BAS.
 
-    if (quest) {
-        const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
-        const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
-        block([
-            ic("fa-solid fa-globe", C.XP),
-            txt(" QUEST  " + targetText + "\n", C.XP),
-            txt(progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 18) + "\n", C.INFO),
-        ], true, 1);
-    }
-    /* Pas de quete : AUCUNE ligne. « QUEST no active quest » ne disait rien et
-       coutait ~150 caracteres dans une sidebar plafonnee a 1 200. */
+       Ce qui a change par rapport a la demande 81 : les objectifs (tutoriel et
+       quete) etaient en HAUT, au-dessus du niveau. Ils sont maintenant les
+       derniers blocs affiches — c'est la seule chose qui bouge, et c'est
+       volontaire : on lit sa progression d'abord, ce qu'il reste a faire
+       ensuite.
 
-    /* Progression : le niveau colle a sa barre d'XP, tous les deux en cyan
-       (l'or reste a l'argent, le vert au succes et aux points de stat). */
-    block([
-        ic("fa-solid fa-ranking-star", COLOUR_XP),
-        txt(" LVL " + lvl + "\n", COLOUR_XP),
-    ]);
-    block([
-        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
-        bar(xpData.ratio, BAR_XP, BAR_SIZE),
-        txt("\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
-    ], true, 2);
-    block([
-        ic("fa-solid fa-bolt", COLOUR_STAMINA),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
-        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
-        txt("\n"),
-    ], true, 3);
+       Une barre garde TOUJOURS sa ligne de chiffres juste au-dessus d'elle :
+       c'est elle qui porte la couleur de la barre (cyan pour l'XP, bleu marine
+       pour la stamina). Sans ce couple, la barre serait un rectangle muet.
+       ══════════════════════════════════════════════════════════════════════ */
 
-    block([
-        ic("fa-solid fa-coins", C.MONEY),
-        txt(" " + nfmt(money) + "\n", C.MONEY),
-    ]);
-    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
-       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
-    if (sp > 0) {
-        block([
-            ic("fa-solid fa-star", C.SUCCESS),
-            txt(" Stat Points " + sp + "\n", C.SUCCESS),
-        ], true, 4);
-    }
-
-    /* Equipe et equipage : la seule ligne qui dit AUJOURD'HUI a qui on parle.
-       Sans elle, un joueur devait ouvrir le chat ou lire son name tag pour
-       savoir s'il etait Pirate ou Marine. Rien n'est affiche avant le choix de
+    /* 1. IDENTITE : equipe et equipage, juste sous le titre. C'est la seule
+       ligne qui dit AUJOURD'HUI a qui on parle. Rien avant le choix de
        l'equipe (« No Team » ne dit rien et coute de la place). */
     const teamData = getTeamData(getPlayerTeam(playerId));
     const crewName = getCrewName(playerId);
@@ -209,8 +168,41 @@ function drawSidebar(playerId){
         block(identity, true, 5);
     }
 
-    /* Equipement en dernier : il ne change qu'a l'achat, et il peut disparaitre
-       sous la pression du budget sans rien faire perdre au joueur. */
+    /* 2. LES STATS, en haut : niveau, argent, points a depenser. */
+    block([
+        ic("fa-solid fa-ranking-star", COLOUR_XP),
+        txt(" LVL " + lvl + "\n", COLOUR_XP),
+    ]);
+    block([
+        ic("fa-solid fa-coins", C.MONEY),
+        txt(" " + nfmt(money) + "\n", C.MONEY),
+    ]);
+    /* Seulement s'il y a des points a depenser : « Stat Points 0 » ne dit rien
+       et coute ~150 caracteres dans une sidebar plafonnee a 1 200. */
+    if (sp > 0) {
+        block([
+            ic("fa-solid fa-star", C.SUCCESS),
+            txt(" Stat Points " + sp + "\n", C.SUCCESS),
+        ], true, 4);
+    }
+
+    /* 3. LES BARRES, au milieu : chiffres puis barre, XP et stamina a la suite.
+       Le niveau colle a sa barre d'XP, tous les deux en cyan (l'or reste a
+       l'argent, le vert au succes et aux points de stat). */
+    block([
+        txt("XP " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", COLOUR_XP),
+        bar(xpData.ratio, BAR_XP, BAR_SIZE),
+        txt("\n"), // pas de style : une couleur sur des sauts de ligne coute 29 car.
+    ], true, 2);
+    block([
+        ic("fa-solid fa-bolt", COLOUR_STAMINA),
+        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
+        txt("\n"),
+    ], true, 3);
+
+    /* 4. EQUIPEMENT : il ne change qu'a l'achat, et il peut disparaitre sous la
+       pression du budget sans rien faire perdre au joueur. */
     if (fruit) {
         block([
             ic("fa-solid fa-sparkle", C.PIRATE),
@@ -223,6 +215,28 @@ function drawSidebar(playerId){
             txt(" " + styleLabel + "\n", styleColor),
         ], true, 7);
     }
+
+    /* 5. LA QUETE, TOUT EN BAS — objectif de tutoriel puis quete en cours.
+       Leurs priorites restent les plus fortes (0 et 1) : ils sont affiches en
+       dernier mais ne sont jamais sacrifies par le budget. */
+    const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
+    if (tut) {
+        block([
+            ic("fa-solid fa-list", C.SUCCESS),
+            txt(" " + short(tut, 40) + "\n", C.SUCCESS),
+        ], true, 0);
+    }
+    if (quest) {
+        const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
+        const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
+        block([
+            ic("fa-solid fa-globe", C.XP),
+            txt(" QUEST  " + targetText + "\n", C.XP),
+            txt(progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 18) + "\n", C.INFO),
+        ], true, 1);
+    }
+    /* Pas de quete : AUCUNE ligne. « QUEST no active quest » ne disait rien et
+       coutait ~150 caracteres dans une sidebar plafonnee a 1 200. */
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
        sont ajoutes du plus utile au moins utile tant que ca tient, et
