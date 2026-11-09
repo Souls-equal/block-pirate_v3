@@ -26,6 +26,9 @@
 //   7. AUCUN PSEUDO DANS LA LOGIQUE. Les pseudos du staff vivent dans la table
 //      STAFF (core/ranks.js) et nulle part ailleurs : une exemption par nom
 //      (« ce joueur peut poser des traps ») est une regle qui n'existe pas.
+//   8. ANCIENNE UI. Le panneau Settings a deja eu un item par ile ("isle_ju").
+//      Un client qui les affiche encore doit obtenir le meme effet : on garde
+//      la lecture, et ce test empeche de la supprimer par megarde.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -660,6 +663,51 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   8. ANCIENNE UI : LES ITEMS D'ILE DU PANNEAU SETTINGS
+   ==========================================================================
+   Le panneau a deja eu un item par ile ("isle_ju", "isle_pv"...). Ces items
+   ne sont plus crees, mais un client qui les a encore en boutique doit pouvoir
+   cliquer dessus. On rejoue le vrai handleSettingsShop : le clic bascule l'ile,
+   exactement comme les items actuels. */
+
+{
+    const ui = await loadModules("core/UI.js");
+    const baseApi = globalThis.api;
+    const db = {};
+    installApi({
+        getPlayerDbValue: (pid, key) => (db[pid] && key in db[pid] ? db[pid][key] : null),
+        setPlayerDbValue: (pid, key, value) => { db[pid] = db[pid] || {}; db[pid][key] = value; },
+        getPlayerIds: () => ["pUI"],
+        getEntityName: () => "Tester",
+        getVariation: () => "sea1",
+        matchmakeToVariation: () => {},
+        clearDirectionArrow: () => {},
+        setDirectionArrow: () => {},
+        createShopItemForPlayer: () => {},
+        updateShopItemForPlayer: () => {},
+        configureShopCategoryForPlayer: () => {},
+    });
+
+    const arrowOff = () => ((db.pUI && db.pUI.arrowOff) || "");
+
+    /* 1. Un item d'ile de l'ancien format masque l'ile... */
+    const first = ui.handleSettingsShop("pUI", "settings", "isle_ju", null, null);
+    check(first === true, "ancienne UI : le clic sur un item d'ile n'est plus reconnu");
+    check(arrowOff() === "JU", `ancienne UI : la flèche n'a pas basculé (arrowOff = « ${arrowOff()} »)`);
+
+    /* 2. ... et le clic suivant la remontre. */
+    ui.handleSettingsShop("pUI", "settings", "isle_ju", null, null);
+    check(!arrowOff(), "ancienne UI : le second clic ne remet pas la flèche");
+
+    /* 3. Une cle inconnue reste, elle, sans effet. */
+    const before = arrowOff();
+    const junk = ui.handleSettingsShop("pUI", "settings", "isle_zz", null, null);
+    check(junk === false && arrowOff() === before, "ancienne UI : une ile inconnue est acceptee");
+
+    globalThis.api = baseApi;
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 
@@ -670,5 +718,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI).`,
 );
