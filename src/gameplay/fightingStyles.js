@@ -34,7 +34,7 @@ import {
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { eachItemSlot } from "./customItem";
-import { cancelConfirm, confirmAction, getTotalMoney, payMoney, useItemControls } from "../utils/data";
+import { applyControls, cancelConfirm, confirmAction, deleteStat, getTotalMoney, isMobilePlayer, payMoney, useItemControls } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, nfmt, say, txt, bold, ic } from "../core/theme";
 
@@ -65,11 +65,12 @@ export function removeVoidNet(playerId) {
     return true;
 }
 
-/* PC seulement, et seulement si un style est actif. */
+/* Le filet n'ouvre que les TOUCHES du PC : inutile en mode items, et inutile
+   sur mobile ou les boutons sont deja a l'ecran (demande 91). */
 export function ensureVoidNet(playerId) {
     if (!playerId) return false;
     const styleName = getFightingStyle(playerId);
-    if (useItemControls(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
+    if (useItemControls(playerId) || isMobilePlayer(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
     return giveVoidNet(playerId);
 }
 
@@ -807,9 +808,10 @@ export function giveFightingStyleItems(playerId, styleName) {
     const style = FIGHTING_STYLES[styleName];
     if (!style) return false;
     removeFightingStyleItems(playerId, styleName);
-    /* PC : un seul item en main. Les deux items de capacite disparaissent, le
-       filet les remplace et ouvre les deux touches (voir index.js). */
-    if (!useItemControls(playerId)) return giveVoidNet(playerId);
+    /* Mode boutons : sur PC le filet remplace les deux items de capacite et
+       ouvre les deux touches (voir index.js) ; sur mobile les deux boutons
+       sont deja la (demande 91), donc aucun item. */
+    if (!useItemControls(playerId)) return isMobilePlayer(playerId) ? true : giveVoidNet(playerId);
     for (let i = 0; i < style.abilities.length; i++) {
         const ab = style.abilities[i];
         if (hasAbilityItem(playerId, ab)) continue;
@@ -834,6 +836,9 @@ export function equipFightingStyle(playerId, styleName, silent = false) {
     try {
         updateSidebarLight(playerId);
     } catch (e) {}
+    /* Sur mobile en mode boutons, apprendre un style ne donne AUCUN item :
+       sans ce rappel, les deux boutons n'apparaitraient qu'au join suivant. */
+    if (isMobilePlayer(playerId)) applyControls(playerId);
     if (!silent) {
         try {
             api.playSound(playerId, "exp_levelup", 1, 1.15);
@@ -860,15 +865,21 @@ export function restoreFightingStyle(playerId) {
     return true;
 }
 
+/* Efface le style : etat memoire, items, puis la CLE de la base.
+   On SUPPRIME la cle au lieu d'y ecrire `null` : l'API n'accepte qu'une
+   chaine ou un nombre, donc un `null` refuse laissait le style en base — il
+   revenait au respawn (restoreFightingStyle) et au join suivant. C'est ce qui
+   faisait qu'un reset ne retirait pas le style (demande 91). */
 export function clearFightingStyle(playerId) {
+    if (!playerId) return false;
     activeStyles.delete(playerId);
     abilityCooldowns.delete(playerId);
     m1Cooldowns.delete(playerId);
     cancelConfirm(playerId);
     removeFightingStyleItems(playerId, null);
-    try {
-        api.setPlayerDbValue(playerId, FS_DB_KEY, null);
-    } catch (e) {}
+    deleteStat(playerId, FS_DB_KEY);
+    try { updateSidebarLight(playerId); } catch (e) {}
+    return true;
 }
 
 export function onPlayerLeaveFightingStyle(playerId) {

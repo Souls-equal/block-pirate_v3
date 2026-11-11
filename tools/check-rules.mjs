@@ -35,6 +35,10 @@
 //      sans perdre les kills deja faits.
 //  12. MACHINE A FRUITS. Un tirage encaisse exactement son prix puis donne le
 //      fruit ; un echec de remise rembourse tout. Jamais de fruit gratuit.
+//  13. COMMANDES PAR APPAREIL, ET LE RESET. Le mobile a les BOUTONS par
+//      defaut (des icones, pas de texte), le PC les ITEMS ; une valeur
+//      enregistree passe avant le defaut. Et un reset SUPPRIME le style de
+//      combat au lieu de le laisser en base.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -950,6 +954,115 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   13. COMMANDES PAR APPAREIL (91) + LE RESET RETIRE LE STYLE (91)
+   ==========================================================================
+   Deux demandes du joueur, deux pieges :
+     a) le mobile etait VERROUILLE sur les items (getControlMode le forcait),
+        donc il ne pouvait pas recevoir les boutons tactiles — l'equivalent
+        mobile des touches, avec le meme fonctionnement ;
+     b) le reset ecrivait `null` dans la cle du style. L'API n'accepte qu'une
+        chaine ou un nombre : le style restait en base et revenait au respawn.
+   On verifie donc les DEFAUTS (boutons sur mobile, items sur PC), le fait
+   qu'un reglage enregistre gagne toujours, et qu'un reset laisse la base et
+   l'inventaire vraiment vides — en reposant les commandes ensuite.
+   ========================================================================== */
+
+{
+    /* L'api AVANT l'import : data.js pose `resetPlayer` au chargement du
+       module, et installApi remet les globales sloppy a zero. */
+    const cleared = [];
+    const hooked = [];
+    installApi({
+        clearInventory: (pid) => cleared.push(pid),
+        getInventoryItemAmount: () => 1,
+        setClientOption: () => {},
+    });
+    /* data.js et fightingStyles.js dans le MEME bundle : une seule memoire. */
+    const game = await loadModules("utils/data.js", ["gameplay/fightingStyles.js"]);
+    game.setControlsHook((pid) => {
+        hooked.push(pid);
+        return true;
+    });
+
+    /* a) Les defauts suivent l'appareil. */
+    game.setDevice("pMob", true);
+    game.setDevice("pPc", false);
+    db.pMob = {};
+    db.pPc = {};
+    check(game.getControlMode("pMob") === "buttons", `commandes : le mobile n'a pas les boutons par defaut (${game.getControlMode("pMob")})`);
+    check(game.getControlMode("pPc") === "items", `commandes : le PC n'a pas les items par defaut (${game.getControlMode("pPc")})`);
+    check(game.useItemControls("pMob") === false, "commandes : le mobile reste en mode items");
+    check(game.useItemControls("pPc") === true, "commandes : le PC est passe en mode boutons sans le demander");
+
+    /* Un choix enregistre passe TOUJOURS avant le defaut, dans les deux sens. */
+    db.pMob.ctl = game.CTL_ITEMS;
+    db.pPc.ctl = game.CTL_BUTTONS;
+    check(game.getControlMode("pMob") === "items", "commandes : le mobile ne peut pas revenir aux items");
+    check(game.getControlMode("pPc") === "buttons", "commandes : le PC ne peut pas passer aux boutons");
+
+    /* Le mode est bien relu apres bascule. */
+    game.setControlMode("pMob", "buttons");
+    check(db.pMob.ctl === "buttons" && game.getControlMode("pMob") === "buttons", "commandes : la bascule vers les boutons ne tient pas");
+
+    /* b) Le reset retire le style, le mode de commande et l'inventaire. */
+    game.setDevice("pReset", true);
+    db.pReset = { fs: "brawler", ctl: "items", money: 500, sp: 7, lvl: 9 };
+    check(typeof globalThis.resetPlayer === "function", "reset : resetPlayer n'est plus defini");
+    check(globalThis.resetPlayer("pReset") === true, "reset : resetPlayer n'a rien fait");
+    check(!("fs" in db.pReset), "reset : le style de combat est reste en base");
+    check(!("ctl" in db.pReset), "reset : le mode de commande est reste en base");
+    check(db.pReset.money === 0, `reset : il reste ${db.pReset.money} Coins`);
+    check(db.pReset.sp === 0, `reset : il reste ${db.pReset.sp} Stat Point`);
+    check(cleared.indexOf("pReset") >= 0, "reset : l'inventaire n'est pas vide");
+    check(hooked.indexOf("pReset") >= 0, "reset : les commandes ne sont pas reposees apres le reset");
+    /* Le style est retire AVANT le vidage de l'inventaire : sinon un item de
+       style encore en base revient au respawn (restoreFightingStyle). */
+    db.pStyle = { fs: "brawler" };
+    game.clearFightingStyle("pStyle");
+    check(!("fs" in db.pStyle), "reset : clearFightingStyle laisse la cle du style en base");
+
+    /* c) Le code, lui : plus de verrou mobile, et des boutons sans item. */
+    const indexSrc = readFileSync(join(SRC, "index.js"), "utf8");
+    check(
+        indexSrc.indexOf("const mobile = isMobilePlayer(playerId)") >= 0,
+        "boutons : buttonsFor ne distingue plus le mobile du PC",
+    );
+    check(
+        indexSrc.indexOf("(mobile || held === SWAP_ORB_Name)") >= 0,
+        "boutons : les capacites du mobile dependent encore de l'item en main",
+    );
+    check(
+        indexSrc.indexOf("const byTouch = isMobilePlayer(playerId)") >= 0,
+        "boutons : l'appui tactile re-verifie l'item en main",
+    );
+    /* Aucun texte sur mobile : les boutons y sont minuscules, une description
+       serait illisible (et Bloxd l'afficherait sous l'icone). */
+    check(
+        indexSrc.indexOf("if (withText && text) button.description = text;") >= 0,
+        "boutons : la description n'est plus reservee au PC (icones seules sur mobile)",
+    );
+    check(
+        indexSrc.indexOf("description: info[i].name") < 0,
+        "boutons : une capacite repasse par une description en dur",
+    );
+    /* Mobile : les deux groupes sont affiches ensemble, donc leurs touches ne
+       doivent pas etre les memes (un clavier physique reste possible). */
+    check(
+        indexSrc.indexOf("MOBILE_STYLE_KEYS") >= 0,
+        "boutons : les capacites et les attaques de style partagent encore une touche sur mobile",
+    );
+    const uiSrc = readFileSync(join(SRC, "core/UI.js"), "utf8");
+    check(
+        uiSrc.indexOf("Touch screens always use items") < 0,
+        "reglage : le panneau refuse toujours le changement de commandes au mobile",
+    );
+    check(
+        uiSrc.indexOf("createShopItemForPlayer(playerId, SETTINGS_CATEGORY, \"set_controls\"") >= 0,
+        "reglage : la carte Controls n'est plus creee",
+    );
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 
@@ -960,5 +1073,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI, chat Global en bleu fonce, PNJ sous le doigt, quete au changement de team, machine a fruits payee avant remise).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI, chat Global en bleu fonce, PNJ sous le doigt, quete au changement de team, machine a fruits payee avant remise, commandes par appareil et reset du style).`,
 );

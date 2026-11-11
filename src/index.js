@@ -8,7 +8,7 @@ import { attackNPC as U, forgetNPC as B, isProtectedNPC as F, npcNearPoint as np
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
-import { ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
+import { getFightingStyle as fsStyle, ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
@@ -190,26 +190,29 @@ ct((t, r, a) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   COMMANDES : clavier sur PC, items sur mobile (demande 75)
+   COMMANDES : items ou boutons, un DEFAUT par appareil (demandes 75 et 91)
 
    Un joueur ne peut pas passer de PC a mobile sans quitter le monde : on lit
    donc api.isMobile UNE fois, au join, et on ne relit plus.
 
-   PC     : 6 boutons personnalises (customButtons). Q = dash, puis une touche
-            par capacite de fruit (Z X C V F). Les items de capacites sont
-            RETIRES de l'inventaire : ils ne servent plus a rien et
-            encombraient 5 slots.
-   MOBILE : pas de clavier, donc pas de boutons a touches. Les items de
-            capacites restent. Le dash a son PROPRE bouton tactile
-            (touchscreenActionButton, onTouchscreenActionButton) : il ne
-            depend donc pas de ce que le joueur tient en main, et l'item
-            « Moonstone Dust » n'est plus donne (demande 90).
+   PC     : ITEMS par defaut. Un item par capacite, main nue pour frapper,
+            clic droit pour dasher. Les boutons (Q, Z X C V F) sont une option
+            dans Settings -> Controls.
+   MOBILE : BOUTONS par defaut. Bloxd affiche les customButtons a l'ecran avec
+            le meme fonctionnement qu'une touche : des petites ICONES (aucun
+            texte possible). Aucun item de capacite, donc aucun slot perdu.
+            Le dash garde son bouton tactile dedie (demande 90), qui ne depend
+            d'aucun item. Les items redeviennent disponibles en passant le
+            reglage sur ITEMS.
 
-   Les keycodes sont ceux du clavier QWERTY ; Bloxd remappe tout seul pour un
+   Le mode est un REGLAGE (db « ctl ») : une valeur enregistree passe toujours
+   avant le defaut de l'appareil (data.getControlMode).
+
+   Les keycodes sont ceux d'un clavier QWERTY ; Bloxd remappe tout seul pour un
    AZERTY (c'est la meme touche physique).
    ══════════════════════════════════════════════════════════════════════════ */
 /* Trois groupes de boutons, jamais melanges dans la meme main :
-     dash    : toujours la (Q) ;
+     dash    : toujours la sur PC (Q) ; sur mobile c'est le bouton tactile ;
      ability : capacites du fruit, autant que le fruit en a (3 a 5) ;
      style   : les deux attaques du style de combat.
    `ability` et `style` partagent Z/X a dessein : on ne peut tenir qu'un item a
@@ -229,28 +232,63 @@ const CONTROLS = {
     ],
 };
 
-/* Boutons envoyes au client, en fonction de ce que le joueur a EN MAIN.
-   Regle (demande 76) : pas d'item en main, pas de touches. */
+/* Un bouton n'a de TEXTE que sur PC : Bloxd affiche les boutons du mobile en
+   tout petit, une description y serait illisible. L'icone porte le sens
+   (demande 91 : « icones seulement »). */
+/* Touches des attaques de style quand les DEUX groupes sont affiches (mobile). */
+const MOBILE_STYLE_KEYS = ["KeyG", "KeyH"];
+
+function pushButton(list, id, icon, keycode, text, withText) {
+    const button = { id: id, icon: icon, keycode: keycode };
+    if (withText && text) button.description = text;
+    list.push(button);
+    return button;
+}
+
+/* Boutons envoyes au client. Deux regles differentes, et c'est VOULU :
+     PC     : un bouton n'apparait qu'avec l'item qui l'ouvre (Swap Orb / Void
+              Net en main), sinon le joueur aurait huit touches mortes ;
+     MOBILE : les boutons SONT la commande (demande 91). Bloxd les affiche a
+              l'ecran avec le meme fonctionnement qu'une touche, donc ils sont
+              la des que le joueur a un fruit / un style — aucun item a tenir.
+   Le dash mobile a deja son bouton tactile (demande 90) : on ne pose pas un
+   second bouton pour la meme action. */
 function buttonsFor(playerId) {
-    /* Mode « items » (le defaut) : aucun bouton, tout passe par les items. */
+    /* Mode « items » : aucun bouton, tout passe par les items. */
     if (useItemControls(playerId)) return [];
-    const list = CONTROLS.dash.slice();
+    const mobile = isMobilePlayer(playerId);
     const held = heldName(playerId);
-    if (held === SWAP_ORB_Name) {
-        /* Une touche par capacite REELLE du fruit, avec l'icone de son type
-           d'attaque (fruit/abilities, ATTACK_TYPES) et son nom en description :
-           le joueur lit « Rocket Salvo » sur le bouton, pas « Ability 2 ». */
-        const info = fruitButtonInfo(n(playerId)).slice(0, fruitAbilityCount(playerId));
+    const list = [];
+    /* Le dash mobile a deja son bouton tactile (demande 90). */
+    if (!mobile) pushButton(list, CONTROLS.dash[0].id, CONTROLS.dash[0].icon, CONTROLS.dash[0].keycode, CONTROLS.dash[0].description, true);
+
+    /* Une touche par capacite REELLE du fruit, avec l'icone de son type
+       d'attaque (fruit/abilities, ATTACK_TYPES) et son nom en description :
+       le joueur lit « Rocket Salvo » sur la touche, pas « Ability 2 ». */
+    const count = fruitAbilityCount(playerId);
+    if (count > 0 && (mobile || held === SWAP_ORB_Name)) {
+        const info = fruitButtonInfo(n(playerId)).slice(0, count);
         for (let i = 0; i < info.length && i < CONTROLS.ability.length; i++) {
-            list.push({
-                id: "ability" + (i + 1),
-                icon: info[i].icon || CONTROLS.ability[i].icon,
-                keycode: CONTROLS.ability[i].keycode,
-                description: info[i].name || CONTROLS.ability[i].description,
-            });
+            pushButton(
+                list,
+                "ability" + (i + 1),
+                info[i].icon || CONTROLS.ability[i].icon,
+                CONTROLS.ability[i].keycode,
+                info[i].name || CONTROLS.ability[i].description,
+                !mobile,
+            );
         }
-    } else if (held === VOID_NET_Name) {
-        for (let i = 0; i < CONTROLS.style.length; i++) list.push(CONTROLS.style[i]);
+    }
+
+    /* Les deux attaques du style, seulement si le joueur en a un.
+       Sur mobile les deux groupes coexistent a l'ecran : leurs touches
+       distinctes (G / H) evitent deux boutons pour un meme keycode — le doigt
+       s'en moque, une tablette avec clavier non. */
+    if (fsStyle(playerId) && (mobile || held === VOID_NET_Name)) {
+        for (let i = 0; i < CONTROLS.style.length; i++) {
+            const keycode = mobile ? MOBILE_STYLE_KEYS[i] : CONTROLS.style[i].keycode;
+            pushButton(list, CONTROLS.style[i].id, CONTROLS.style[i].icon, keycode, CONTROLS.style[i].description, !mobile);
+        }
     }
     return list;
 }
@@ -290,20 +328,21 @@ function setupDevice(playerId) {
 }
 
 /* Pose les commandes du mode courant, et RIEN de l'autre :
-     « items »   : items de capacite + items de style, dash a l'action
-                   secondaire (mobile : l'item Dash, puisqu'il n'a pas de
-                   clic droit) ;
-     « buttons » : Swap Orb / Void Net, touches, aucun item de capacite.
-   Appele au join ET a chaque bascule des Settings (data.applyControls). */
+     « items »   : items de capacite + items de style, main nue pour frapper ;
+     « buttons » : les boutons (icones), aucun item de capacite.
+   Le BOUTON TACTILE du dash est mobile et ne depend pas du mode : il est pose
+   dans les deux cas (demande 90), et retire sur PC.
+   Appele au join, au respawn et a chaque bascule des Settings. */
 function setupControls(playerId) {
+    const mobile = isMobilePlayer(playerId);
+    setupDashBtn(playerId);
     if (useItemControls(playerId)) {
         lastButtons[playerId] = null;
         try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
         dropSwap(playerId), dropNet(playerId);
-        /* Le dash mobile a son bouton tactile ; sur PC c'est le clic droit, et
-           un item de dash d'une ancienne version est nettoye au passage. */
-        setupDashBtn(playerId);
-        if (!isMobilePlayer(playerId)) dropDash(playerId);
+        /* Un item de dash residuel d'une ancienne version est nettoye sur PC
+           (le mobile garde le sien : son clic dashe toujours). */
+        if (!mobile) dropDash(playerId);
         /* Les items du fruit et du style reviennent (restore ne redonne que ce
            qui manque, donc un joueur deja equipe ne recoit rien en double). */
         Gt("controls.fruit", () => g(playerId));
@@ -313,8 +352,15 @@ function setupControls(playerId) {
     dropDash(playerId);
     dropAbilityItems(playerId);
     dropFightingStyleItems(playerId);
-    ensureSwap(playerId);
-    ensureNet(playerId);
+    /* Swap Orb / Void Net n'ouvrent que les touches du PC. Sur mobile les
+       boutons sont deja la : l'item n'occuperait qu'un slot. */
+    if (mobile) {
+        dropSwap(playerId);
+        dropNet(playerId);
+    } else {
+        ensureSwap(playerId);
+        ensureNet(playerId);
+    }
     applyButtons(playerId);
     return true;
 }
@@ -347,8 +393,12 @@ function clickPoint(playerId) {
 onTouchscreenActionButton = (playerId, touchDown) => {
     Gt("dashButton", () => dashButton(playerId, touchDown));
 },
-/* Bouton personnalise presse (PC). Le bouton n'existe que si le bon item est en
-   main, mais on revérifie ici : un client peut garder un bouton residuel. */
+/* Bouton presse : par une touche sur PC, par un tap sur MOBILE (Bloxd affiche
+   les customButtons a l'ecran des joueurs tactiles, avec le meme
+   fonctionnement — demande 91).
+   Sur PC, le bouton n'existe que si le bon item est en main ; on revérifie ici
+   parce qu'un client peut garder un bouton residuel. Sur mobile, aucun item a
+   tenir : les boutons sont la commande elle-meme. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
     if (buttonId === "dash") {
@@ -356,18 +406,20 @@ onPlayerPressedButton = (playerId, buttonId) => {
         return;
     }
     const held = heldName(playerId);
-    if (held === SWAP_ORB_Name) {
+    const byTouch = isMobilePlayer(playerId) && !useItemControls(playerId);
+    if (held === SWAP_ORB_Name || byTouch) {
         const m = /^ability([1-5])$/.exec(buttonId);
-        if (!m) return;
-        const aim = clickPoint(playerId);
-        try {
-            slotAbility(playerId, Number(m[1]) - 1, false, aim.x, aim.y, aim.z, aim.block, aim.target);
-        } catch (e) {
-            _t("button.ability", e);
+        if (m) {
+            const aim = clickPoint(playerId);
+            try {
+                slotAbility(playerId, Number(m[1]) - 1, false, aim.x, aim.y, aim.z, aim.block, aim.target);
+            } catch (e) {
+                _t("button.ability", e);
+            }
+            return;
         }
-        return;
     }
-    if (held === VOID_NET_Name) {
+    if (held === VOID_NET_Name || byTouch) {
         const index = buttonId === "style1" ? 0 : buttonId === "style2" ? 1 : -1;
         if (index < 0) return;
         const aim = clickPoint(playerId);
@@ -379,9 +431,10 @@ onPlayerPressedButton = (playerId, buttonId) => {
     }
 };
 
-/* Les touches dependent de l'item EN MAIN : on les recalcule quand le joueur
-   change de slot (le cas normal) et quand son inventaire bouge (item donne,
-   ramasse, perdu). applyButtons ne renvoie rien si la liste n'a pas change. */
+/* Sur PC les boutons dependent de l'item EN MAIN, sur mobile du fruit et du
+   style : on les recalcule quand le joueur change de slot (le cas normal) et
+   quand son inventaire bouge (item donne, ramasse, perdu). applyButtons
+   n'envoie rien si la liste n'a pas change. */
 onPlayerSelectInventorySlot = (t, slot) => {
     applyButtons(t);
 }, onInventoryUpdated = t => {
@@ -444,6 +497,9 @@ onPlayerSelectInventorySlot = (t, slot) => {
     /* Le bouton tactile du dash est repose : un respawn recharge le client, et
        un joueur mobile ne doit pas perdre son dash en mourant. */
     Gt("dashButton", () => setupDashBtn(t)),
+    /* Les boutons du mobile dependent du fruit et du style : au respawn, le
+       joueur vient de les recuperer. */
+    Gt("buttons", () => applyButtons(t)),
     Gt("sidebar", () => K(t));
     try {
         sTimeout(() => {
@@ -496,7 +552,9 @@ onPlayerSelectInventorySlot = (t, slot) => {
         return;
     }
     if (Kt(t)) return;
-    if (api.isPlayerCrouching(t) && l(t)) return K(t), void N();
+    /* Sneak + clic sur un fruit : il vient d'etre mange, donc les boutons du
+       mobile doivent apparaitre tout de suite (aucun item pour les ouvrir). */
+    if (api.isPlayerCrouching(t) && l(t)) return K(t), Gt("buttons", () => applyButtons(t)), void N();
     if (m && isNPCEntity(m)) {
         try {
             Zt(t, m);

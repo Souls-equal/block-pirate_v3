@@ -709,9 +709,13 @@ function createSettingsItems(playerId) {
         });
     } catch (e) {}
 
-    /* Choix des commandes (demande 77). Le mobile n'a pas de clavier : on ne lui
-       propose rien, il reste en « items » sans pouvoir en sortir. */
-    if (!isMobilePlayer(playerId)) {
+    /* Choix des commandes (demandes 77 et 91). Les DEUX modes existent sur les
+       deux appareils : Bloxd affiche les boutons a l'ecran des joueurs
+       tactiles, avec le meme fonctionnement qu'une touche. Le defaut suit
+       l'appareil (boutons sur mobile, items sur PC) ; ce reglage est le seul
+       endroit ou on le change, et il est enregistre. */
+    {
+        const mobile = isMobilePlayer(playerId);
         try {
             api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_controls", {
                 image: byButtons ? "Swap Orb" : "Moonstone Dust",
@@ -724,15 +728,19 @@ function createSettingsItems(playerId) {
                 description: [
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
                     txt(byButtons
-                        ? " Keyboard: the items in your hand open the keys."
+                        ? (mobile
+                            ? " Buttons on screen: one icon per ability."
+                            : " Keyboard: the items in your hand open the keys.")
                         : " Items: one item per ability.", C.INFO),
                     bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), C.SUCCESS),
                     txt(byButtons
-                        ? " — Q dash, Z X C V F fruit, Z X style."
-                        : " — click an ability item, right click to dash.", C.INFO),
+                        ? (mobile
+                            ? " — ability icons, and the dash button."
+                            : " — Q dash, Z X C V F fruit, Z X style.")
+                        : " — click an ability item; the dash has its own button.", C.INFO),
                     txt(byButtons
                         ? "\nSwitch back if you prefer items."
-                        : "\nSwitch if you prefer the keyboard.", C.INFO),
+                        : "\nSwitch if you prefer the buttons.", C.INFO),
                 ],
             });
         } catch (e) {}
@@ -873,24 +881,22 @@ function setIslandShown(playerId, name, want) {
    du nouveau donnes immediatement (data.applyControls -> index.js) : le joueur
    n'a pas a se deconnecter pour voir le changement. */
 function toggleControlMode(playerId) {
-    if (isMobilePlayer(playerId)) {
-        settingsSay(playerId, [
-            ic("fa-solid fa-circle-info", C.INFO),
-            txt(" Touch screens always use items: your dash is the Dash item.", C.INFO),
-        ]);
-        return;
-    }
     const byButtons = getControlMode(playerId) === "buttons";
     const mode = setControlMode(playerId, byButtons ? "items" : "buttons");
     applyControls(playerId);
     createSettingsItems(playerId);
     const buttons = mode === "buttons";
+    const mobile = isMobilePlayer(playerId);
     settingsSay(playerId, [
         ic(buttons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
-        bold(buttons ? " Keyboard controls." : " Item controls.", SETTING_CONTROLS_COLOR),
+        bold(buttons ? " Button controls." : " Item controls.", SETTING_CONTROLS_COLOR),
         txt(buttons
-            ? " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash."
-            : " One item per ability, and right click to dash.", C.INFO),
+            ? (mobile
+                ? " One icon per ability on your screen, and the dash button. No item to hold."
+                : " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash.")
+            : (mobile
+                ? " One item per ability. Your dash stays on its button."
+                : " One item per ability, and right click to dash."), C.INFO),
     ]);
 }
 

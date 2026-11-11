@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 367 473 caracteres** (72 % de la limite de 512 000 du World Code, -56 % par rapport aux sources lisibles).
+**32 fichiers, 368 169 caracteres** (72 % de la limite de 512 000 du World Code, -56 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -34,27 +34,27 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `core/ranks.js` | 2 276 | 5 392 |
 | `core/team.js` | 16 261 | 48 087 |
 | `core/theme.js` | 18 069 | 40 765 |
-| `core/UI.js` | 14 669 | 45 443 |
+| `core/UI.js` | 14 787 | 45 932 |
 | `fruit/abilities.js` | 38 178 | 52 633 |
 | `fruit/fruitData.js` | 4 331 | 6 209 |
 | `fruit/func-abilities.js` | 23 412 | 39 595 |
-| `fruit/index.js` | 22 244 | 43 872 |
+| `fruit/index.js` | 22 287 | 44 061 |
 | `gameplay/codes.js` | 3 870 | 7 279 |
-| `gameplay/customItem.js` | 5 246 | 13 975 |
-| `gameplay/fightingStyles.js` | 19 277 | 42 146 |
+| `gameplay/customItem.js` | 5 246 | 14 105 |
+| `gameplay/fightingStyles.js` | 19 370 | 43 026 |
 | `gameplay/loot.js` | 1 970 | 7 267 |
 | `gameplay/NPCs.js` | 8 610 | 21 876 |
 | `gameplay/quest.js` | 10 158 | 23 440 |
 | `gameplay/saber.js` | 28 931 | 79 595 |
 | `gameplay/spawning.js` | 5 937 | 14 602 |
-| `gameplay/stamina.js` | 5 349 | 16 351 |
-| `gameplay/stats.js` | 5 381 | 12 896 |
-| `gameplay/tutorial.js` | 6 772 | 16 191 |
+| `gameplay/stamina.js` | 5 298 | 16 394 |
+| `gameplay/stats.js` | 5 403 | 13 203 |
+| `gameplay/tutorial.js` | 6 795 | 16 214 |
 | `gameplay/variations.js` | 6 343 | 20 896 |
-| `index.js` | 16 100 | 40 912 |
+| `index.js` | 16 481 | 43 926 |
 | `utils/boss.js` | 6 895 | 16 246 |
 | `utils/combat.js` | 15 465 | 48 329 |
-| `utils/data.js` | 6 480 | 17 987 |
+| `utils/data.js` | 6 547 | 19 316 |
 | `utils/fx.js` | 6 076 | 10 662 |
 | `utils/haki.js` | 5 207 | 13 434 |
 | `utils/killAttribution.js` | 2 017 | 6 490 |

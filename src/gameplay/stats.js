@@ -263,7 +263,11 @@ export function initUpgradeShop() {
         description: [
             ic("fa-solid fa-clock-rotate-left", C.DANGER),
             txt(" Refund every Stat Point you spent.", C.INFO),
-            bold("\n\u25cf Your level and your items are kept.", C.SUCCESS),
+            /* Le style de combat n'est PAS concerne : il s'achete, et un
+               remboursement de points de stat ne doit pas le retirer. La carte
+               le dit, pour qu'on ne confonde pas avec la remise a zero
+               complete (data.resetPlayer, demande 91). */
+            bold("\n\u25cf Your level, items and Fighting Style are kept.", C.SUCCESS),
             txt("\nClick twice to confirm.", C.INFO),
         ],
         sortPriority: 0,
@@ -304,7 +308,7 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
             ic("fa-solid fa-clock-rotate-left", C.DANGER),
             txt(" Reset every stat? ", C.INFO),
             bold(spent + " Stat Point" + (spent > 1 ? "s" : "") + " come back", C.MONEY),
-            txt(", your level and your items stay.", C.INFO),
+            txt(", your level, items and Fighting Style stay.", C.INFO),
         ])) return true;
         const refund = resetStats(playerId);
         say(playerId, [

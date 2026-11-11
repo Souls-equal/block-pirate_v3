@@ -43,7 +43,9 @@ export const ITEM_LOOKS = {
            inventaire d'avant affiche « Dash » et pas un nom technique. C'est
            une MATIERE (aucun effet propre) : un item qui propulse tout seul
            ferait un second dash impossible a annuler sur mobile ;
-         - Swap Orb / Void Net : ouvrent les touches du mode « boutons ». */
+         - Swap Orb / Void Net : ouvrent les touches du mode « boutons » sur
+           PC. Sur mobile les boutons sont deja a l'ecran, donc ces deux items
+           n'y sont jamais donnes (demande 91). */
     "Moonstone Dust": {
         displayName: "Dash",
         description: "Click to dash forward. It costs stamina and cannot be dropped.",

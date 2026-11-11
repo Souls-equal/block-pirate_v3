@@ -6,14 +6,30 @@ import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../gameplay/
 import { clearFruit } from "../fruit/index";
 import { clearFightingStyle } from "../gameplay/fightingStyles";
 
+/* REMISE A ZERO D'UN JOUEUR
+   L'ordre compte : on retire d'abord ce qui POSSEDE des items (fruit, style),
+   qui les purge, PUIS on vide l'inventaire. Un item de style encore en base
+   reviendrait sinon au respawn (restoreFightingStyle) — c'est exactement ce
+   qu'on veut eviter : un joueur reset ne doit plus avoir de style (demande 91).
+   Le style est efface par sa CLE (`deleteStat`) : ecrire `null` laissait la
+   valeur en base, donc le style revenait au join suivant.
+   `ctl` est supprime aussi : les commandes repartent du defaut de l'appareil
+   (boutons sur mobile, items sur PC). Le drapeau d'appareil reste : il est
+   encore juste, et le relire au join suffit. */
 resetPlayer = (id) => {
+    if (!id) return false;
     setLevel(id, 1, true);
     resetStats(id);
     setStat(id, "money", 0);
     setStat(id, "sp", 0);
     clearFruit(id);
     clearFightingStyle(id);
+    deleteStat(id, "ctl");
     api.clearInventory(id);
+    /* Le mode a pu changer (ctl supprime) : on repose items ou boutons. */
+    applyControls(id);
+    try { updateSidebar(id); } catch (e) {}
+    return true;
 }
 
 import { C, nfmt, say, txt, bold, ic } from "../core/theme";
@@ -436,8 +452,9 @@ export function reconcileSP(playerId) {
 /* APPAREIL DU JOUEUR --------------------------------------------------------
    Lu UNE seule fois, au join (api.isMobile) : un joueur ne peut pas passer de
    PC a mobile sans quitter le monde, donc inutile de relire a chaque tick. Ce
-   drapeau decide des COMMANDES (touches sur PC, items sur mobile) et rien
-   d'autre : il ne touche ni l'inventaire du joueur ni ses statistiques. */
+   drapeau decide du DEFAUT des commandes (boutons sur mobile, items sur PC),
+   du bouton tactile du dash et de la detection des PNJ au doigt. Il ne touche
+   ni l'inventaire du joueur ni ses statistiques. */
 const devices = {};
 
 export function setDevice(playerId, mobile) {
@@ -454,13 +471,17 @@ export function clearDevice(playerId) {
     delete devices[playerId];
 }
 
-/* MODE DE COMMANDE — un REGLAGE, pas un appareil (demande 77)
+/* MODE DE COMMANDE — un REGLAGE, avec un DEFAUT par appareil (91)
    ---------------------------------------------------------------------------
-     "items"   : les items de capacite et de style, et le dash a l'action
-                 secondaire. C'est le comportement historique, et le DEFAUT.
-     "buttons" : Swap Orb / Void Net et les touches du PC (demande 76).
-   Le mobile n'a pas le choix : pas de clavier, donc toujours "items" (le dash
-   passe par l'item « Dash »). Un reglage enregistre ne le change pas. */
+     "items"   : un item par capacite, ouvrables a la main. Sur mobile, le dash
+                 reste le bouton tactile.
+     "buttons" : les BOUTONS. Sur PC ils apparaissent avec leur touche (Q,
+                 Z X C V F) ; Bloxd les affiche aussi sur mobile, ou ils
+                 jouent exactement le meme role, sans clavier.
+   DEFAUT : le mobile a les BOUTONS (ce sont de petites icones, on ne peut pas
+   y mettre de texte), le PC a les ITEMS (comportement historique). Chacun
+   peut basculer dans Settings -> Controls, et son choix est enregistre : une
+   valeur en base passe TOUJOURS avant le defaut de l'appareil. */
 const CTRL_DB_KEY = "ctl";
 export const CTL_ITEMS = "items";
 export const CTL_BUTTONS = "buttons";
@@ -468,10 +489,12 @@ export const CTL_BUTTONS = "buttons";
 /* Un seul endroit qui decide : tout le reste du code passe par la. */
 export function getControlMode(playerId) {
     if (!playerId) return CTL_ITEMS;
-    if (isMobilePlayer(playerId)) return CTL_ITEMS;
     let saved = null;
     try { saved = api.getPlayerDbValue(playerId, CTRL_DB_KEY); } catch (e) { saved = null; }
-    return saved === CTL_BUTTONS ? CTL_BUTTONS : CTL_ITEMS;
+    if (saved === CTL_BUTTONS) return CTL_BUTTONS;
+    if (saved === CTL_ITEMS) return CTL_ITEMS;
+    /* Rien en base : le defaut suit l'appareil (demande 91). */
+    return isMobilePlayer(playerId) ? CTL_BUTTONS : CTL_ITEMS;
 }
 
 export function setControlMode(playerId, mode) {
