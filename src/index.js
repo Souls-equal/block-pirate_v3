@@ -235,9 +235,6 @@ const CONTROLS = {
 /* Un bouton n'a de TEXTE que sur PC : Bloxd affiche les boutons du mobile en
    tout petit, une description y serait illisible. L'icone porte le sens
    (demande 91 : « icones seulement »). */
-/* Touches des attaques de style quand les DEUX groupes sont affiches (mobile). */
-const MOBILE_STYLE_KEYS = ["KeyG", "KeyH"];
-
 function pushButton(list, id, icon, keycode, text, withText) {
     const button = { id: id, icon: icon, keycode: keycode };
     if (withText && text) button.description = text;
@@ -245,14 +242,15 @@ function pushButton(list, id, icon, keycode, text, withText) {
     return button;
 }
 
-/* Boutons envoyes au client. Deux regles differentes, et c'est VOULU :
-     PC     : un bouton n'apparait qu'avec l'item qui l'ouvre (Swap Orb / Void
-              Net en main), sinon le joueur aurait huit touches mortes ;
-     MOBILE : les boutons SONT la commande (demande 91). Bloxd les affiche a
-              l'ecran avec le meme fonctionnement qu'une touche, donc ils sont
-              la des que le joueur a un fruit / un style — aucun item a tenir.
-   Le dash mobile a deja son bouton tactile (demande 90) : on ne pose pas un
-   second bouton pour la meme action. */
+/* Boutons envoyes au client. LA REGLE EST LA MEME SUR LES DEUX APPAREILS
+   (demandes 76, 77 et 91) : un bouton n'apparait qu'avec l'ITEM qui l'ouvre,
+   Swap Orb ou Void Net en main. Sur mobile l'orb et le filet sont donc donnes
+   comme sur PC, et c'est le meme geste : je sors l'item, les icones
+   apparaissent, je le range, elles disparaissent.
+   Sans cette regle, le mobile aurait huit boutons en permanence a l'ecran,
+   dont deux groupes qui ne servent pas au meme moment.
+   Seule difference : le mobile n'a pas de bouton « dash » dans cette liste, il
+   a son bouton tactile dedie (demande 90). */
 function buttonsFor(playerId) {
     /* Mode « items » : aucun bouton, tout passe par les items. */
     if (useItemControls(playerId)) return [];
@@ -265,9 +263,8 @@ function buttonsFor(playerId) {
     /* Une touche par capacite REELLE du fruit, avec l'icone de son type
        d'attaque (fruit/abilities, ATTACK_TYPES) et son nom en description :
        le joueur lit « Rocket Salvo » sur la touche, pas « Ability 2 ». */
-    const count = fruitAbilityCount(playerId);
-    if (count > 0 && (mobile || held === SWAP_ORB_Name)) {
-        const info = fruitButtonInfo(n(playerId)).slice(0, count);
+    if (held === SWAP_ORB_Name) {
+        const info = fruitButtonInfo(n(playerId)).slice(0, fruitAbilityCount(playerId));
         for (let i = 0; i < info.length && i < CONTROLS.ability.length; i++) {
             pushButton(
                 list,
@@ -278,16 +275,10 @@ function buttonsFor(playerId) {
                 !mobile,
             );
         }
-    }
-
-    /* Les deux attaques du style, seulement si le joueur en a un.
-       Sur mobile les deux groupes coexistent a l'ecran : leurs touches
-       distinctes (G / H) evitent deux boutons pour un meme keycode — le doigt
-       s'en moque, une tablette avec clavier non. */
-    if (fsStyle(playerId) && (mobile || held === VOID_NET_Name)) {
+    } else if (held === VOID_NET_Name && fsStyle(playerId)) {
+        /* Les deux attaques du style, et seulement si le joueur en a un. */
         for (let i = 0; i < CONTROLS.style.length; i++) {
-            const keycode = mobile ? MOBILE_STYLE_KEYS[i] : CONTROLS.style[i].keycode;
-            pushButton(list, CONTROLS.style[i].id, CONTROLS.style[i].icon, keycode, CONTROLS.style[i].description, !mobile);
+            pushButton(list, CONTROLS.style[i].id, CONTROLS.style[i].icon, CONTROLS.style[i].keycode, CONTROLS.style[i].description, !mobile);
         }
     }
     return list;
@@ -305,10 +296,10 @@ function applyButtons(playerId) {
     try { api.setClientOption(playerId, "customButtons", list); } catch (e) { _t("buttons", e); }
 }
 
-/* Les deux items de commande (PC). Ils ne SERVENT a rien d'autre qu'a ouvrir
-   des touches : tout ce que le jeu ferait d'eux (lancer, poser, manger,
-   echanger, charger, lacher) est donc bloque. Sans ca, un clic droit lance la
-   « Devil Fruit Orb » et la consomme. */
+/* Les deux items de commande (PC ET mobile). Ils ne SERVENT a rien d'autre
+   qu'a ouvrir des boutons : tout ce que le jeu ferait d'eux (lancer, poser,
+   manger, echanger, charger, lacher) est donc bloque. Sans ca, un clic droit
+   lance la « Devil Fruit Orb » et la consomme. */
 function isCommandItemName(name) {
     return name === SWAP_ORB_Name || name === VOID_NET_Name;
 }
@@ -319,7 +310,8 @@ function heldCommandItem(playerId) {
 }
 
 /* L'appareil ne change qu'en quittant le monde : on le lit UNE fois, au tout
-   debut du join (avant le fruit, qui donne des items differents selon lui). */
+   debut du join. Il decide du dash tactile, du defaut des commandes et de la
+   detection des PNJ au doigt ; les items, eux, sont les memes partout. */
 function setupDevice(playerId) {
     let mobile = false;
     try { mobile = api.isMobile(playerId) === true; } catch (e) { mobile = false; }
@@ -352,15 +344,10 @@ function setupControls(playerId) {
     dropDash(playerId);
     dropAbilityItems(playerId);
     dropFightingStyleItems(playerId);
-    /* Swap Orb / Void Net n'ouvrent que les touches du PC. Sur mobile les
-       boutons sont deja la : l'item n'occuperait qu'un slot. */
-    if (mobile) {
-        dropSwap(playerId);
-        dropNet(playerId);
-    } else {
-        ensureSwap(playerId);
-        ensureNet(playerId);
-    }
+    /* L'orb et le filet ouvrent les boutons, SUR LES DEUX APPAREILS : c'est le
+       meme systeme d'items a sortir (demande 91). */
+    ensureSwap(playerId);
+    ensureNet(playerId);
     applyButtons(playerId);
     return true;
 }
@@ -396,9 +383,9 @@ onTouchscreenActionButton = (playerId, touchDown) => {
 /* Bouton presse : par une touche sur PC, par un tap sur MOBILE (Bloxd affiche
    les customButtons a l'ecran des joueurs tactiles, avec le meme
    fonctionnement — demande 91).
-   Sur PC, le bouton n'existe que si le bon item est en main ; on revérifie ici
-   parce qu'un client peut garder un bouton residuel. Sur mobile, aucun item a
-   tenir : les boutons sont la commande elle-meme. */
+   Le bouton n'existe que si le bon item est en main, mais on revérifie ici :
+   un client peut garder un bouton residuel, et c'est LE MEME controle sur les
+   deux appareils. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
     if (buttonId === "dash") {
@@ -406,8 +393,7 @@ onPlayerPressedButton = (playerId, buttonId) => {
         return;
     }
     const held = heldName(playerId);
-    const byTouch = isMobilePlayer(playerId) && !useItemControls(playerId);
-    if (held === SWAP_ORB_Name || byTouch) {
+    if (held === SWAP_ORB_Name) {
         const m = /^ability([1-5])$/.exec(buttonId);
         if (m) {
             const aim = clickPoint(playerId);
@@ -419,7 +405,7 @@ onPlayerPressedButton = (playerId, buttonId) => {
             return;
         }
     }
-    if (held === VOID_NET_Name || byTouch) {
+    if (held === VOID_NET_Name) {
         const index = buttonId === "style1" ? 0 : buttonId === "style2" ? 1 : -1;
         if (index < 0) return;
         const aim = clickPoint(playerId);

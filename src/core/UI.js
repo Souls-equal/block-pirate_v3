@@ -729,13 +729,13 @@ function createSettingsItems(playerId) {
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
                     txt(byButtons
                         ? (mobile
-                            ? " Buttons on screen: one icon per ability."
+                            ? " Hold Fruit Abilities: its icons appear on screen."
                             : " Keyboard: the items in your hand open the keys.")
                         : " Items: one item per ability.", C.INFO),
                     bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), C.SUCCESS),
                     txt(byButtons
                         ? (mobile
-                            ? " — ability icons, and the dash button."
+                            ? " — one icon per ability, plus the dash button."
                             : " — Q dash, Z X C V F fruit, Z X style.")
                         : " — click an ability item; the dash has its own button.", C.INFO),
                     txt(byButtons
@@ -892,7 +892,7 @@ function toggleControlMode(playerId) {
         bold(buttons ? " Button controls." : " Item controls.", SETTING_CONTROLS_COLOR),
         txt(buttons
             ? (mobile
-                ? " One icon per ability on your screen, and the dash button. No item to hold."
+                ? " Hold Fruit Abilities for the ability icons, Fighting Style Capacities for the style ones. Your dash has its own button."
                 : " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash.")
             : (mobile
                 ? " One item per ability. Your dash stays on its button."

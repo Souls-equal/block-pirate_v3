@@ -34,7 +34,7 @@ import {
 } from "../utils/fx";
 import { run, setTimeout as sTimeout, sleep } from "../utils/timer";
 import { eachItemSlot } from "./customItem";
-import { applyControls, cancelConfirm, confirmAction, deleteStat, getTotalMoney, isMobilePlayer, payMoney, useItemControls } from "../utils/data";
+import { cancelConfirm, confirmAction, deleteStat, getTotalMoney, payMoney, useItemControls } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, nfmt, say, txt, bold, ic } from "../core/theme";
 
@@ -65,12 +65,13 @@ export function removeVoidNet(playerId) {
     return true;
 }
 
-/* Le filet n'ouvre que les TOUCHES du PC : inutile en mode items, et inutile
-   sur mobile ou les boutons sont deja a l'ecran (demande 91). */
+/* Le filet n'ouvre que les BOUTONS : inutile en mode items. En mode boutons il
+   est donne sur PC COMME sur mobile (demande 91) : c'est l'item qui fait
+   apparaitre les deux icones du style. */
 export function ensureVoidNet(playerId) {
     if (!playerId) return false;
     const styleName = getFightingStyle(playerId);
-    if (useItemControls(playerId) || isMobilePlayer(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
+    if (useItemControls(playerId) || !styleName || !FIGHTING_STYLES[styleName]) return removeVoidNet(playerId), false;
     return giveVoidNet(playerId);
 }
 
@@ -808,10 +809,9 @@ export function giveFightingStyleItems(playerId, styleName) {
     const style = FIGHTING_STYLES[styleName];
     if (!style) return false;
     removeFightingStyleItems(playerId, styleName);
-    /* Mode boutons : sur PC le filet remplace les deux items de capacite et
-       ouvre les deux touches (voir index.js) ; sur mobile les deux boutons
-       sont deja la (demande 91), donc aucun item. */
-    if (!useItemControls(playerId)) return isMobilePlayer(playerId) ? true : giveVoidNet(playerId);
+    /* Mode boutons : le filet remplace les deux items de capacite et ouvre les
+       deux boutons, sur PC comme sur mobile (demande 91). */
+    if (!useItemControls(playerId)) return giveVoidNet(playerId);
     for (let i = 0; i < style.abilities.length; i++) {
         const ab = style.abilities[i];
         if (hasAbilityItem(playerId, ab)) continue;
@@ -836,9 +836,6 @@ export function equipFightingStyle(playerId, styleName, silent = false) {
     try {
         updateSidebarLight(playerId);
     } catch (e) {}
-    /* Sur mobile en mode boutons, apprendre un style ne donne AUCUN item :
-       sans ce rappel, les deux boutons n'apparaitraient qu'au join suivant. */
-    if (isMobilePlayer(playerId)) applyControls(playerId);
     if (!silent) {
         try {
             api.playSound(playerId, "exp_levelup", 1, 1.15);
