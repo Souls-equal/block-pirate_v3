@@ -38,9 +38,11 @@ export const ITEM_LOOKS = {
        au joueur. Le code les reconnait par leur nom d'item ("Moonstone Dust",
        "Swap Orb", "Void Net") et JAMAIS par ce qui est ecrit ici : renommer
        une entree ne casse donc aucun test ni aucun choix de commande.
-         - Moonstone Dust : le dash du mobile, seul moyen de dasher a l'ecran.
-           C'est une MATIERE (aucun effet propre) : un item qui propulse tout
-           seul ferait un second dash impossible a annuler sur mobile ;
+         - Moonstone Dust : RELIQUAT des anciennes versions (le dash mobile a
+           maintenant son bouton tactile). Le nom reste traduit pour qu'un
+           inventaire d'avant affiche « Dash » et pas un nom technique. C'est
+           une MATIERE (aucun effet propre) : un item qui propulse tout seul
+           ferait un second dash impossible a annuler sur mobile ;
          - Swap Orb / Void Net : ouvrent les touches du mode « boutons ». */
     "Moonstone Dust": {
         displayName: "Dash",

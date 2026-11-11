@@ -624,6 +624,37 @@ if (!controlsMatch) {
 }
 
 /* ==========================================================================
+   3c. Bouton tactile du dash (mobile)
+   ==========================================================================
+   Le dash mobile ne passe plus par un item a tenir en main : il a son propre
+   bouton tactile (demande 90). Trois choses le cassent en silence :
+     - la client option n'est jamais posee  -> aucun bouton a l'ecran ;
+     - le callback n'existe pas             -> un bouton mort ;
+     - l'icone du bouton n'existe pas       -> un « ? » dans le bouton.
+   On verifie donc les trois, sur les sources telles qu'elles partent. */
+{
+    const staminaSrc = readFileSync(join(ROOT, "src/gameplay/stamina.js"), "utf8");
+    checked++;
+    if (staminaSrc.indexOf('"touchscreenActionButton"') < 0)
+        errors.push("dash mobile : src/gameplay/stamina.js ne pose pas la client option touchscreenActionButton");
+    const bolt = /ic\("fa-solid fa-([a-z-]+)"/.exec(staminaSrc.slice(staminaSrc.indexOf("function dashButtonParts")));
+    checked++;
+    if (!bolt || !fa.has(bolt[1]))
+        errors.push("dash mobile : l'icone du bouton tactile n'est pas dans la liste blanche");
+
+    /* L'ASSIGNATION, pas la premiere mention (les commentaires en parlent). */
+    const hook = /onTouchscreenActionButton\s*=/.exec(controlsSource);
+    checked++;
+    if (!hook) errors.push("src/index.js : onTouchscreenActionButton introuvable (le bouton tactile ne fait rien)");
+    else {
+        const body = controlsSource.slice(hook.index, hook.index + 400);
+        checked++;
+        if (body.toLowerCase().indexOf("dash") < 0)
+            errors.push("onTouchscreenActionButton n'appelle pas le dash");
+    }
+}
+
+/* ==========================================================================
    3b. Icones des capacites de fruit (types d'attaque)
    ==========================================================================
    Les touches du PC affichent l'icone du TYPE d'une capacite (projectile,

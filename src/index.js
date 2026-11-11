@@ -4,7 +4,7 @@ import { abilityCollision as b, abilityJoin as P, abilityLeave as k, fruitButton
 import { isImmuneToDamage as A, onPlayerThrowableHitTerrainPaint as I, onPlayerUsedThrowablePaint as v } from "./fruit/func-abilities";
 import { dCode as w, joinUI as M, onPlayerJoinLeaderboard as S, refreshLeaderboardAll as N, updateSidebar as K, updateSidebarLight as H, handleSettingsShop as bpSettingsShop, settingsLeave as bpSettingsLeave, settingsSyncVariation as bpSettingsSync, setTutorialLineLookup as bpSetTutorialLine } from "./core/UI"; 
 import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from "./gameplay/quest";
-import { attackNPC as U, forgetNPC as B, isProtectedNPC as F } from "./gameplay/NPCs";
+import { attackNPC as U, forgetNPC as B, isProtectedNPC as F, npcNearPoint as npcUnderFinger } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
@@ -15,7 +15,7 @@ import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { isBossMob as isBossMob } from "./gameplay/loot";
 import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, ensureDashItem as ensureDash, handleDashItemClick as dashItemClick, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, handleDashButton as dashButton, handleDashItemClick as dashItemClick, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, setupDashButton as setupDashBtn, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -199,10 +199,11 @@ ct((t, r, a) => {
             par capacite de fruit (Z X C V F). Les items de capacites sont
             RETIRES de l'inventaire : ils ne servent plus a rien et
             encombraient 5 slots.
-   MOBILE : pas de clavier, donc pas de boutons. Les items de capacites
-            restent, et un item « Moonstone Dust » (une matiere inerte) sert
-            de dash : son clic est traite par onPlayerClick, et son action
-            secondaire est refusee dans onPlayerAltAction.
+   MOBILE : pas de clavier, donc pas de boutons a touches. Les items de
+            capacites restent. Le dash a son PROPRE bouton tactile
+            (touchscreenActionButton, onTouchscreenActionButton) : il ne
+            depend donc pas de ce que le joueur tient en main, et l'item
+            « Moonstone Dust » n'est plus donne (demande 90).
 
    Les keycodes sont ceux du clavier QWERTY ; Bloxd remappe tout seul pour un
    AZERTY (c'est la meme touche physique).
@@ -299,9 +300,10 @@ function setupControls(playerId) {
         lastButtons[playerId] = null;
         try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
         dropSwap(playerId), dropNet(playerId);
-        /* Le dash par item n'existe que sur mobile : sur PC c'est le clic droit. */
-        if (isMobilePlayer(playerId)) ensureDash(playerId);
-        else dropDash(playerId);
+        /* Le dash mobile a son bouton tactile ; sur PC c'est le clic droit, et
+           un item de dash d'une ancienne version est nettoye au passage. */
+        setupDashBtn(playerId);
+        if (!isMobilePlayer(playerId)) dropDash(playerId);
         /* Les items du fruit et du style reviennent (restore ne redonne que ce
            qui manque, donc un joueur deja equipe ne recoit rien en double). */
         Gt("controls.fruit", () => g(playerId));
@@ -338,6 +340,13 @@ function clickPoint(playerId) {
     return { x: x, y: y, z: z, block: block, target: target };
 }
 
+/* Bouton tactile du mobile (demande 90). Bloxd appelle ce callback pour
+   l'APPUI et pour le RELACHEMENT : seul l'appui dash. Il n'existe que si
+   setupDashButton a pose le client option, donc les joueurs PC — qui ont le
+   clic droit et Q — ne peuvent pas le declencher. */
+onTouchscreenActionButton = (playerId, touchDown) => {
+    Gt("dashButton", () => dashButton(playerId, touchDown));
+},
 /* Bouton personnalise presse (PC). Le bouton n'existe que si le bon item est en
    main, mais on revérifie ici : un client peut garder un bouton residuel. */
 onPlayerPressedButton = (playerId, buttonId) => {
@@ -432,6 +441,9 @@ onPlayerSelectInventorySlot = (t, slot) => {
     /* Protection PvP : 5 min contre le joueur qui vient de la tuer. */
     Gt("pvpShield", () => pvShield(t)), Gt("hakiRespawn", () => Lt(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
+    /* Le bouton tactile du dash est repose : un respawn recharge le client, et
+       un joueur mobile ne doit pas perdre son dash en mourant. */
+    Gt("dashButton", () => setupDashBtn(t)),
     Gt("sidebar", () => K(t));
     try {
         sTimeout(() => {
@@ -440,11 +452,33 @@ onPlayerSelectInventorySlot = (t, slot) => {
         }, 5);
     } catch (t) {}
 }, onPlayerClick = (t, r, a, i, e, o, m) => { Nt(t, r, a, i, e, o, m)
+    /* TACTILE : pas de visee d'entite, `targetEId` arrive nul et AUCUN PNJ ne
+       repondait sur mobile (recruteurs compris). On prend donc le PNJ sous le
+       doigt quand la cible ne peut pas etre lui :
+         - aucune cible ;
+         - une cible qui n'est ni un PNJ ni une creature vivante (un panneau
+           « Press to code » pose devant le marchand avalait le tap).
+       Un coup porte a un joueur ou a un mob garde TOUJOURS sa cible. */
+    if (isMobilePlayer(t)) {
+        let take = !m;
+        if (!take) {
+            let type = null;
+            try { type = api.getEntityType(m); } catch (e2) { type = null; }
+            take = "Player" !== type && !isMobType(type);
+        }
+        if (take) {
+            try {
+                const near = npcUnderFinger(a, i, e);
+                if (near) m = near;
+            } catch (e2) {}
+        }
+    }
     /* Zone neutre du lobby : aucune capacite (armement, fruit, style de
        combat, clic d'attaque). Le dialogue PNJ reste possible. */
     if (idInSafeZone(t) && !(m && isNPCEntity(m))) return void safeZoneBlocked(t);
-    /* Item de dash (mobile) : un clic suffit, et il ne fait rien d'autre (pas
-       de coup de poing a travers). */
+    /* Item de dash RESIDUEL (versions d'avant la demande 90) : un clic suffit,
+       et il ne fait rien d'autre (pas de coup de poing a travers). Le dash
+       mobile ne passe plus par la : voir le bouton tactile plus bas. */
     let heldDash = null;
     try { heldDash = api.getHeldItem(t); } catch (e) { heldDash = null; }
     if (heldDash && heldDash.name === DASH_ITEM_Name) return void dashItemClick(t, heldDash.name);

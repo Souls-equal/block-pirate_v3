@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 365 459 caracteres** (71 % de la limite de 512 000 du World Code, -55 % par rapport aux sources lisibles).
+**32 fichiers, 367 449 caracteres** (72 % de la limite de 512 000 du World Code, -56 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -38,20 +38,20 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `fruit/abilities.js` | 38 178 | 52 633 |
 | `fruit/fruitData.js` | 4 331 | 6 209 |
 | `fruit/func-abilities.js` | 23 412 | 39 595 |
-| `fruit/index.js` | 21 718 | 41 333 |
+| `fruit/index.js` | 22 244 | 43 872 |
 | `gameplay/codes.js` | 3 870 | 7 279 |
-| `gameplay/customItem.js` | 5 246 | 13 827 |
+| `gameplay/customItem.js` | 5 246 | 13 975 |
 | `gameplay/fightingStyles.js` | 19 277 | 42 146 |
 | `gameplay/loot.js` | 1 970 | 7 267 |
-| `gameplay/NPCs.js` | 7 561 | 18 986 |
-| `gameplay/quest.js` | 9 782 | 22 131 |
+| `gameplay/NPCs.js` | 8 586 | 21 442 |
+| `gameplay/quest.js` | 10 158 | 23 440 |
 | `gameplay/saber.js` | 28 931 | 79 595 |
 | `gameplay/spawning.js` | 5 937 | 14 602 |
-| `gameplay/stamina.js` | 5 672 | 16 385 |
+| `gameplay/stamina.js` | 5 349 | 16 351 |
 | `gameplay/stats.js` | 5 381 | 12 896 |
 | `gameplay/tutorial.js` | 6 772 | 16 191 |
-| `gameplay/variations.js` | 6 233 | 20 389 |
-| `index.js` | 15 824 | 39 137 |
+| `gameplay/variations.js` | 6 343 | 20 896 |
+| `index.js` | 16 100 | 40 912 |
 | `utils/boss.js` | 6 895 | 16 246 |
 | `utils/combat.js` | 15 465 | 48 329 |
 | `utils/data.js` | 6 480 | 17 987 |
