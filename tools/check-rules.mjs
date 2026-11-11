@@ -1045,6 +1045,32 @@ const installed = await (async () => {
         /onTouchscreenActionButton = \(playerId, touchDown\) => \{[\s\S]{0,160}?dashButtonPressed/.test(indexSrc),
         "dash mobile : onTouchscreenActionButton n'appelle plus le dash",
     );
+
+    /* ── UNE SEULE ENTREE POUR LE DASH MOBILE (demande 95) ──────────────────
+       Mesure en jeu (demande 94) : le callback du bouton tactile n'arrive QUE
+       quand on presse le bouton. On verrouille donc les trois autres portes,
+       qui dasaient autrefois sur tactile : le clic (item residuel), l'action
+       secondaire, et les touches de clavier. Et la sonde de mesure, elle, ne
+       doit jamais repartir en production. */
+    check(
+        indexSrc.indexOf("probeSend") < 0 && indexSrc.indexOf("SONDE DES ENTREES") < 0,
+        "sonde : la sonde de mesure (demande 94) est encore dans src/index.js",
+    );
+    const altBody = indexSrc.slice(indexSrc.indexOf("onPlayerAltAction ="), indexSrc.indexOf("onMobDamagingPlayer ="));
+    check(
+        altBody.indexOf("!mobileDash && useItemControls(t)") >= 0,
+        "dash mobile : l'action secondaire dashe de nouveau sur un ecran tactile",
+    );
+    const dashSource = readFileSync(join(SRC, "gameplay/stamina.js"), "utf8");
+    check(
+        dashSource.indexOf("export function handleDashButton") >= 0
+            && dashSource.indexOf("if (!isMobilePlayer(playerId)) return false;") >= 0,
+        "dash : handleDashButton n'est pas reserve aux joueurs tactiles",
+    );
+    check(
+        dashSource.indexOf("DASH_BUTTON_MIN_MS") >= 0,
+        "dash mobile : l'anti-repetition du bouton tactile a disparu",
+    );
     check(
         cut.indexOf("if (held === SWAP_ORB_Name) {") >= 0,
         "boutons : le Swap Orb n'ouvre plus les capacites du fruit",

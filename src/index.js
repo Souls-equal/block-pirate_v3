@@ -360,13 +360,17 @@ function clickPoint(playerId) {
     return { x: x, y: y, z: z, block: block, target: target };
 }
 
-/* Bouton TACTILE du mobile (demande 90). Bloxd appelle ce callback pour
-   l'APPUI et pour le RELACHEMENT : seul l'appui dash. Il n'existe que si
-   setupDashButton a pose la client option, donc les joueurs PC — qui ont le
-   clic droit et Q — ne peuvent pas le declencher.
-   ATTENTION (demande 93) : ce bouton partage son callback avec le bouton
-   d'ACTION, qui frappe et qui casse les blocs. La sonde temporaire en fin de
-   fichier dit ce qui arrive vraiment, pour ne dasher que sur le bon appui. */
+/* ── LA SEULE ENTREE DU DASH MOBILE (demandes 90 et 95) ────────────────────
+   Bloxd appelle ce callback pour l'APPUI et pour le RELACHEMENT : seul l'appui
+   dashe (handleDashButton ignore `touchDown` faux, et un doigt pose ne peut pas
+   enchainer deux dashs). Il n'existe que si setupDashButton a pose la client
+   option, donc un joueur PC — clic droit et Q — ne peut pas le declencher.
+   MESURE EN JEU (demande 94) : sur mobile, presser ce bouton est le SEUL cas
+   ou `TSd`/`TSu` arrive. Casser un bloc, frapper, parler a un PNJ, sauter ou
+   toucher le cote de l'ecran n'appelle pas ce callback — et ne dashe donc pas.
+   Aucun autre chemin ne dashe sur un ecran tactile : voir onPlayerClick (item
+   residuel retire, jamais de dash), onPlayerAltAction (jamais sur mobile) et
+   onPlayerPressedButton (touches de clavier, refusees sur mobile). */
 onTouchscreenActionButton = (playerId, touchDown) => {
     Gt("dashButton", () => dashButtonPressed(playerId, touchDown));
 }, /* Bouton presse — TOUCHES DE CLAVIER, donc PC seulement (demande 94).
@@ -876,95 +880,3 @@ doPeriodicSave = () => {
     Gt("saberClose", () => spClose());
 };
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SONDE DES ENTREES TACTILES — TEMPORAIRE (demande 94)
-   ══════════════════════════════════════════════════════════════════════════
-   À RETIRER une fois la question tranchée : elle n'est là que pour MESURER.
-
-   Le bouton tactile (`touchscreenActionButton`) est le contenu du bouton
-   d'ACTION : frapper, casser un bloc et le presser arrivent donc par le même
-   callback. On veut savoir CE QUI arrive, et dans quel ordre, quand on presse
-   le bouton du dash et quand on fait autre chose.
-
-   Chaque rafale d'appels (8 ticks, ~400 ms) est envoyée au joueur MOBILE dans
-   le chat,
-   avec les codes suivants — plusieurs codes = plusieurs callbacks :
-
-     TSd  onTouchscreenActionButton, appui        TSu  ... relâchement
-     clk  onPlayerClick   [...] = bloc visé et type d'entité touchée
-     clkup onPlayerClickUp                        chg[item]  chargement d'item
-     alt  onPlayerAltAction                       xalt  action secondaire demandée
-     btn[id]  onPlayerPressedButton (clavier PC)  blk[old>new]  changement de bloc
-
-   Mode d'emploi : presser le bouton du dash -> relever la ligne ; puis casser
-   un bloc, frapper un mob, parler à un PNJ, sauter, se baisser -> relever
-   chaque ligne. La différence entre le premier cas et les autres EST le
-   signal qui manque.
-   ══════════════════════════════════════════════════════════════════════════ */
-const probeBursts = {};
-
-function probeSend(playerId, code) {
-    if (!playerId) return;
-    try { if (!isMobilePlayer(playerId)) return; } catch (e) { return; }
-    let burst = probeBursts[playerId];
-    if (!burst) burst = probeBursts[playerId] = { codes: [], n: 0, handle: null, stamp: 0 };
-    /* Nouvelle rafale : on la numerote pour que le joueur puisse dire « la 3 ». */
-    if (!burst.codes.length) burst.n += 1;
-    if (burst.codes.indexOf(code) < 0) burst.codes.push(code);
-    burst.stamp += 1;
-    const mine = burst.stamp;
-    if (burst.handle) { try { burst.handle.stop(); } catch (e) {} }
-    burst.handle = sTimeout(() => {
-        if (burst.stamp !== mine) return;
-        const text = burst.codes.join(" ");
-        burst.codes = [];
-        burst.handle = null;
-        try { api.sendMessage(playerId, "[sonde " + burst.n + "] " + text); } catch (e) {}
-        try { api.log("[sonde] " + playerId + " #" + burst.n + " " + text); } catch (e) {}
-    }, 8);
-}
-
-/* Un code par callback, avec ce que Bloxd nous dit à ce moment-là. */
-function probeCode(name, args) {
-    const playerId = args[0];
-    if (name === "onTouchscreenActionButton") return probeSend(playerId, args[1] ? "TSd" : "TSu");
-    if (name === "onPlayerClick") {
-        let target = "aucune";
-        if (args[6]) {
-            try { target = api.getEntityType(args[6]) || "entite"; } catch (e) { target = "entite"; }
-        }
-        return probeSend(playerId, "clk[" + (args[5] || "air") + "|" + target + "]" + (args[1] ? "*alt" : ""));
-    }
-    if (name === "onPlayerClickUp") return probeSend(playerId, "clkup");
-    if (name === "onPlayerAltAction") return probeSend(playerId, "alt");
-    if (name === "onPlayerAttemptAltAction") return probeSend(playerId, "xalt");
-    if (name === "onPlayerPressedButton") return probeSend(playerId, "btn[" + args[1] + "]");
-    if (name === "onPlayerStartChargingItem") return probeSend(playerId, "chg[" + args[1] + "]");
-    if (name === "onPlayerChangeBlock") return probeSend(playerId, "blk[" + (args[5] || "?") + ">" + (args[6] || "?") + "]");
-}
-
-/* Les callbacks sont des globales : on les enveloppe APRES leur definition (ce
-   bloc est en fin de fichier) et on rend leur valeur de retour intacte — un
-   "preventAction" oublie changerait le jeu au lieu de le mesurer. */
-for (const probeName of [
-    "onTouchscreenActionButton", "onPlayerClick", "onPlayerClickUp", "onPlayerAltAction",
-    "onPlayerAttemptAltAction", "onPlayerPressedButton", "onPlayerStartChargingItem", "onPlayerChangeBlock",
-]) {
-    const original = globalThis[probeName];
-    if (typeof original !== "function") continue;
-    globalThis[probeName] = function () {
-        try { probeCode(probeName, arguments); } catch (e) {}
-        return original.apply(this, arguments);
-    };
-}
-
-/* Le bouton tactile ne survit pas à la session : on oublie la rafale en cours. */
-{
-    const probeLeave = globalThis.onPlayerLeave;
-    if (typeof probeLeave === "function") {
-        globalThis.onPlayerLeave = function () {
-            try { delete probeBursts[arguments[0]]; } catch (e) {}
-            return probeLeave.apply(this, arguments);
-        };
-    }
-}

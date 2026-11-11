@@ -2110,10 +2110,10 @@ est enregistré (clé `ctl`).
   et `onPlayerPressedButton` refuse de son côté tout appui venu d'un tactile.
 - Le dash mobile passe par `touchscreenActionButton` (une icône d'éclair) →
   `onTouchscreenActionButton` → `handleDashButton` → `tryDash`, posé au join et au respawn.
-  **Attention** : cette option ne crée pas un bouton de plus, elle donne son **contenu au
-  bouton d'action principal** (celui qui frappe et qui casse les blocs). Le même callback
-  arrive donc aussi pour un coup de poing ou un tap sur un PNJ — c'est le défaut à l'étude,
-  et une **sonde temporaire** (voir plus bas) relève ce qui arrive dans chaque cas.
+  **C'est la seule entrée du dash sur un écran tactile**, et c'est mesuré en jeu
+  (demande 94) : presser ce bouton est le seul cas où le callback arrive. Casser un bloc,
+  frapper un mob, parler à un PNJ, sauter, ou toucher le côté de l'écran ne l'appellent pas
+  — et ne dashent donc pas.
 - `onPlayerAltAction` **ne dashe jamais sur mobile** : l'action secondaire y est déclenchée
   par le tactile aussi, et elle ne doit pas propulser.
 - `handleDashItemClick` ne dashe plus sur mobile non plus : un `Moonstone Dust` résiduel y
@@ -2185,12 +2185,11 @@ Trois détails qui comptent :
    à l'appui **et** au relâchement : seul l'appui dashe, et un même doigt posé
    ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Il n'existe que sur
    mobile : sur PC le dash reste le clic droit ou `Q`.
-5. **Sonde temporaire (demande 94).** Le bloc `SONDE DES ENTREES TACTILES` en
-   fin de `src/index.js` enveloppe les callbacks et envoie au joueur tactile une
-   ligne de chat par rafale d'appels (~400 ms) : `TSd`/`TSu` (bouton),
-   `clk[bloc|entité]`, `clkup`, `alt`/`xalt`, `btn[id]`, `chg[item]`,
-   `blk[avant>après]`. Elle ne change **rien** au jeu — elle rend juste visible
-   ce que Bloxd envoie. À retirer une fois la question tranchée.
+5. **Le dash mobile n'a qu'une entrée, et elle est mesurée.** La sonde
+   temporaire de la demande 94 (une ligne de chat par rafale d'appels) a montré
+   qu'un écran tactile n'envoie `TSd`/`TSu` que pour le bouton : ni un clic, ni
+   un coup, ni un tap sur un PNJ n'appellent `onTouchscreenActionButton`. Elle a
+   été retirée après mesure, et `npm run check` vérifie qu'elle ne revient pas.
 
 `npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
 liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une
