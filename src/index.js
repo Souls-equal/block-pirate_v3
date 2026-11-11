@@ -15,7 +15,7 @@ import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { isBossMob as isBossMob } from "./gameplay/loot";
 import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { DASH_ITEM as DASH_ITEM_Name, clearActionButton as clearActionBtn, handleDashItemClick as dashItemClick, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { DASH_ITEM as DASH_ITEM_Name, clearActionButton as clearActionBtn, handleDashButton as dashButtonPressed, handleDashItemClick as dashItemClick, setupDashButton as setupDashBtn, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -199,11 +199,10 @@ ct((t, r, a) => {
    PC     : ITEMS par defaut. Un item par capacite, main nue pour frapper,
             clic droit pour dasher. Les boutons (Q, Z X C V F) sont une option
             dans Settings -> Controls, ouverts par Swap Orb / Void Net.
-   MOBILE : ITEMS, toujours, plus UN SEUL bouton personnalise : « dash »
-            (demandes 92 et 93). Bloxd affiche nos customButtons a l'ecran des
-            joueurs tactiles ; un seul y tient, et les capacites restent des
-            items. Le bouton d'action du tactile n'est JAMAIS detourne : il sert
-            a frapper, et le detourner faisait dasher a chaque coup.
+   MOBILE : ITEMS, toujours, plus le BOUTON TACTILE du dash (demandes 90, 92
+            et 94). Les customButtons sont des touches de clavier — Bloxd ne
+            les declenche que par onPlayerPressedButton, donc jamais sur un
+            ecran tactile : un mobile n'en recoit AUCUN.
 
    Le mode est un REGLAGE (db « ctl ») pour les joueurs PC ; un joueur tactile
    est verrouille sur les items (data.getControlMode).
@@ -232,20 +231,14 @@ const CONTROLS = {
     ],
 };
 
-/* Boutons envoyes au client.
-     MOBILE : UN SEUL bouton, « dash » (demande 93). Bloxd affiche nos boutons
-              personnalises a l'ecran des joueurs tactiles ; un seul y tient, et
-              c'est celui du dash. Les capacites restent des items.
-     PC     : un bouton n'apparait qu'avec l'ITEM qui l'ouvre, Swap Orb ou Void
-              Net en main (demandes 76, 77 et 91) ; en mode items, aucun.
-   Le bouton d'action du tactile (touchscreenActionButton) n'est JAMAIS utilise :
-   il change le contenu du bouton qui sert a frapper, donc chaque coup partait
-   en dash (demande 93). */
+/* Boutons envoyes au client : PC UNIQUEMENT.
+     Un bouton n'apparait qu'avec l'ITEM qui l'ouvre, Swap Orb ou Void Net en
+     main (demandes 76, 77 et 91) ; en mode items, aucun.
+     MOBILE : jamais rien ici. Ce sont des TOUCHES de clavier : Bloxd ne les
+     declenche que par onPlayerPressedButton, qui n'arrive jamais d'un ecran
+     tactile (demande 94). Le dash mobile est le bouton tactile, ailleurs. */
 function buttonsFor(playerId) {
-    if (isMobilePlayer(playerId)) {
-        /* Une icone, pas de texte : le bouton est petit. */
-        return [{ id: CONTROLS.dash[0].id, icon: CONTROLS.dash[0].icon, keycode: CONTROLS.dash[0].keycode }];
-    }
+    if (isMobilePlayer(playerId)) return [];
     /* Mode « items » sur PC : aucun bouton, tout passe par les items. */
     if (useItemControls(playerId)) return [];
     const held = heldName(playerId);
@@ -317,10 +310,9 @@ function setupDevice(playerId) {
    Appele au join, au respawn et a chaque bascule des Settings. */
 function setupControls(playerId) {
     const mobile = isMobilePlayer(playerId);
-    /* Le bouton d'action reprend son contenu normal : il ne dashe plus
-       (demande 93, voir gameplay/stamina.js). */
-    clearActionBtn(playerId);
     if (mobile || useItemControls(playerId)) {
+        /* Mobile : ses items, et le bouton tactile du dash. */
+        if (mobile) setupDashBtn(playerId);
         dropSwap(playerId), dropNet(playerId);
         /* L'item de dash ne sert plus a rien : le dash a son bouton sur mobile,
            et le clic droit sur PC. Un reliquat d'inventaire est retire dans les
@@ -334,6 +326,8 @@ function setupControls(playerId) {
         applyButtons(playerId);
         return true;
     }
+    /* PC : aucun bouton tactile — son bouton d'action reste normal. */
+    clearActionBtn(playerId);
     dropDash(playerId);
     dropAbilityItems(playerId);
     dropFightingStyleItems(playerId);
@@ -366,13 +360,22 @@ function clickPoint(playerId) {
     return { x: x, y: y, z: z, block: block, target: target };
 }
 
-/* Bouton presse — le seul chemin des boutons, sur les DEUX appareils.
-   Mobile : le bouton « dash » (le seul qu'il recoit). PC : dash + capacites +
-   style, ouverts par l'item en main (demandes 76, 77, 91 et 93). Le bouton
-   n'existe que si le bon item est en main, mais on revérifie ici : un client
-   peut garder un bouton residuel d'une session precedente. */
+/* Bouton TACTILE du mobile (demande 90). Bloxd appelle ce callback pour
+   l'APPUI et pour le RELACHEMENT : seul l'appui dash. Il n'existe que si
+   setupDashButton a pose la client option, donc les joueurs PC — qui ont le
+   clic droit et Q — ne peuvent pas le declencher.
+   ATTENTION (demande 93) : ce bouton partage son callback avec le bouton
+   d'ACTION, qui frappe et qui casse les blocs. La sonde temporaire en fin de
+   fichier dit ce qui arrive vraiment, pour ne dasher que sur le bon appui. */
+onTouchscreenActionButton = (playerId, touchDown) => {
+    Gt("dashButton", () => dashButtonPressed(playerId, touchDown));
+}, /* Bouton presse — TOUCHES DE CLAVIER, donc PC seulement (demande 94).
+   Le bouton n'existe que si le bon item est en main, mais on revérifie ici :
+   un client peut garder un bouton residuel d'une session precedente. Sur un
+   ecran tactile, aucune touche n'existe : on ne dashe pas par ici. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
+    if (isMobilePlayer(playerId)) return;
     if (buttonId === "dash") {
         try { ot(playerId); } catch (e) { _t("button.dash", e); }
         return;
@@ -467,7 +470,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
     /* Le bouton tactile du dash est repose : un respawn recharge le client, et
        un joueur mobile ne doit pas perdre son dash en mourant. */
-    Gt("dashButton", () => clearActionBtn(t)),
+    Gt("dashButton", () => setupDashBtn(t)),
     /* Les boutons du mobile dependent du fruit et du style : au respawn, le
        joueur vient de les recuperer. */
     Gt("buttons", () => applyButtons(t)),
@@ -872,3 +875,96 @@ doPeriodicSave = () => {
     Bt();
     Gt("saberClose", () => spClose());
 };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SONDE DES ENTREES TACTILES — TEMPORAIRE (demande 94)
+   ══════════════════════════════════════════════════════════════════════════
+   À RETIRER une fois la question tranchée : elle n'est là que pour MESURER.
+
+   Le bouton tactile (`touchscreenActionButton`) est le contenu du bouton
+   d'ACTION : frapper, casser un bloc et le presser arrivent donc par le même
+   callback. On veut savoir CE QUI arrive, et dans quel ordre, quand on presse
+   le bouton du dash et quand on fait autre chose.
+
+   Chaque rafale d'appels (8 ticks, ~400 ms) est envoyée au joueur MOBILE dans
+   le chat,
+   avec les codes suivants — plusieurs codes = plusieurs callbacks :
+
+     TSd  onTouchscreenActionButton, appui        TSu  ... relâchement
+     clk  onPlayerClick   [...] = bloc visé et type d'entité touchée
+     clkup onPlayerClickUp                        chg[item]  chargement d'item
+     alt  onPlayerAltAction                       xalt  action secondaire demandée
+     btn[id]  onPlayerPressedButton (clavier PC)  blk[old>new]  changement de bloc
+
+   Mode d'emploi : presser le bouton du dash -> relever la ligne ; puis casser
+   un bloc, frapper un mob, parler à un PNJ, sauter, se baisser -> relever
+   chaque ligne. La différence entre le premier cas et les autres EST le
+   signal qui manque.
+   ══════════════════════════════════════════════════════════════════════════ */
+const probeBursts = {};
+
+function probeSend(playerId, code) {
+    if (!playerId) return;
+    try { if (!isMobilePlayer(playerId)) return; } catch (e) { return; }
+    let burst = probeBursts[playerId];
+    if (!burst) burst = probeBursts[playerId] = { codes: [], n: 0, handle: null, stamp: 0 };
+    /* Nouvelle rafale : on la numerote pour que le joueur puisse dire « la 3 ». */
+    if (!burst.codes.length) burst.n += 1;
+    if (burst.codes.indexOf(code) < 0) burst.codes.push(code);
+    burst.stamp += 1;
+    const mine = burst.stamp;
+    if (burst.handle) { try { burst.handle.stop(); } catch (e) {} }
+    burst.handle = sTimeout(() => {
+        if (burst.stamp !== mine) return;
+        const text = burst.codes.join(" ");
+        burst.codes = [];
+        burst.handle = null;
+        try { api.sendMessage(playerId, "[sonde " + burst.n + "] " + text); } catch (e) {}
+        try { api.log("[sonde] " + playerId + " #" + burst.n + " " + text); } catch (e) {}
+    }, 8);
+}
+
+/* Un code par callback, avec ce que Bloxd nous dit à ce moment-là. */
+function probeCode(name, args) {
+    const playerId = args[0];
+    if (name === "onTouchscreenActionButton") return probeSend(playerId, args[1] ? "TSd" : "TSu");
+    if (name === "onPlayerClick") {
+        let target = "aucune";
+        if (args[6]) {
+            try { target = api.getEntityType(args[6]) || "entite"; } catch (e) { target = "entite"; }
+        }
+        return probeSend(playerId, "clk[" + (args[5] || "air") + "|" + target + "]" + (args[1] ? "*alt" : ""));
+    }
+    if (name === "onPlayerClickUp") return probeSend(playerId, "clkup");
+    if (name === "onPlayerAltAction") return probeSend(playerId, "alt");
+    if (name === "onPlayerAttemptAltAction") return probeSend(playerId, "xalt");
+    if (name === "onPlayerPressedButton") return probeSend(playerId, "btn[" + args[1] + "]");
+    if (name === "onPlayerStartChargingItem") return probeSend(playerId, "chg[" + args[1] + "]");
+    if (name === "onPlayerChangeBlock") return probeSend(playerId, "blk[" + (args[5] || "?") + ">" + (args[6] || "?") + "]");
+}
+
+/* Les callbacks sont des globales : on les enveloppe APRES leur definition (ce
+   bloc est en fin de fichier) et on rend leur valeur de retour intacte — un
+   "preventAction" oublie changerait le jeu au lieu de le mesurer. */
+for (const probeName of [
+    "onTouchscreenActionButton", "onPlayerClick", "onPlayerClickUp", "onPlayerAltAction",
+    "onPlayerAttemptAltAction", "onPlayerPressedButton", "onPlayerStartChargingItem", "onPlayerChangeBlock",
+]) {
+    const original = globalThis[probeName];
+    if (typeof original !== "function") continue;
+    globalThis[probeName] = function () {
+        try { probeCode(probeName, arguments); } catch (e) {}
+        return original.apply(this, arguments);
+    };
+}
+
+/* Le bouton tactile ne survit pas à la session : on oublie la rafale en cours. */
+{
+    const probeLeave = globalThis.onPlayerLeave;
+    if (typeof probeLeave === "function") {
+        globalThis.onPlayerLeave = function () {
+            try { delete probeBursts[arguments[0]]; } catch (e) {}
+            return probeLeave.apply(this, arguments);
+        };
+    }
+}

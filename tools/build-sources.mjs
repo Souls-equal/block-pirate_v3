@@ -111,9 +111,8 @@ const ENTRY_POINTS = [
   /* Ajoutes par la demande 76 : ils bloquent les actions des deux items de
      commande. S'ils disparaissent, les items redeviennent lancables. */
   "onPlayerAttemptAltAction", "onPlayerStartChargingItem", "onPlayerPressedButton",
-  /* La demande 90 avait ajoute `onTouchscreenActionButton` ici ; la 93 l'a
-     retire : ce callback appartient au bouton d'ACTION (frapper, casser des
-     blocs), pas a nous. S'il revenait, chaque coup dasherait. */
+  /* Ajoute par la demande 90 : le bouton tactile du dash mobile. */
+  "onTouchscreenActionButton",
   "onPlayerSelectInventorySlot",
   "tick", "onClose",
 ];
