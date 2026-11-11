@@ -1,7 +1,7 @@
 // stamina.js
 
 import { setInterval } from "../utils/timer";
-import { C, ic, txt } from "../core/theme";
+import { C, ic } from "../core/theme";
 import { isMobilePlayer } from "../utils/data";
 
 /* PARAMÈTRES — modifiez tout ici */
@@ -385,15 +385,17 @@ export function removeDashItem(playerId) {
    tactile dedie :
        api.setClientOption(id, "touchscreenActionButton", <texte style>)
        -> onTouchscreenActionButton(id, touchDown)
-   On y met un simple « DASH » : le dash ne depend donc plus de ce que le
-   joueur a en main, et l'item n'est plus donne (les inventaires d'avant en
-   contiennent encore : son clic marche toujours, voir handleDashItemClick).
-   Sur PC le bouton est retire : le dash reste le clic droit / la touche Q. */
+   On y met une ICONE (un eclat) et rien d'autre : les boutons du mobile sont
+   petits, le texte n'y tient pas (demande 91). Le dash ne depend donc plus de
+   ce que le joueur a en main, et l'item n'est plus donne (les inventaires
+   d'avant en contiennent encore : son clic marche toujours, voir
+   handleDashItemClick). Sur PC le bouton est retire : le dash reste le clic
+   droit / la touche Q. */
 const DASH_BUTTON_MIN_MS = 250;
 const dashButtonAt = {};
 
 function dashButtonParts() {
-    return [ic("fa-solid fa-bolt", C.MARINE), txt(" DASH", C.MARINE, { fontWeight: "bold" })];
+    return [ic("fa-solid fa-bolt", C.MARINE)];
 }
 
 /* Pose (ou retire) le bouton tactile selon l'appareil. Appele au join et a

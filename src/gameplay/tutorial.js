@@ -79,7 +79,7 @@ const STEPS = [
             txt("Click the ", C.INFO), bold("Combat Teacher", C.MONEY),
             txt(": your first fighting style is ", C.INFO), bold("free", C.SUCCESS),
             txt(".\n", C.INFO),
-            txt("A style replaces bare hands: stronger punches and a dash. Click to punch, hold the style item to move.", C.INFO),
+            txt("A style replaces bare hands: stronger punches, plus two attacks of its own (items on PC, buttons on a phone). Click to punch.", C.INFO),
         ],
     },
     {

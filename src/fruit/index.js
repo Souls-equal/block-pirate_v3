@@ -1,6 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout, txt, ic } from "../core/theme";
-import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket, useItemControls } from "../utils/data";
+import { bestFruitTicket, confirmAction, fruitRollPrice, isMobilePlayer, spendFruitTicket, useItemControls } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -506,11 +506,11 @@ export function removeSwapOrb(t) {
   return true;
 }
 
-/* PC seulement. Sur mobile, l'item de dash et les items de capacite restent la
-   seule entree possible : pas d'orb. */
+/* L'orb n'ouvre que les TOUCHES : en mode items il ne sert a rien, et sur
+   mobile les boutons sont deja a l'ecran (demande 91) — pas d'orb non plus. */
 export function ensureSwapOrb(t) {
   if (!t) return false;
-  if (useItemControls(t) || !getFruit(t)) return removeSwapOrb(t), false;
+  if (useItemControls(t) || isMobilePlayer(t) || !getFruit(t)) return removeSwapOrb(t), false;
   return giveSwapOrb(t);
 }
 
@@ -550,12 +550,13 @@ function N(t, e, o) {
   h.set(t, e);
   const r = n[e];
   if (r) {
-    /* PC : les capacites sont sur Z/X/C/V/F (voir index.js, customButtons), donc
-       AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
-       encombrer les 5 slots. Mobile : les items restent, c'est son seul moyen. */
+    /* BOUTONS (PC ou mobile, demande 91) : les capacites sont sur Z/X/C/V/F,
+       donc AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
+       encombrer les 5 slots. ITEMS : un item par capacite, c'est la commande.
+       L'orb n'est jamais donne sur mobile : les boutons y sont deja. */
     if (k(t), useItemControls(t)) {
       if (r.giveditems) for (const e of r.giveditems) I(t, e, r);
-    } else giveSwapOrb(t);
+    } else if (!isMobilePlayer(t)) giveSwapOrb(t);
     try {
       restoreFightingStyle(t);
     } catch (t) {}
@@ -792,7 +793,7 @@ export function restorePlayerFruit(t) {
       k(t);
       if (useItemControls(t)) {
         if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
-      } else giveSwapOrb(t);
+      } else if (!isMobilePlayer(t)) giveSwapOrb(t);
       try {
         restoreFightingStyle(t);
       } catch (t) {}

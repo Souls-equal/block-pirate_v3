@@ -820,8 +820,8 @@ ici créerait le cycle `customItem → data`).
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
 | `Moonstone Dust` | **Dash** | reliquat des anciennes versions (matière inerte) : son clic dashe encore, il n'est plus donné |
-| `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
-| `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons) |
+| `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons, **PC seulement**) |
+| `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons, **PC seulement**) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
 | `Magmaward Fuel` | **Ancient Relic** | butin de la Saber Quest |
 | `Black Carpet` | **Haki Fragment** | butin du boss, se revend au Haki Buyer |
@@ -976,6 +976,7 @@ contrôle à chaque tick (`settingsSyncVariation`) s'en aperçoit tout seul.
 | `Show an island` | liste déroulante des îles **cachées** → en remontre une |
 | `Respawn` | tue le joueur pour le débloquer (coincé dans un bloc, sous la map…) |
 | `PvP Protection` | active / désactive le bouclier de 5 min accordé contre son tueur au respawn |
+| `Controls` | bascule **items ↔ boutons** ; le défaut suit l'appareil (boutons sur mobile) |
 
 **Les deux listes sont complémentaires, et c'est le code qui le garantit** : `Hide` ne propose
 que ce qui est visible, `Show` ne propose que ce qui est caché. Valider **déplace** l'île d'une
@@ -1090,6 +1091,42 @@ erreur, et le rappel de l'un ne confirme pas l'autre. La confirmation est remise
 
 Les achats en **points de stat** (`handleShopBuy`) ne sont pas concernés : ils ne coûtent
 pas d'argent et se remboursent au reset.
+
+---
+
+## Remise à zéro d'un joueur (`resetPlayer`)
+
+`resetPlayer(id)` (`src/utils/data.js`) remet un compte à zéro : niveau 1, points de stat
+remboursés (`resetStats`), `money` et `sp` à 0, fruit retiré, **style de combat retiré**,
+inventaire vidé, et clé `ctl` supprimée pour que les commandes repartent du **défaut de
+l'appareil**.
+
+**L'ordre compte, et c'est tout le correctif de la demande 91.** Le style vit dans une clé
+db (`fs`) et `clearFightingStyle` y écrivait `null`. L'API n'accepte qu'une chaîne ou un
+nombre : la valeur restait donc en base, `restoreFightingStyle` la relisait au respawn, et
+le joueur retrouvait son style après un reset. Deux changements :
+
+1. `clearFightingStyle` **supprime la clé** (`deleteStat(playerId, "fs")`) au lieu de
+   l'écraser. Elle purge déjà, dans le même appel, l'état mémoire (`activeStyles`,
+   cooldowns M1 et capacités) et les items du style
+   (`removeFightingStyleItems(…, null)` + `removeVoidNet`).
+2. `resetPlayer` retire le fruit **et** le style **avant** `api.clearInventory(id)`. Un
+   item de style donné après le vidage reviendrait au respawn suivant.
+
+La clé `ctl` est supprimée **sans** toucher au drapeau d'appareil : un joueur remis à zéro
+retombe donc sur « boutons » sur mobile et « items » sur PC, sans se reconnecter
+(`applyControls` est rappelé en fin de fonction). Le grade d'un joueur n'est pas concerné :
+un reset ne touche jamais aux rangs.
+
+`npm run check` rejoue le reset complet sur une `api` simulée : `fs` et `ctl` doivent
+disparaître de la base, l'argent et les points revenir à zéro, l'inventaire être vidé et
+les commandes reposées.
+
+**Ce n'est pas la carte `Reset Stats` des Upgrades** (`upg_reset`, `src/gameplay/stats.js`).
+Celle-là ne rembourse que les **points de stat** : elle garde le niveau, les items **et le
+style de combat**, et sa description le dit désormais noir sur blanc. Deux actions
+différentes, deux effets différents : `resetPlayer` remet le personnage à zéro, `Reset
+Stats` redistribue des points.
 
 ---
 
@@ -2053,43 +2090,68 @@ même préfixe de famille (`control-`, `gravity-`) et ajoute la famille dans
 
 ---
 
-## Commandes : deux modes au choix, items par défaut
+## Commandes : items sur PC, boutons sur mobile (et l'inverse si on veut)
 
-Le joueur **choisit** entre deux commandes dans **Settings → Controls**. Par
-défaut (et pour tout compte qui n'a rien choisi) c'est le mode **ITEMS**, le
-comportement historique.
+Le joueur **choisit** dans **Settings → Controls**, et son choix est enregistré
+(clé `ctl`). Sans choix, le **défaut suit l'appareil** (`getControlMode`) :
 
 | | Dash | Capacités | Coup de poing |
 |---|---|---|---|
-| **ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
-| **BUTTONS** (PC) | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
-| **Mobile** | **bouton tactile `DASH`** | un item par capacité | M1 à main nue |
+| **PC — ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
+| **PC — BUTTONS** | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
+| **MOBILE — BUTTONS (défaut)** | bouton tactile | une **icône** par capacité, à l'écran | M1 à main nue |
+| **MOBILE — ITEMS** | bouton tactile | un item par capacité | M1 à main nue |
 
-- **Le mobile n'a pas le choix** : pas de clavier, donc jamais de boutons à
-  touches. Un réglage en base ne le change pas, et l'item de Settings n'est même
-  pas créé sur un écran tactile.
+- **Pourquoi le mobile a les boutons par défaut** : Bloxd affiche les
+  `customButtons` à l'écran des joueurs tactiles, et ils jouent **exactement le
+  même rôle qu'une touche** (`onPlayerPressedButton`). Sur un écran de cinq
+  slots, un item par capacité en mangeait jusqu'à cinq. Le réglage reste là
+  pour qui préfère les items — rien n'est retiré à personne.
+- **Icônes seules, jamais de texte** : un bouton mobile est minuscule, donc
+  `buttonsFor()` ne remplit pas `description` sur un écran tactile
+  (`pushButton(…, !mobile)`). L'icône porte le sens : une par type d'attaque
+  (section suivante).
+- **Rien à tenir en main sur mobile.** Sur PC un bouton n'apparaît qu'avec
+  l'item qui l'ouvre (`Swap Orb` / `Void Net`), sinon le joueur aurait huit
+  touches mortes ; sur mobile les boutons sont là dès qu'il a un fruit ou un
+  style, et `onPlayerPressedButton` ne re-vérifie plus l'item en main
+  (`byTouch`).
+- **Aucun doublon d'item** : en mode boutons, `ensureSwapOrb()` et
+  `ensureVoidNet()` ne donnent rien à un mobile. Ces deux items n'ouvrent que
+  des touches de clavier : les donner sur un écran tactile, c'est un slot perdu.
 - **Le dash mobile a son propre bouton** (`touchscreenActionButton` →
   `onTouchscreenActionButton` → `handleDashButton` → `tryDash`) : il ne dépend
-  plus de ce que le joueur tient en main, et le clic qui sert à parler aux PNJ
-  ou à frapper n'est plus confisqué par un item. La client option est posée au
-  join, reposée au respawn, et retirée sur PC (`null`).
+  ni du mode ni de ce que le joueur tient en main, et le clic qui sert à parler
+  aux PNJ ou à frapper n'est plus confisqué par un item. Il porte une icône
+  (`fa-bolt`) et pas de texte. La client option est posée au join, reposée au
+  respawn et à chaque bascule de réglage, et retirée sur PC (`null`).
 - **La bascule est immédiate** : `setControlMode()` écrit la clé `ctl`, puis
   `applyControls()` (hook posé par `index.js`) retire les items du mode quitté
-  et donne ceux du mode choisi — pas besoin de se reconnecter.
+  et donne ceux du mode choisi — pas besoin de se reconnecter. La carte de
+  Settings existe maintenant sur les deux appareils
+  (`toggleControlMode` ne refuse plus le tactile).
+- **Les boutons suivent le vivant** : ils sont recalculés au changement de
+  slot, à la mise à jour d'inventaire, au respawn, **à l'absorption d'un
+  fruit** et à l'apprentissage d'un style (`equipFightingStyle` → `applyControls`
+  sur mobile). `applyButtons()` ne renvoie rien si la liste n'a pas changé.
 - Les items de commande (`Swap Orb`, `Void Net`) et l'item de dash ne peuvent
   pas être lâchés, et n'ont aucune action native : voir la section suivante.
 
 Le mode est lu une seule fois par action (`useItemControls()`), donc le fruit et
 le style savent toujours quoi donner : `fruit/index` et `fightingStyles` passent
-tous les deux par lui, jamais par `api.isMobile` directement.
+tous les deux par lui. Le seul test qui reste, c'est « l'item en main ouvre
+quoi », et il est dans `buttonsFor()`. Quand l'appareil compte vraiment (dash
+tactile, détection des PNJ au doigt, **défaut** des commandes), c'est
+`isMobilePlayer()` : le drapeau est lu une fois, au join.
 
 ### Une icône par type d'attaque
 
-Le joueur voit cinq touches sans les lire : l'icône doit dire ce que fait la
-touche. Une icône par capacité serait 152 dessins à maintenir, donc chaque
+Le joueur voit cinq boutons sans les lire : l'icône doit dire ce que fait le
+bouton. Une icône par capacité serait 152 dessins à maintenir, donc chaque
 capacité est classée dans **un des 16 types** ci-dessous (`ATTACK_TYPES` et
 `ABILITY_TYPE` dans `fruit/abilities.js`), et le bouton porte l'icône de son
-type **et le nom de la capacité** en description.
+type. Le nom de la capacité n'est mis **qu'en description**, donc sur PC : sur
+mobile il n'y a pas la place pour un mot.
 
 | # | Type | Icône | # | Type | Icône |
 |---|---|---|---|---|---|
@@ -2109,8 +2171,9 @@ la capacité non classée, comme il refuse une icône absente de la liste blanch
 Les `keycode` envoyés sont ceux d'un clavier QWERTY (`KeyQ`, `KeyZ`…) : Bloxd
 les remappe seul sur un AZERTY, c'est la même touche physique. `ability` et
 `style` partagent `Z`/`X` **à dessein** : une seule main à la fois, donc les
-deux groupes ne sont jamais actifs ensemble. Le dash, lui, est toujours là et ne
-partage rien.
+deux groupes ne sont jamais actifs ensemble. Sur mobile il n'y a pas de clavier :
+les mêmes boutons sont des icônes à l'écran, et le `keycode` ne sert pas. Le
+dash, lui, a son bouton tactile dédié sur mobile et ne partage rien.
 
 Trois détails qui comptent :
 
@@ -2132,8 +2195,8 @@ Trois détails qui comptent :
    dispatcher que le clic.
 4. **Le bouton tactile ne se répète pas.** `onTouchscreenActionButton` arrive
    à l'appui **et** au relâchement : seul l'appui dashe, et un même doigt posé
-   ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Le bouton n'existe
-   que sur mobile : `onPlayerPressedButton` reste le chemin du PC.
+   ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Il n'existe que sur
+   mobile : sur PC le dash reste le clic droit ou `Q`.
 
 `npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
 liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une
