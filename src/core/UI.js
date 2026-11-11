@@ -709,13 +709,10 @@ function createSettingsItems(playerId) {
         });
     } catch (e) {}
 
-    /* Choix des commandes (demandes 77 et 91). Les DEUX modes existent sur les
-       deux appareils : Bloxd affiche les boutons a l'ecran des joueurs
-       tactiles, avec le meme fonctionnement qu'une touche. Le defaut suit
-       l'appareil (boutons sur mobile, items sur PC) ; ce reglage est le seul
-       endroit ou on le change, et il est enregistre. */
-    {
-        const mobile = isMobilePlayer(playerId);
+    /* Choix des commandes (demande 77). PC seulement : un ecran tactile n'a
+       qu'UN bouton supplementaire, celui du dash, donc ses capacites passent
+       par les items et il n'a rien a choisir (demande 92). */
+    if (!isMobilePlayer(playerId)) {
         try {
             api.createShopItemForPlayer(playerId, SETTINGS_CATEGORY, "set_controls", {
                 image: byButtons ? "Swap Orb" : "Moonstone Dust",
@@ -728,16 +725,12 @@ function createSettingsItems(playerId) {
                 description: [
                     ic(byButtons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
                     txt(byButtons
-                        ? (mobile
-                            ? " Hold Fruit Abilities: its icons appear on screen."
-                            : " Keyboard: the items in your hand open the keys.")
+                        ? " Keyboard: the items in your hand open the keys."
                         : " Items: one item per ability.", C.INFO),
                     bold("\n● " + (byButtons ? "BUTTONS" : "ITEMS"), C.SUCCESS),
                     txt(byButtons
-                        ? (mobile
-                            ? " — one icon per ability, plus the dash button."
-                            : " — Q dash, Z X C V F fruit, Z X style.")
-                        : " — click an ability item; the dash has its own button.", C.INFO),
+                        ? " — Q dash, Z X C V F fruit, Z X style."
+                        : " — click an ability item, right click to dash.", C.INFO),
                     txt(byButtons
                         ? "\nSwitch back if you prefer items."
                         : "\nSwitch if you prefer the buttons.", C.INFO),
@@ -881,22 +874,27 @@ function setIslandShown(playerId, name, want) {
    du nouveau donnes immediatement (data.applyControls -> index.js) : le joueur
    n'a pas a se deconnecter pour voir le changement. */
 function toggleControlMode(playerId) {
+    /* Le tactile n'a pas de clavier, et un seul bouton a l'ecran (le dash) :
+       ses capacites restent des items, il n'y a rien a basculer (demande 92). */
+    if (isMobilePlayer(playerId)) {
+        settingsSay(playerId, [
+            ic("fa-solid fa-circle-info", C.INFO),
+            txt(" Touch screens always use items: one item per ability.", C.INFO),
+            txt("\nYour dash is the button under your thumb.", C.INFO),
+        ]);
+        return;
+    }
     const byButtons = getControlMode(playerId) === "buttons";
     const mode = setControlMode(playerId, byButtons ? "items" : "buttons");
     applyControls(playerId);
     createSettingsItems(playerId);
     const buttons = mode === "buttons";
-    const mobile = isMobilePlayer(playerId);
     settingsSay(playerId, [
         ic(buttons ? "fa-solid fa-computer-mouse" : "fa-solid fa-backpack", SETTING_CONTROLS_COLOR),
         bold(buttons ? " Button controls." : " Item controls.", SETTING_CONTROLS_COLOR),
         txt(buttons
-            ? (mobile
-                ? " Hold Fruit Abilities for the ability icons, Fighting Style Capacities for the style ones. Your dash has its own button."
-                : " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash.")
-            : (mobile
-                ? " One item per ability. Your dash stays on its button."
-                : " One item per ability, and right click to dash."), C.INFO),
+            ? " Hold Fruit Abilities for your fruit keys, Fighting Style Capacities for your style keys. Q is your dash."
+            : " One item per ability, and right click to dash.", C.INFO),
     ]);
 }
 

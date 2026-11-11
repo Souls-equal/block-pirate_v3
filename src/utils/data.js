@@ -471,17 +471,17 @@ export function clearDevice(playerId) {
     delete devices[playerId];
 }
 
-/* MODE DE COMMANDE — un REGLAGE, avec un DEFAUT par appareil (91)
+/* MODE DE COMMANDE — les items par defaut, les boutons en option sur PC (91)
    ---------------------------------------------------------------------------
      "items"   : un item par capacite, ouvrables a la main. Sur mobile, le dash
                  reste le bouton tactile.
-     "buttons" : les BOUTONS. Sur PC ils apparaissent avec leur touche (Q,
-                 Z X C V F) ; Bloxd les affiche aussi sur mobile, ou ils
-                 jouent exactement le meme role, sans clavier.
-   DEFAUT : le mobile a les BOUTONS (ce sont de petites icones, on ne peut pas
-   y mettre de texte), le PC a les ITEMS (comportement historique). Chacun
-   peut basculer dans Settings -> Controls, et son choix est enregistre : une
-   valeur en base passe TOUJOURS avant le defaut de l'appareil. */
+     "buttons" : les BOUTONS, avec leur touche (Q, Z X C V F). PC seulement.
+   LE MOBILE EST VERROUILLE SUR LES ITEMS, et c'est un constat, pas un choix
+   esthetique : Bloxd n'affiche qu'UN bouton supplementaire a l'ecran (celui du
+   dash), et les clics normaux continuaient de partir en dash. Un ecran de cinq
+   slots supporte tres bien un item par capacite, c'est le comportement
+   historique et il ne depend d'aucune limite du moteur. Un reglage en base ne
+   change donc rien pour un joueur tactile. */
 const CTRL_DB_KEY = "ctl";
 export const CTL_ITEMS = "items";
 export const CTL_BUTTONS = "buttons";
@@ -489,12 +489,11 @@ export const CTL_BUTTONS = "buttons";
 /* Un seul endroit qui decide : tout le reste du code passe par la. */
 export function getControlMode(playerId) {
     if (!playerId) return CTL_ITEMS;
+    /* Le tactile n'a pas le choix : items, et le dash par son bouton. */
+    if (isMobilePlayer(playerId)) return CTL_ITEMS;
     let saved = null;
     try { saved = api.getPlayerDbValue(playerId, CTRL_DB_KEY); } catch (e) { saved = null; }
-    if (saved === CTL_BUTTONS) return CTL_BUTTONS;
-    if (saved === CTL_ITEMS) return CTL_ITEMS;
-    /* Rien en base : le defaut suit l'appareil (demande 91). */
-    return isMobilePlayer(playerId) ? CTL_BUTTONS : CTL_ITEMS;
+    return saved === CTL_BUTTONS ? CTL_BUTTONS : CTL_ITEMS;
 }
 
 export function setControlMode(playerId, mode) {
