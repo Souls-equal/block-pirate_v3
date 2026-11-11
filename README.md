@@ -2099,21 +2099,25 @@ est enregistré (clé `ctl`).
 |---|---|---|---|
 | **PC — ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
 | **PC — BUTTONS** | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
-| **MOBILE** (aucun choix) | **bouton tactile** | un item par capacité | M1 à main nue |
+| **MOBILE** (aucun choix) | **bouton `dash`** | un item par capacité | M1 à main nue |
 
-**Le mobile est verrouillé sur les items, et c'est un constat.** Bloxd n'affiche **qu'un
-bouton supplémentaire** à l'écran (`touchscreenActionButton`), et il est déjà pris par le
-dash. Quand la version précédente a tenté d'y mettre aussi les `customButtons`, les clics
-normaux partaient en dash : le tactile ne distingue pas assez finement un tap d'une action
-secondaire. Un écran de cinq slots supporte très bien **un item par capacité** — c'est le
-comportement historique, il ne dépend d'aucune limite du moteur.
+**Le mobile est verrouillé sur les items, plus UN bouton.** Bloxd affiche les boutons
+personnalisés (`customButtons`) à l'écran des joueurs tactiles, et **un seul** y tient sans
+gêner le jeu : c'est celui du dash. Les capacités restent donc des **items**.
 
 - `getControlMode()` **force** `CTL_ITEMS` pour un joueur tactile : un `ctl = "buttons"`
-  laissé en base ne ressuscite pas les boutons. `buttonsFor()` renvoie `[]` pour un mobile,
-  donc `customButtons` n'est jamais envoyé — le seul bouton est celui du dash.
-- `onPlayerAltAction` **ne dashe plus sur mobile**. C'était la fuite : l'action secondaire
-  (que le tactile déclenche aussi) appelait `tryDash` en mode items. Le dash n'a désormais
-  qu'une entrée : `onTouchscreenActionButton` → `handleDashButton` → `tryDash`.
+  laissé en base ne ressuscite pas les capacités en boutons. `buttonsFor()` renvoie
+  **exactement une entrée** pour un mobile — `{ id: "dash", icon: "zap", keycode: "KeyQ" }`.
+- **`touchscreenActionButton` n'est JAMAIS utilisé** (demande 93). Ce n'est pas un bouton de
+  plus : c'est le **contenu du bouton d'action principal**, celui qui frappe et qui casse
+  les blocs. Son callback, `onTouchscreenActionButton`, arrive donc à **chaque** appui : le
+  joueur dashait en frappant, en parlant à un PNJ, en minant. L'option est remise à `null`
+  au join, au respawn et à chaque bascule (`clearActionButton`), et le callback n'est même
+  plus défini.
+- `onPlayerAltAction` **ne dashe plus sur mobile**. C'était une autre fuite : l'action
+  secondaire (que le tactile déclenche aussi) appelait `tryDash` en mode items. Le dash
+  mobile n'a désormais **qu'une entrée** : le bouton `dash` → `onPlayerPressedButton` →
+  `tryDash`.
 - `handleDashItemClick` ne dashe plus sur mobile non plus : un `Moonstone Dust` résiduel y
   est **retiré** au premier clic (et au join), sans propulser personne. Sur PC, son clic
   dashe encore, puis il est retiré.
@@ -2179,10 +2183,10 @@ Trois détails qui comptent :
    depuis `getPosition`, `getPlayerFacingInfo().dir/camPos`, `targetBlock()` et
    `pickTarget(…, 40, 0.6)`, puis appelle `handleAbilitySlot(id, n)` — le même
    dispatcher que le clic.
-4. **Le bouton tactile ne se répète pas.** `onTouchscreenActionButton` arrive
-   à l'appui **et** au relâchement : seul l'appui dashe, et un même doigt posé
-   ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Il n'existe que sur
-   mobile : sur PC le dash reste le clic droit ou `Q`.
+4. **Le dash mobile est un bouton, pas le bouton d'action.** Bloxd n'offre qu'un
+   `customButtons` sur un écran tactile : c'est le dash (`zap`, `KeyQ`), et il
+   passe par `onPlayerPressedButton`, comme sur PC. Le bouton d'action, lui,
+   garde son rôle — frapper et casser des blocs — et ne dashe jamais.
 
 `npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
 liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une

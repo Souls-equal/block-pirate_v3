@@ -15,7 +15,7 @@ import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { isBossMob as isBossMob } from "./gameplay/loot";
 import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
-import { DASH_ITEM as DASH_ITEM_Name, clearDashState as clearDash, handleDashButton as dashButton, handleDashItemClick as dashItemClick, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, setupDashButton as setupDashBtn, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
+import { DASH_ITEM as DASH_ITEM_Name, clearActionButton as clearActionBtn, handleDashItemClick as dashItemClick, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
 import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
@@ -190,7 +190,8 @@ ct((t, r, a) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   COMMANDES : items partout, boutons en option sur PC (demandes 75, 91)
+   COMMANDES : items partout, un bouton « dash » sur mobile, boutons en option
+   sur PC (demandes 75, 76, 77, 91, 92, 93)
 
    Un joueur ne peut pas passer de PC a mobile sans quitter le monde : on lit
    donc api.isMobile UNE fois, au join, et on ne relit plus.
@@ -198,11 +199,11 @@ ct((t, r, a) => {
    PC     : ITEMS par defaut. Un item par capacite, main nue pour frapper,
             clic droit pour dasher. Les boutons (Q, Z X C V F) sont une option
             dans Settings -> Controls, ouverts par Swap Orb / Void Net.
-   MOBILE : ITEMS, toujours, et un SEUL bouton a l'ecran : celui du dash
-            (touchscreenActionButton, demande 90). Bloxd n'affiche qu'un bouton
-            supplementaire, et les clics normaux partaient en dash des qu'on
-            melangeait les deux (demandes 91 puis 92). Les icones de capacite
-            n'existent donc PAS sur mobile : un item par capacite, comme avant.
+   MOBILE : ITEMS, toujours, plus UN SEUL bouton personnalise : « dash »
+            (demandes 92 et 93). Bloxd affiche nos customButtons a l'ecran des
+            joueurs tactiles ; un seul y tient, et les capacites restent des
+            items. Le bouton d'action du tactile n'est JAMAIS detourne : il sert
+            a frapper, et le detourner faisait dasher a chaque coup.
 
    Le mode est un REGLAGE (db « ctl ») pour les joueurs PC ; un joueur tactile
    est verrouille sur les items (data.getControlMode).
@@ -231,15 +232,22 @@ const CONTROLS = {
     ],
 };
 
-/* Boutons envoyes au client : PC UNIQUEMENT.
-   Un bouton n'apparait qu'avec l'ITEM qui l'ouvre, Swap Orb ou Void Net en
-   main (demandes 76, 77 et 91). Le mobile n'en recoit JAMAIS : Bloxd n'affiche
-   qu'un bouton supplementaire a l'ecran — celui du dash, deja pris par
-   touchscreenActionButton (demande 90). Sur un ecran tactile, les capacites
-   passent donc par les items, comme avant. */
+/* Boutons envoyes au client.
+     MOBILE : UN SEUL bouton, « dash » (demande 93). Bloxd affiche nos boutons
+              personnalises a l'ecran des joueurs tactiles ; un seul y tient, et
+              c'est celui du dash. Les capacites restent des items.
+     PC     : un bouton n'apparait qu'avec l'ITEM qui l'ouvre, Swap Orb ou Void
+              Net en main (demandes 76, 77 et 91) ; en mode items, aucun.
+   Le bouton d'action du tactile (touchscreenActionButton) n'est JAMAIS utilise :
+   il change le contenu du bouton qui sert a frapper, donc chaque coup partait
+   en dash (demande 93). */
 function buttonsFor(playerId) {
-    /* Mode « items », et TOUT mobile : aucun bouton, tout passe par les items. */
-    if (useItemControls(playerId) || isMobilePlayer(playerId)) return [];
+    if (isMobilePlayer(playerId)) {
+        /* Une icone, pas de texte : le bouton est petit. */
+        return [{ id: CONTROLS.dash[0].id, icon: CONTROLS.dash[0].icon, keycode: CONTROLS.dash[0].keycode }];
+    }
+    /* Mode « items » sur PC : aucun bouton, tout passe par les items. */
+    if (useItemControls(playerId)) return [];
     const held = heldName(playerId);
     const list = [];
     const button = (id, icon, keycode, text) => {
@@ -301,27 +309,29 @@ function setupDevice(playerId) {
 }
 
 /* Pose les commandes du mode courant, et RIEN de l'autre :
-     « items »   : items de capacite + items de style, main nue pour frapper ;
-     « buttons » : les boutons (icones), aucun item de capacite. PC seulement.
-   Le BOUTON TACTILE du dash est le SEUL bouton du mobile : il est pose dans les
-   deux modes (demande 90) et retire sur PC.
+     « items » (PC)  : items de capacite + items de style, main nue pour frapper,
+                       aucun bouton ;
+     « buttons » (PC): les boutons (icones), aucun item de capacite ;
+     MOBILE          : items pour les capacites, et UN SEUL bouton, le dash
+                       (demandes 92 et 93).
    Appele au join, au respawn et a chaque bascule des Settings. */
 function setupControls(playerId) {
     const mobile = isMobilePlayer(playerId);
-    setupDashBtn(playerId);
+    /* Le bouton d'action reprend son contenu normal : il ne dashe plus
+       (demande 93, voir gameplay/stamina.js). */
+    clearActionBtn(playerId);
     if (mobile || useItemControls(playerId)) {
-        lastButtons[playerId] = null;
-        try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
         dropSwap(playerId), dropNet(playerId);
-        /* L'item de dash ne sert plus a rien : le dash a son bouton tactile
-           sur mobile, et le clic droit sur PC. Un reliquat d'inventaire est
-           retire dans les deux cas — sur mobile il faisait dasher chaque clic
-           (demande 92). */
+        /* L'item de dash ne sert plus a rien : le dash a son bouton sur mobile,
+           et le clic droit sur PC. Un reliquat d'inventaire est retire dans les
+           deux cas — sur mobile il faisait dasher chaque clic (demande 92). */
         dropDash(playerId);
         /* Les items du fruit et du style reviennent (restore ne redonne que ce
            qui manque, donc un joueur deja equipe ne recoit rien en double). */
         Gt("controls.fruit", () => g(playerId));
         Gt("controls.style", () => fsRestore(playerId));
+        /* buttonsFor ne renvoie QUE le dash sur mobile, et rien sur PC items. */
+        applyButtons(playerId);
         return true;
     }
     dropDash(playerId);
@@ -356,16 +366,11 @@ function clickPoint(playerId) {
     return { x: x, y: y, z: z, block: block, target: target };
 }
 
-/* Bouton tactile du mobile (demande 90). Bloxd appelle ce callback pour
-   l'APPUI et pour le RELACHEMENT : seul l'appui dash. Il n'existe que si
-   setupDashButton a pose le client option, donc les joueurs PC — qui ont le
-   clic droit et Q — ne peuvent pas le declencher. */
-onTouchscreenActionButton = (playerId, touchDown) => {
-    Gt("dashButton", () => dashButton(playerId, touchDown));
-},
-/* Bouton presse (PC : les customButtons n'existent que la, demande 92).
-   Le bouton n'existe que si le bon item est en main, mais on revérifie ici :
-   un client peut garder un bouton residuel d'une session precedente. */
+/* Bouton presse — le seul chemin des boutons, sur les DEUX appareils.
+   Mobile : le bouton « dash » (le seul qu'il recoit). PC : dash + capacites +
+   style, ouverts par l'item en main (demandes 76, 77, 91 et 93). Le bouton
+   n'existe que si le bon item est en main, mais on revérifie ici : un client
+   peut garder un bouton residuel d'une session precedente. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
     if (buttonId === "dash") {
@@ -437,7 +442,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
 }, onPlayerLeave = t => {
     /* L'appareil et les essais de donne d'item de dash ne survivent pas a la
        session : le prochain join relit api.isMobile. */
-    try { clearPlayerDevice(t), clearDash(t), delete lastButtons[t]; } catch (e) {}
+    try { clearPlayerDevice(t), delete lastButtons[t]; } catch (e) {}
     Gt("variation.leave", () => variationLeave(t));
     bpClearConfirm(t);
     /* Chaque sortie est isolee : avant, une exception dans la premiere
@@ -462,7 +467,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
     /* Le bouton tactile du dash est repose : un respawn recharge le client, et
        un joueur mobile ne doit pas perdre son dash en mourant. */
-    Gt("dashButton", () => setupDashBtn(t)),
+    Gt("dashButton", () => clearActionBtn(t)),
     /* Les boutons du mobile dependent du fruit et du style : au respawn, le
        joueur vient de les recuperer. */
     Gt("buttons", () => applyButtons(t)),

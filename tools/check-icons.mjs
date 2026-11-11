@@ -624,34 +624,37 @@ if (!controlsMatch) {
 }
 
 /* ==========================================================================
-   3c. Bouton tactile du dash (mobile)
+   3c. Le bouton du dash (mobile) — et le bouton d'ACTION, qu'on ne touche pas
    ==========================================================================
-   Le dash mobile ne passe plus par un item a tenir en main : il a son propre
-   bouton tactile (demande 90). Trois choses le cassent en silence :
-     - la client option n'est jamais posee  -> aucun bouton a l'ecran ;
-     - le callback n'existe pas             -> un bouton mort ;
-     - l'icone du bouton n'existe pas       -> un « ? » dans le bouton.
-   On verifie donc les trois, sur les sources telles qu'elles partent. */
+   Historique : le dash mobile a d'abord ete un item (demande 75), puis le
+   bouton d'action du tactile (`touchscreenActionButton`, demande 90). Ce
+   dernier ne cree pas un bouton : il change le contenu du bouton qui sert a
+   FRAPPER, donc chaque coup partait en dash (demande 93). Le dash est
+   maintenant un bouton personnalise, le seul que recoit un mobile.
+   Trois choses cassent en silence :
+     - l'option d'action n'est pas remise a `null`  -> le bouton d'action ment ;
+     - un bouton sans icone valide                  -> un « ? » a l'ecran ;
+     - un bouton dont l'id n'est pas traite         -> un bouton mort.
+   ========================================================================== */
 {
     const staminaSrc = readFileSync(join(ROOT, "src/gameplay/stamina.js"), "utf8");
     checked++;
-    if (staminaSrc.indexOf('"touchscreenActionButton"') < 0)
-        errors.push("dash mobile : src/gameplay/stamina.js ne pose pas la client option touchscreenActionButton");
-    const bolt = /ic\("fa-solid fa-([a-z-]+)"/.exec(staminaSrc.slice(staminaSrc.indexOf("function dashButtonParts")));
+    if (staminaSrc.indexOf('"touchscreenActionButton", null') < 0)
+        errors.push("dash : src/gameplay/stamina.js ne remet pas le bouton d'action a null");
     checked++;
-    if (!bolt || !fa.has(bolt[1]))
-        errors.push("dash mobile : l'icone du bouton tactile n'est pas dans la liste blanche");
+    const everyAction = staminaSrc.split('"touchscreenActionButton"').slice(1);
+    if (everyAction.some((tail) => !/^\s*,\s*null/.test(tail)))
+        errors.push("dash : le contenu du bouton d'action est encore detourne (chaque coup dasherait)");
 
-    /* L'ASSIGNATION, pas la premiere mention (les commentaires en parlent). */
-    const hook = /onTouchscreenActionButton\s*=/.exec(controlsSource);
+    /* Le bouton du mobile vient de CONTROLS.dash, deja verifie plus haut ; on
+       verifie quand meme la presence du bouton et l'absence du callback. */
     checked++;
-    if (!hook) errors.push("src/index.js : onTouchscreenActionButton introuvable (le bouton tactile ne fait rien)");
-    else {
-        const body = controlsSource.slice(hook.index, hook.index + 400);
-        checked++;
-        if (body.toLowerCase().indexOf("dash") < 0)
-            errors.push("onTouchscreenActionButton n'appelle pas le dash");
-    }
+    if (/onTouchscreenActionButton\s*=/.test(controlsSource))
+        errors.push("src/index.js : onTouchscreenActionButton est encore branche (le bouton d'action dasherait)");
+    checked++;
+    const mobileButtons = /if \(isMobilePlayer\(playerId\)\) \{[\s\S]{0,220}?\[\{ id: CONTROLS\.dash\[0\]\.id/.test(controlsSource);
+    if (!mobileButtons)
+        errors.push("src/index.js : le mobile ne recoit pas son bouton unique de dash");
 }
 
 /* ==========================================================================

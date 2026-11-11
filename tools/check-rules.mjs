@@ -613,12 +613,13 @@ const installed = await (async () => {
        coute donc rien de plus qu'un slot que le joueur peut jeter. */
     check(typeof stamina.dropLegacyDashItem === "undefined", "item de dash : le balayage des anciens items est de retour");
 
-    /* ── LE DASH MOBILE N'A PLUS D'ITEM A TENIR (demande 90) ───────────────
-       Sortir « Moonstone Dust » pour dasher obligeait a le tenir en main : le
-       slot etait perdu, et le tap qui sert a parler aux PNJ partait en dash.
-       Le dash mobile passe donc par un BOUTON tactile, qui ne depend pas de ce
-       que le joueur a en main. On verifie l'option posee, son retrait sur PC,
-       et le fait qu'un releachement ne dashe pas. */
+    /* ── LE DASH MOBILE N'EST PLUS LE BOUTON D'ACTION (demandes 90 -> 93) ──
+       `touchscreenActionButton` ne cree pas un bouton : il change le CONTENU du
+       bouton d'action principal (celui qui frappe et qui casse des blocs).
+       `onTouchscreenActionButton` se declenchait donc a CHAQUE appui : le
+       joueur dashait en frappant, en parlant a un PNJ, en minerant.
+       Le dash passe maintenant par UN bouton personnalise, et l'option est
+       remise a `null` : on verifie les deux, et l'absence du callback. */
     {
         const options = [];
         let impulses = 0;
@@ -628,33 +629,32 @@ const installed = await (async () => {
             getPlayerFacingInfo: () => ({ dir: [0, 0, 1] }),
             applyImpulse: () => { impulses++; },
             getPlayerIds: () => ["pMob", "pPc"],
+            getInventoryItemAmount: () => 0,
+            removeItemName: () => 1,
         });
         stamina.setDevice("pMob", true);
         stamina.setDevice("pPc", false);
 
+        /* L'option est REMISE A ZERO, jamais remplie : le bouton d'action
+           reprend son contenu normal sur les deux appareils. */
         options.length = 0;
-        check(stamina.setupDashButton("pMob") === true, "dash mobile : le bouton tactile n'est pas pose sur mobile");
+        stamina.clearActionButton("pMob");
+        stamina.clearActionButton("pPc");
         check(
-            options.some((o) => o.id === "pMob" && o.key === "touchscreenActionButton" && o.value),
-            "dash mobile : le client option touchscreenActionButton n'est pas rempli",
+            options.length === 2 && options.every((o) => o.key === "touchscreenActionButton" && o.value === null),
+            "dash : le bouton d'action du tactile n'est pas remis a son contenu normal",
         );
-        options.length = 0;
-        check(stamina.setupDashButton("pPc") === false, "dash mobile : un joueur PC recoit le bouton tactile");
-        check(
-            options.some((o) => o.id === "pPc" && o.key === "touchscreenActionButton" && o.value === null),
-            "dash mobile : le bouton tactile n'est pas retire sur PC",
-        );
+        check(typeof stamina.handleDashButton === "undefined", "dash : le callback du bouton d'action est revenu (chaque coup dasherait)");
+        check(typeof stamina.setupDashButton === "undefined", "dash : touchscreenActionButton est encore rempli par stamina");
 
+        /* L'item residuel ne dashe plus sur mobile, il est retire ; sur PC son
+           clic dashe encore. */
         stamina.staminaJoin("pMob");
         impulses = 0;
-        check(stamina.handleDashButton("pMob", false) === false, "dash mobile : le relachement du bouton est traite comme un appui");
-        check(impulses === 0, `dash mobile : ${impulses} dash(s) au relachement du bouton`);
-        stamina.handleDashButton("pMob", true);
-        check(impulses === 1, "dash mobile : l'appui sur le bouton tactile ne dashe pas");
-        stamina.handleDashButton("pMob", true);
-        check(impulses === 1, `dash mobile : ${impulses} dash(s) pour un seul appui (anti-repetition)`);
-        check(stamina.handleDashButton("pPc", true) === false, "dash mobile : le bouton tactile dashe aussi sur PC");
-        check(impulses === 1, "dash mobile : un appui sur PC a consomme de la stamina");
+        stamina.handleDashItemClick("pMob", "Moonstone Dust");
+        check(impulses === 0, `dash mobile : ${impulses} dash(s) pour un clic sur l'item residuel`);
+        stamina.handleDashItemClick("pPc", "Moonstone Dust");
+        check(impulses === 1, "dash PC : le clic sur l'item de dash ne dashe plus");
         stamina.staminaLeave("pMob");
     }
 
@@ -1028,9 +1028,17 @@ const installed = await (async () => {
        dash (le bouton tactile). */
     const indexSrc = readFileSync(join(SRC, "index.js"), "utf8");
     const cut = indexSrc.slice(indexSrc.indexOf("function buttonsFor"), indexSrc.indexOf("function applyButtons"));
+    /* Mobile : UN SEUL bouton, le dash, et rien d'autre. */
     check(
-        cut.indexOf("useItemControls(playerId) || isMobilePlayer(playerId)") >= 0,
-        "boutons : buttonsFor envoie encore des boutons a un mobile",
+        cut.indexOf("if (isMobilePlayer(playerId)) {") >= 0,
+        "boutons : buttonsFor ne traite plus le mobile a part",
+    );
+    const mobileCut = cut.slice(cut.indexOf("if (isMobilePlayer(playerId)) {"), cut.indexOf("/* Mode « items » sur PC"));
+    check(
+        mobileCut.indexOf("id: CONTROLS.dash[0].id") >= 0
+            && mobileCut.indexOf("abilities") < 0
+            && mobileCut.indexOf("style") < 0,
+        "boutons : le mobile ne recoit pas exactement un bouton de dash",
     );
     check(
         cut.indexOf("if (held === SWAP_ORB_Name) {") >= 0,
@@ -1051,6 +1059,30 @@ const installed = await (async () => {
         clickCut.indexOf("if (isMobilePlayer(t)) dropDash(t);") >= 0,
         "dash : un clic sur l'item de dash residuel dashe encore sur mobile",
     );
+    /* Le dash mobile n'a qu'UNE porte : son bouton. Le callback du bouton
+       d'action ne doit plus exister (demande 93). */
+    const dashSrc = readFileSync(join(SRC, "gameplay/stamina.js"), "utf8");
+    check(
+        dashSrc.indexOf("export function clearActionButton") >= 0,
+        "dash : clearActionButton a disparu (le bouton d'action resterait detourne)",
+    );
+    const indexSrcDash = readFileSync(join(SRC, "index.js"), "utf8");
+    check(
+        !/onTouchscreenActionButton\s*=/.test(indexSrcDash),
+        "dash : onTouchscreenActionButton est encore branche — chaque coup dasherait",
+    );
+    const controlsCut = indexSrcDash.slice(indexSrcDash.indexOf("function setupControls"));
+    check(
+        controlsCut.indexOf("clearActionBtn(playerId)") >= 0,
+        "dash : setupControls ne remet pas le bouton d'action a son contenu normal",
+    );
+    /* Et au respawn : le client peut recharger son bouton d'action. */
+    const respawnCut = indexSrcDash.slice(indexSrcDash.indexOf("onRespawnRequest ="), indexSrcDash.indexOf("onPlayerClick ="));
+    check(
+        respawnCut.indexOf("clearActionBtn") >= 0,
+        "dash : le respawn ne remet pas le bouton d'action a son contenu normal",
+    );
+
     /* L'orb et le filet n'ouvrent que des touches de clavier : jamais sur mobile. */
     const fruitSrc = readFileSync(join(SRC, "fruit/index.js"), "utf8");
     const fsSrc = readFileSync(join(SRC, "gameplay/fightingStyles.js"), "utf8");
@@ -1075,7 +1107,7 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
-   14. MOBILE : LES ITEMS, ET UN SEUL BOUTON — CELUI DU DASH (92)
+   14. MOBILE : LES ITEMS, ET UN SEUL BOUTON — CELUI DU DASH (92, 93)
    ==========================================================================
    Le joueur a tranche apres avoir essaye la 91 : Bloxd n'affiche qu'un bouton
    supplementaire a l'ecran, et les clics normaux partaient en dash des qu'on
