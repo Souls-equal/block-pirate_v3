@@ -2,7 +2,7 @@
 
 Sources lisibles : `src/`. Regenerer : `npm run build:src`.
 
-**32 fichiers, 367 934 caracteres** (72 % de la limite de 512 000 du World Code, -56 % par rapport aux sources lisibles).
+**32 fichiers, 367 459 caracteres** (72 % de la limite de 512 000 du World Code, -56 % par rapport aux sources lisibles).
 
 ## Comment coller
 
@@ -47,11 +47,11 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `gameplay/quest.js` | 10 158 | 23 440 |
 | `gameplay/saber.js` | 28 931 | 79 595 |
 | `gameplay/spawning.js` | 5 937 | 14 602 |
-| `gameplay/stamina.js` | 5 313 | 16 748 |
+| `gameplay/stamina.js` | 4 940 | 15 845 |
 | `gameplay/stats.js` | 5 403 | 13 203 |
 | `gameplay/tutorial.js` | 6 795 | 16 214 |
 | `gameplay/variations.js` | 6 343 | 20 896 |
-| `index.js` | 16 345 | 42 981 |
+| `index.js` | 16 243 | 43 204 |
 | `utils/boss.js` | 6 895 | 16 246 |
 | `utils/combat.js` | 15 465 | 48 329 |
 | `utils/data.js` | 6 538 | 19 289 |

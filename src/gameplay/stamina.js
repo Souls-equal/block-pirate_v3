@@ -1,7 +1,6 @@
 // stamina.js
 
 import { setInterval } from "../utils/timer";
-import { C, ic } from "../core/theme";
 import { isMobilePlayer } from "../utils/data";
 
 /* PARAMÈTRES — modifiez tout ici */
@@ -351,19 +350,17 @@ function dashAnim(playerId) {
     } catch (e) {}
 }
 
-/* ── DASH : une touche sur PC, un BOUTON TACTILE sur mobile ─────────────────
-   PC     : bouton personnalise « dash » (api.setClientOption customButtons,
-            KeyQ) -> onPlayerPressedButton -> tryDash.
-   MOBILE : un bouton tactile dedie (client option touchscreenActionButton)
-            -> onTouchscreenActionButton -> handleDashButton -> tryDash.
-            Aucun item a sortir, aucun slot perdu : le dash ne depend plus de
-            ce que le joueur tient en main (demande 90).
+/* ── DASH : un bouton, sur les deux appareils ───────────────────────────────
+   Le dash n'est plus un item, et il n'est plus le bouton d'action du tactile.
+   Bloxd affiche NOS boutons personnalises (customButtons) a l'ecran des
+   joueurs tactiles, avec le meme fonctionnement qu'une touche : le seul que
+   nous y mettons est « dash » (voir src/index.js, buttonsFor). Sur mobile cet
+   ecran n'a donc qu'UN bouton de plus, et il ne fait que dasher.
 
-   L'item « Moonstone Dust » n'est donc PLUS donne : il servait de dash mobile
-   en occupant un slot, et son clic sur un PNJ partait en dash au lieu de
-   parler. Un inventaire d'une version d'avant peut encore en contenir : sur PC
-   son clic dashe encore, sur mobile il est retire au join et ne dashe JAMAIS
-   (le bouton tactile est la seule entree, demande 92).
+   L'item « Moonstone Dust » n'est PLUS donne : il servait de dash mobile en
+   occupant un slot, et son clic sur un PNJ partait en dash au lieu de parler.
+   Un inventaire d'une version d'avant peut encore en contenir : sur PC son
+   clic dashe encore, sur mobile il est retire au join et ne dashe JAMAIS.
    Il est INERTE a dessein (voir la demande 75 : « Snowdash » propulsait tout
    seul, donc un second dash impossible a annuler sur mobile).
 
@@ -379,62 +376,38 @@ export function removeDashItem(playerId) {
     return true;
 }
 
-/* ── BOUTON TACTILE « DASH » (mobile) ────────────────────────────────────────
-   Le dash mobile ne passe plus par un item. Sortir « Moonstone Dust » pour
-   dasher obligeait a le tenir en main : ce slot etait perdu, et le tap qui
-   sert a parler aux PNJ ou a frapper partait en dash. Bloxd expose un bouton
-   tactile dedie :
-       api.setClientOption(id, "touchscreenActionButton", <texte style>)
-       -> onTouchscreenActionButton(id, touchDown)
-   On y met une ICONE (un eclat) et rien d'autre : c'est le SEUL bouton
-   supplementaire que Bloxd affiche sur mobile, il porte donc tout le sens
-   (demandes 91 et 92). Le dash ne depend donc plus de
-   ce que le joueur a en main, et l'item n'est plus donne (les inventaires
-   d'avant en contiennent encore : son clic marche toujours, voir
-   handleDashItemClick). Sur PC le bouton est retire : le dash reste le clic
-   droit / la touche Q. */
-const DASH_BUTTON_MIN_MS = 250;
-const dashButtonAt = {};
+/* ── LE BOUTON DU DASH ──────────────────────────────────────────────────────
+   PC     : bouton personnalise « dash » (customButtons, KeyQ)
+            -> onPlayerPressedButton -> tryDash.
+   MOBILE : LE MEME bouton personnalise, et c'est le SEUL que Bloxd affiche en
+            plus de la barre d'items (demande 92). Il ne depend d'aucun item et
+            ne touche a rien d'autre : le pouce le presse, le joueur dashe.
 
-function dashButtonParts() {
-    return [ic("fa-solid fa-bolt", C.MARINE)];
-}
+   POURQUOI PAS touchscreenActionButton (demande 90, retiree en 93)
+   -----------------------------------------------------------------
+   `touchscreenActionButton` ne cree pas un bouton : il change le CONTENU du
+   bouton d'action principal, celui qui sert a frapper et a casser des blocs.
+   `onTouchscreenActionButton` se declenche donc a CHAQUE appui d'action : le
+   joueur dashait en frappant, en parlant a un PNJ, en minerant. Aucune garde
+   cote code ne peut reparer ca, puisque le callback ne distingue pas un appui
+   « bouton » d'un appui normal. La client option est donc remise a `null`
+   (contenu par defaut du bouton d'action) et le dash passe par customButtons.
+   ────────────────────────────────────────────────────────────────────────── */
 
-/* Pose (ou retire) le bouton tactile selon l'appareil. Appele au join et a
-   chaque changement de mode de commandes : un client ne doit jamais garder un
-   bouton qui ne correspond plus a l'appareil. */
-export function setupDashButton(playerId) {
+/* Retire notre ancien contenu du bouton d'action. Pose au join et au respawn :
+   un client qui aurait garde l'option d'une session d'avant retrouve son bouton
+   d'action normal. */
+export function clearActionButton(playerId) {
     if (!playerId) return false;
-    if (!isMobilePlayer(playerId)) {
-        try { api.setClientOption(playerId, "touchscreenActionButton", null); } catch (e) {}
-        return false;
-    }
-    try {
-        api.setClientOption(playerId, "touchscreenActionButton", dashButtonParts());
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-/* Appui sur le bouton tactile. `touchDown` arrive aussi au relachement : on ne
-   dash qu'a l'appui. Un doigt pose peut repeter l'appui : un dash par
-   DASH_BUTTON_MIN_MS au maximum, sinon un seul appui viderait la stamina. */
-export function handleDashButton(playerId, touchDown) {
-    if (!playerId || !touchDown) return false;
-    if (!isMobilePlayer(playerId)) return false;
-    const now = Date.now();
-    if (dashButtonAt[playerId] && now - dashButtonAt[playerId] < DASH_BUTTON_MIN_MS) return true;
-    dashButtonAt[playerId] = now;
-    tryDash(playerId);
+    try { api.setClientOption(playerId, "touchscreenActionButton", null); } catch (e) { return false; }
     return true;
 }
 
 /* Clic sur un item de dash RESIDUEL (les inventaires d'avant en contiennent).
    Sur PC, ce clic dashe encore : c'est un raccourci comme un autre.
-   Sur MOBILE, il ne dashe PAS : le dash n'a qu'une entree, le bouton tactile
-   (demande 92, les clics normaux partaient en dash). L'item est retire au
-   passage, donc le clic suivant est un clic normal.
+   Sur MOBILE, il ne dashe PAS : le dash n'a qu'une entree, le bouton « dash »
+   (demandes 92 et 93). L'item est retire au passage, donc le clic suivant est
+   un clic normal.
    Renvoie true s'il s'agit bien de cet item, pour que l'appelant arrete de
    traiter le clic. */
 export function handleDashItemClick(playerId, itemName) {
@@ -445,8 +418,4 @@ export function handleDashItemClick(playerId, itemName) {
     }
     tryDash(playerId);
     return true;
-}
-
-export function clearDashState(playerId) {
-    delete dashButtonAt[playerId];
 }
