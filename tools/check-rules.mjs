@@ -1027,13 +1027,44 @@ const installed = await (async () => {
         indexSrc.indexOf("const mobile = isMobilePlayer(playerId)") >= 0,
         "boutons : buttonsFor ne distingue plus le mobile du PC",
     );
+    /* LES DEUX ITEMS RESTENT LA PORTE DES BOUTONS, SUR LES DEUX APPAREILS
+       (consigne du joueur apres la 91). Un bouton n'apparait qu'avec son item
+       en main ; aucun bouton ne doit dependre de l'appareil. */
     check(
-        indexSrc.indexOf("(mobile || held === SWAP_ORB_Name)") >= 0,
-        "boutons : les capacites du mobile dependent encore de l'item en main",
+        indexSrc.indexOf("(mobile || held === SWAP_ORB_Name)") < 0,
+        "boutons : les capacites ne dependent plus de l'item en main (Swap Orb)",
     );
     check(
-        indexSrc.indexOf("const byTouch = isMobilePlayer(playerId)") >= 0,
-        "boutons : l'appui tactile re-verifie l'item en main",
+        indexSrc.indexOf("(mobile || held === VOID_NET_Name)") < 0,
+        "boutons : les attaques de style ne dependent plus de l'item en main (Void Net)",
+    );
+    check(
+        indexSrc.indexOf("if (held === SWAP_ORB_Name) {") >= 0,
+        "boutons : le Swap Orb n'ouvre plus les capacites du fruit",
+    );
+    check(
+        indexSrc.indexOf("else if (held === VOID_NET_Name") >= 0,
+        "boutons : le Void Net n'ouvre plus les attaques du style",
+    );
+    check(
+        indexSrc.indexOf("const byTouch") < 0,
+        "boutons : l'appui tactile ne passe plus par l'item en main",
+    );
+    /* L'orb et le filet sont donnes sur mobile aussi : la fonction qui les pose
+       ne doit plus exclure l'appareil. */
+    const fruitSrc = readFileSync(join(SRC, "fruit/index.js"), "utf8");
+    const fsSrc = readFileSync(join(SRC, "gameplay/fightingStyles.js"), "utf8");
+    check(
+        fruitSrc.indexOf("isMobilePlayer(t) || !getFruit(t)") < 0,
+        "items : le Swap Orb n'est plus donne sur mobile",
+    );
+    check(
+        fsSrc.indexOf("isMobilePlayer(playerId) || !styleName") < 0,
+        "items : le Void Net n'est plus donne sur mobile",
+    );
+    check(
+        fsSrc.indexOf("isMobilePlayer(playerId) ? true : giveVoidNet") < 0,
+        "items : un style appris sur mobile ne donne plus le Void Net",
     );
     /* Aucun texte sur mobile : les boutons y sont minuscules, une description
        serait illisible (et Bloxd l'afficherait sous l'icone). */
@@ -1047,10 +1078,7 @@ const installed = await (async () => {
     );
     /* Mobile : les deux groupes sont affiches ensemble, donc leurs touches ne
        doivent pas etre les memes (un clavier physique reste possible). */
-    check(
-        indexSrc.indexOf("MOBILE_STYLE_KEYS") >= 0,
-        "boutons : les capacites et les attaques de style partagent encore une touche sur mobile",
-    );
+
     const uiSrc = readFileSync(join(SRC, "core/UI.js"), "utf8");
     check(
         uiSrc.indexOf("Touch screens always use items") < 0,
@@ -1059,6 +1087,69 @@ const installed = await (async () => {
     check(
         uiSrc.indexOf("createShopItemForPlayer(playerId, SETTINGS_CATEGORY, \"set_controls\"") >= 0,
         "reglage : la carte Controls n'est plus creee",
+    );
+}
+
+/* ==========================================================================
+   14. LES DEUX ITEMS OUVRENT LES BOUTONS, MOBILE COMPRIS
+   ==========================================================================
+   Consigne du joueur apres la 91 : on GARDE le systeme des deux items qui
+   font apparaitre les boutons, et il vaut aussi pour le mobile. En mode
+   boutons, un mobile recoit donc le Swap Orb (fruit) et le Void Net (style)
+   exactement comme un PC, et aucun bouton n'apparait sans eux.
+   ========================================================================== */
+
+{
+    const given = [];
+    installApi({
+        giveItem: (pid, name) => { given.push({ pid, name }); return 1; },
+        removeItemName: () => 1,
+        setItemSlot: () => {},
+        getInventoryItemAmount: () => 0,
+        getHeldItem: () => null,
+    });
+    const game = await loadModules("fruit/index.js", ["utils/data.js", "gameplay/fightingStyles.js", "fruit/abilities.js", "utils/timer.js"]);
+    const run = (steps) => { for (let i = 0; i < steps; i++) game.step(); };
+    game.setDevice("pOrbMob", true);
+    game.setDevice("pItemsMob", true);
+
+    /* Mode BOUTONS sur mobile : l'orb arrive avec le fruit. On passe par
+       activateFruit (le joueur mange un fruit), qui suit le meme chemin que le
+       join : equiperFruit -> giveSwapOrb. */
+    let held = { name: "Heatwarp Flounder" };
+    api.getHeldItem = () => held;
+    db.pOrbMob = { ctl: "buttons" };
+    given.length = 0;
+    game.activateFruit("pOrbMob");
+    run(40);
+    check(
+        given.some((g) => g.pid === "pOrbMob" && g.name === "Swap Orb"),
+        `items : le mobile en mode boutons ne recoit pas le Swap Orb (${given.map((g) => g.name).join(", ")})`,
+    );
+
+    /* Mode ITEMS sur mobile : un item par capacite, JAMAIS l'orb. */
+    db.pItemsMob = { ctl: "items" };
+    given.length = 0;
+    game.activateFruit("pItemsMob");
+    run(40);
+    check(
+        given.length > 0 && !given.some((g) => g.name === "Swap Orb"),
+        "items : le mobile en mode items recoit encore le Swap Orb (ou aucun item de capacite)",
+    );
+    held = null;
+
+    /* Le style suit la meme regle : le filet en mode boutons, les items en mode items. */
+    given.length = 0;
+    game.equipFightingStyle("pOrbMob", "Combat", true);
+    check(
+        given.some((g) => g.pid === "pOrbMob" && g.name === "Void Net"),
+        "items : le mobile en mode boutons ne recoit pas le Void Net en apprenant un style",
+    );
+    given.length = 0;
+    game.equipFightingStyle("pItemsMob", "Combat", true);
+    check(
+        given.length > 0 && !given.some((g) => g.name === "Void Net"),
+        "items : le mobile en mode items recoit le Void Net au lieu des items du style",
     );
 }
 
