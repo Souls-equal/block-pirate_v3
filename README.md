@@ -819,7 +819,7 @@ ici créerait le cycle `customItem → data`).
 | Item technique | Nom affiché | Description |
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
-| `Moonstone Dust` | **Dash** | le dash du mobile (matière inerte, aucun effet propre) |
+| `Moonstone Dust` | **Dash** | reliquat des anciennes versions (matière inerte) : son clic dashe encore, il n'est plus donné |
 | `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons) |
 | `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
@@ -1465,11 +1465,28 @@ nommés exactement :
 | `Pirate Recruiter` | `PIRATES` |
 | `Marine Recruiter` | `MARINES` |
 
-Au **premier clic**, il annonce la team dans laquelle il va te basculer, la team actuelle
-et la conversion des armes. Au **second clic** (même fenêtre de 3 s que tous les achats),
-le changement est appliqué par `setPlayerTeam()` : base de données, nametag, canaux de
-chat, sidebar, armes de team et classement sont mis à jour d'un coup. S'il est déjà dans
-cette team, il le dit et ne fait rien.
+Au **premier clic**, il annonce la team dans laquelle il va te basculer, la team actuelle,
+la conversion des armes et le **déplacement** qui suit. Au **second clic** (même fenêtre de
+3 s que tous les achats), le changement est appliqué par `setPlayerTeam()` : base de
+données, nametag, canaux de chat, sidebar, armes de team et classement sont mis à jour
+d'un coup. S'il est déjà dans cette team, il le dit et ne fait rien.
+
+Deux effets s'ajoutent au changement de team :
+
+- **Téléportation à l'île de départ de la nouvelle team** — `teleportToTeamSpawn()`
+  (`gameplay/variations.js`) envoie le joueur au spawn de sa team dans la mer 1
+  (`SEAS[1].teams`), variations coupées comprises : un pirate arrive chez les pirates.
+- **La quête suit la team, sans perdre les kills** — `refreshQuestTeam()`
+  (`gameplay/quest.js`) reprend la **même** quête (même palier, donc même niveau),
+  remappe la cible et le marqueur sur la nouvelle team, et **conserve
+  `questProgress`**. Un joueur qui a déjà tué 3 des 5 cibles n'a pas à recommencer.
+  Sans quête en cours, rien n'est lancé à sa place.
+
+Sur **mobile**, le tactile n'envoie aucune cible d'entité (`targetEId` est nul) : le tap
+n'atteignait donc aucun PNJ. `npcNearPoint()` (`gameplay/NPCs.js`) retrouve le PNJ le plus
+proche du point touché (rayon de 3 blocs) quand la cible ne peut pas être lui — jamais à la
+place d'un coup porté à un joueur ou à un mob. Les recruteurs, comme tous les marchands,
+répondent donc aussi sur téléphone.
 
 Le nom est le seul branchement (`TEAM_RECRUITERS` dans `src/gameplay/NPCs.js`) : renommer
 le PNJ dans le monde suffit à le désactiver, et en ajouter un troisième pour une future
@@ -2046,12 +2063,16 @@ comportement historique.
 |---|---|---|---|
 | **ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
 | **BUTTONS** (PC) | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
-| **Mobile** | item **`Dash`** | un item par capacité | M1 à main nue |
+| **Mobile** | **bouton tactile `DASH`** | un item par capacité | M1 à main nue |
 
-- **Le mobile n'a pas le choix** : pas de clavier, donc jamais de boutons, et le
-  dash passe **toujours** par l'item (`Moonstone Dust`, affiché **`Dash`** avec sa
-  description dans `ITEM_LOOKS`). Un réglage en base ne le change pas, et
-  l'item de Settings n'est même pas créé sur un écran tactile.
+- **Le mobile n'a pas le choix** : pas de clavier, donc jamais de boutons à
+  touches. Un réglage en base ne le change pas, et l'item de Settings n'est même
+  pas créé sur un écran tactile.
+- **Le dash mobile a son propre bouton** (`touchscreenActionButton` →
+  `onTouchscreenActionButton` → `handleDashButton` → `tryDash`) : il ne dépend
+  plus de ce que le joueur tient en main, et le clic qui sert à parler aux PNJ
+  ou à frapper n'est plus confisqué par un item. La client option est posée au
+  join, reposée au respawn, et retirée sur PC (`null`).
 - **La bascule est immédiate** : `setControlMode()` écrit la clé `ctl`, puis
   `applyControls()` (hook posé par `index.js`) retire les items du mode quitté
   et donne ceux du mode choisi — pas besoin de se reconnecter.
@@ -2093,15 +2114,13 @@ partage rien.
 
 Trois détails qui comptent :
 
-1. **L'item de dash n'a aucun effet propre.** C'est une **matière**
-   (`Moonstone Dust`) : son clic (`onPlayerClick`) appelle **notre** `tryDash` —
-   coût en stamina, animation, verrou anti-coup de poing — et son action
-   secondaire (`onPlayerAltAction`) est refusée. C'était tout l'intérêt du
-   changement : `Snowdash` propulsait le joueur **de lui-même**, et sur mobile ce
-   dash-là ne peut pas être annulé, d'où un second dash gratuit. L'item est à
-   **usage unique** et n'est jamais rendu : un ancien `Snowdash` qui traîne dans
-   un inventaire est un reliquat inerte (il ne déclenche plus rien), on ne le
-   ramasse pas au join.
+1. **Le dash est toujours NOTRE dash.** Le bouton tactile comme l'item
+   résiduel (`Moonstone Dust`, une **matière** sans effet propre) passent par
+   `tryDash` : coût en stamina, animation, verrou anti-coup de poing. C'était
+   tout l'intérêt du changement de matière : `Snowdash` propulsait le joueur
+   **de lui-même**, et sur mobile ce dash-là ne peut pas être annulé, d'où un
+   second dash gratuit. L'item n'est plus donné : un reliquat d'inventaire ne
+   déclenche qu'un dash normal, et il est retiré au join sur PC.
 2. **Le `Void Net` fait le coup de poing.** En main, `onPlayerClick` appelle
    directement `handleFightingStyleM1(…, allowHeldItem = true)` : le filet
    n'empêche pas le M1 du style, il le déclenche. Sans lui, la main nue fait le
@@ -2111,10 +2130,10 @@ Trois détails qui comptent :
    depuis `getPosition`, `getPlayerFacingInfo().dir/camPos`, `targetBlock()` et
    `pickTarget(…, 40, 0.6)`, puis appelle `handleAbilitySlot(id, n)` — le même
    dispatcher que le clic.
-4. **Inventaire plein.** Bloxd ne le signale pas : `ensureDashItem` donne l'item
-   puis **vérifie** sa présence. S'il n'est pas là, le joueur est prévenu **une
-   fois** (« free a slot… ») et un réessai repart toutes les 5 s pendant 5 min ;
-   la chaîne est arrêtée au départ du joueur (`clearDashState`).
+4. **Le bouton tactile ne se répète pas.** `onTouchscreenActionButton` arrive
+   à l'appui **et** au relâchement : seul l'appui dashe, et un même doigt posé
+   ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Le bouton n'existe
+   que sur mobile : `onPlayerPressedButton` reste le chemin du PC.
 
 `npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
 liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une

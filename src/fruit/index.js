@@ -977,6 +977,16 @@ function B(t, e) {
       f("fruitRoll.refund", t, e.key);
     }
 }
+/* Combien de cet item le joueur porte-t-il ? Sert a verifier une remise que
+   l'API n'a pas confirmee. Zero si la lecture echoue. */
+function heldFruitAmount(t, itemName) {
+  try {
+    const n = api.getInventoryItemAmount(t, itemName);
+    return "number" == typeof n && n > 0 ? n : 0;
+  } catch (e) {
+    return 0;
+  }
+}
 /* Encaisse le prix AU MOMENT DE LA LIVRAISON. Relit le solde : le joueur a pu
    depenser entre-temps (autre achat, autre PNJ). Renvoie false si l'argent
    n'y est plus — dans ce cas rien n'est debite et rien n'est donne. */
@@ -992,6 +1002,18 @@ function fruitPay(t, e) {
   try {
     api.setPlayerDbValue(t, e.key, e.balanceAfter);
     e.paid = true;
+    /* La base peut REFUSER l'ecriture sans lever (quota du joueur atteint).
+       On relit le solde : si le debit n'est pas la, on remet l'ancien et on
+       refuse le tirage. C'est ce controle qui garantit qu'un fruit ne parte
+       jamais sans avoir ete paye. */
+    if (T(t, e.key) !== e.balanceAfter) {
+      e.paid = false;
+      try {
+        api.setPlayerDbValue(t, e.key, e.balanceBefore);
+      } catch (r) {}
+      f("fruitRoll.pay.notWritten", "balance not written", e.key);
+      return false;
+    }
     return true;
   } catch (r) {
     f("fruitRoll.pay", r, e.key);
@@ -1020,12 +1042,22 @@ function refundRoll(t) {
   /* Si rien n'a encore ete debite (cas normal), il n'y a rien a rendre :
      aucun appel a la base, donc aucune erreur sur un joueur deja parti. */
   B(t, e);
-  if (fruitOnline(t)) A(t);
+  /* A() est deja protege (joueur parti + try/catch) : on l'appelle toujours,
+     sinon un roll interrompu laissait « ROLLING... » a l'ecran. */
+  A(t);
   return true;
 }
 function E(t, o, r) {
   const c = r;
   M.set(t, c);
+  /* FILET DE SECURITE. Le timer du monde arrete un callback qui leve plusieurs
+     fois de suite : l'animation mourrait alors en plein tour, le roll resterait
+     bloque dans M (le joueur ne pourrait plus jamais relancer) et l'overlay
+     afficherait « ROLLING... » a vie. Au bout de ~15 s, on rembourse et on
+     efface, quoi qu'il soit arrive. */
+  e(() => {
+    M.get(t) === c && refundRoll(t);
+  }, 300);
   const a = (function () {
     const t = [];
     for (const e of Object.keys(i)) {
@@ -1040,6 +1072,7 @@ function E(t, o, r) {
     w(t, ["???", "???", "???"], "ROLLING...", r.price, r.level, "#facc15"),
     e(function i() {
       if (M.get(t) !== c) return;
+      try {
       /* Parti en plein tour : plus rien a afficher, plus rien a jouer. */
       if (!fruitOnline(t)) return void refundRoll(t);
       const u = Math.min(1, l / 120);
@@ -1052,6 +1085,7 @@ function E(t, o, r) {
               (function (t, o, r, i) {
                 if (M.get(t) !== o) return;
                 M.delete(t);
+                try {
                 /* Parti pendant l'animation : rien n'a ete debite, on s'arrete. */
                 if (!fruitOnline(t)) return;
                 /* Encaisse maintenant : le solde peut avoir baisse pendant les 2 s. */
@@ -1078,8 +1112,13 @@ function E(t, o, r) {
                   D(t, "exp_levelup", 0.75, 1),
                   w(t, [r, r, r], "JACKPOT", i.price, i.level, P(r, "#86efac")));
                 try {
+                  /* Le retour de giveItem doit etre POSITIF. Sinon on verifie
+                     l'inventaire : un echec (sac plein, retour inattendu) ne
+                     doit jamais passer pour une remise. */
+                  const before = heldFruitAmount(t, a);
                   const e = api.giveItem(t, a, 1, fruitItemAttributes(r));
-                  if ("number" == typeof e && e < 1) throw new Error("Inventory is full");
+                  if (!("number" == typeof e && e >= 1) && heldFruitAmount(t, a) <= before)
+                    throw new Error("Inventory is full");
                 } catch (e) {
                   /* Parti entre l'encaissement et la remise : il n'y a plus
                      personne a rembourser ni a prevenir, et loguer une erreur
@@ -1118,6 +1157,19 @@ function E(t, o, r) {
                       "fruitRoll.reward",
                     ));
                 }, 50);
+                } catch (err) {
+                  /* Rien ne doit rester a moitie fait : si le code casse entre
+                     l'encaissement et la remise, l'argent est rendu. */
+                  B(t, i);
+                  f("fruitRoll.delivery", err, r);
+                  if (fruitOnline(t)) {
+                    A(t);
+                    p(t, "The fruit machine failed. Your money was refunded.", {
+                      color: "#f87171",
+                      fontWeight: "700",
+                    });
+                  }
+                }
               })(t, c, o, r),
             18,
           )
@@ -1138,6 +1190,12 @@ function E(t, o, r) {
         ));
       const d = u < 0.35 ? 2 : u < 0.7 ? 3 : u < 0.9 ? 4 : u < 0.98 ? 6 : 8;
       ((l += d), e(i, d));
+      } catch (err) {
+        /* Une erreur ici ne doit pas laisser la machine bloquee : on rembourse
+           (rien n'a encore ete debite) et on rend l'ecran au joueur. */
+        f("fruitRoll.tick", err);
+        refundRoll(t);
+      }
     }, 1));
 }
 export function rollFruit(t, e = 1) {

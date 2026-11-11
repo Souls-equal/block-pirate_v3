@@ -577,6 +577,40 @@ export function startQuest(playerId) {
     updateSidebar(playerId);
 }
 
+/* CHANGEMENT DE TEAM — la quete suit la nouvelle team (demande 90).
+   Meme quete, donc meme palier (et donc meme niveau), mais la cible et le
+   marqueur sont ceux de la nouvelle team ; la PROGRESSION EST CONSERVEE : un
+   joueur qui a deja tue 3 des 5 cibles ne recommence pas. Sans quete en
+   cours, il n'y a rien a remapper : on ne lance pas une quete a sa place. */
+export function refreshQuestTeam(playerId) {
+    if (!playerId) return false;
+    const qid = getStat(playerId, "questId", null);
+    if (!qid) return false;
+    const quest = getQuestById(qid);
+    if (!quest) return false;
+
+    const resolved = resolveQuest(quest, getPlayerTeam(playerId));
+    const live = questProgress[playerId];
+    const killed = Math.max(0, Number(live === undefined ? getStat(playerId, "questProgress", 0) : live) || 0);
+
+    playerQuest[playerId] = resolved;
+    questProgress[playerId] = killed;
+    saveQuest(playerId, resolved, killed);
+
+    try {
+        api.setDirectionArrow(
+            playerId,
+            resolved.id,
+            resolved.position,
+            "Quest Location",
+            true,
+            { color: "red", fontSize: "17px", fontWeight: "bold" }
+        );
+    } catch (e) {}
+    try { updateSidebar(playerId); } catch (e) {}
+    return true;
+}
+
 /* RESTORE ON JOIN */
 export function restorePlayerQuest(playerId) {
     delete playerQuest[playerId];

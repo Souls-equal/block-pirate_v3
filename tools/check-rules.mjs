@@ -29,6 +29,12 @@
 //   8. ANCIENNE UI. Le panneau Settings a deja eu un item par ile ("isle_ju").
 //      Un client qui les affiche encore doit obtenir le meme effet : on garde
 //      la lecture, et ce test empeche de la supprimer par megarde.
+//  10. PNJ SOUS LE DOIGT. Un ecran tactile n'envoie aucune cible d'entite :
+//      on retrouve le PNJ le plus proche du point touche, et seulement un PNJ.
+//  11. CHANGEMENT DE TEAM. La quete suit la nouvelle team (cible et marqueur)
+//      sans perdre les kills deja faits.
+//  12. MACHINE A FRUITS. Un tirage encaisse exactement son prix puis donne le
+//      fruit ; un echec de remise rembourse tout. Jamais de fruit gratuit.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -588,7 +594,9 @@ const installed = await (async () => {
    nom soit ignore, et le balayage des anciens items au join. */
 
 {
-    const stamina = await loadModules("gameplay/stamina.js");
+    /* data.js est charge DANS LE MEME bundle : isMobilePlayer doit etre la meme
+       instance que celle que stamina interroge (deux bundles = deux memoires). */
+    const stamina = await loadModules("gameplay/stamina.js", ["utils/data.js"]);
 
     check(stamina.DASH_ITEM === "Moonstone Dust", `item de dash : « ${stamina.DASH_ITEM} » au lieu de « Moonstone Dust »`);
     check(stamina.DASH_ITEM !== "Snowdash", "item de dash : « Snowdash » est revenu (item qui se deplace tout seul)");
@@ -601,6 +609,51 @@ const installed = await (async () => {
        Un « Snowdash » residuel ne declenche plus rien (verifie dessus) et ne
        coute donc rien de plus qu'un slot que le joueur peut jeter. */
     check(typeof stamina.dropLegacyDashItem === "undefined", "item de dash : le balayage des anciens items est de retour");
+
+    /* ── LE DASH MOBILE N'A PLUS D'ITEM A TENIR (demande 90) ───────────────
+       Sortir « Moonstone Dust » pour dasher obligeait a le tenir en main : le
+       slot etait perdu, et le tap qui sert a parler aux PNJ partait en dash.
+       Le dash mobile passe donc par un BOUTON tactile, qui ne depend pas de ce
+       que le joueur a en main. On verifie l'option posee, son retrait sur PC,
+       et le fait qu'un releachement ne dashe pas. */
+    {
+        const options = [];
+        let impulses = 0;
+        installApi({
+            isMobile: (id) => id === "pMob",
+            setClientOption: (id, key, value) => options.push({ id, key, value }),
+            getPlayerFacingInfo: () => ({ dir: [0, 0, 1] }),
+            applyImpulse: () => { impulses++; },
+            getPlayerIds: () => ["pMob", "pPc"],
+        });
+        stamina.setDevice("pMob", true);
+        stamina.setDevice("pPc", false);
+
+        options.length = 0;
+        check(stamina.setupDashButton("pMob") === true, "dash mobile : le bouton tactile n'est pas pose sur mobile");
+        check(
+            options.some((o) => o.id === "pMob" && o.key === "touchscreenActionButton" && o.value),
+            "dash mobile : le client option touchscreenActionButton n'est pas rempli",
+        );
+        options.length = 0;
+        check(stamina.setupDashButton("pPc") === false, "dash mobile : un joueur PC recoit le bouton tactile");
+        check(
+            options.some((o) => o.id === "pPc" && o.key === "touchscreenActionButton" && o.value === null),
+            "dash mobile : le bouton tactile n'est pas retire sur PC",
+        );
+
+        stamina.staminaJoin("pMob");
+        impulses = 0;
+        check(stamina.handleDashButton("pMob", false) === false, "dash mobile : le relachement du bouton est traite comme un appui");
+        check(impulses === 0, `dash mobile : ${impulses} dash(s) au relachement du bouton`);
+        stamina.handleDashButton("pMob", true);
+        check(impulses === 1, "dash mobile : l'appui sur le bouton tactile ne dashe pas");
+        stamina.handleDashButton("pMob", true);
+        check(impulses === 1, `dash mobile : ${impulses} dash(s) pour un seul appui (anti-repetition)`);
+        check(stamina.handleDashButton("pPc", true) === false, "dash mobile : le bouton tactile dashe aussi sur PC");
+        check(impulses === 1, "dash mobile : un appui sur PC a consomme de la stamina");
+        stamina.staminaLeave("pMob");
+    }
 
     /* ── AUCUN LOG QUAND UN JOUEUR PART ────────────────────────────────────
        Un depart au milieu d'un tick fait lever les fonctions de l'API
@@ -744,6 +797,159 @@ const installed = await (async () => {
 }
 
 /* ==========================================================================
+   10. PNJ SOUS LE DOIGT (MOBILE)
+   ==========================================================================
+   Un ecran tactile n'a pas de visee d'entite : onPlayerClick arrive avec un
+   `targetEId` NUL, et le clic ne trouvait donc aucun PNJ — les recruteurs ne
+   repondaient pas sur mobile (demande 90). npcNearPoint retrouve le PNJ le
+   plus proche du point touche. On verifie qu'il trouve bien un PNJ, qu'il
+   ignore tout ce qui n'est pas un PNJ et qu'il ne prend pas une cible
+   lointaine. */
+
+{
+    const npcs = await loadModules("gameplay/NPCs.js");
+    const NEAR = { npc1: [10.5, 65, 10.5], npc2: [13, 65, 10], mob1: [10.5, 65, 10.5], far: [90, 65, 90] };
+    const isNPC = (id) => id === "npc1" || id === "npc2";
+    installApi({
+        getEntitiesInRect: (min, max) => Object.keys(NEAR).filter((id) => {
+            const p = NEAR[id];
+            return p[0] >= min[0] && p[0] <= max[0] && p[1] >= min[1] && p[1] <= max[1] && p[2] >= min[2] && p[2] <= max[2];
+        }),
+        getEntityType: (id) => (isNPC(id) ? "NPC" : "Mob"),
+        getPosition: (id) => NEAR[id] || null,
+    });
+
+    check(npcs.npcNearPoint(10, 65, 10) === "npc1", "mobile : le PNJ sous le doigt n'est pas trouve");
+    /* Un mob au meme endroit ne doit jamais etre pris pour un PNJ. */
+    check(npcs.npcNearPoint(10, 65, 10) !== "mob1", "mobile : un mob ordinaire est pris pour un PNJ");
+    /* Loin de tout : aucune cible inventee. */
+    check(npcs.npcNearPoint(200, 65, 200) === null, "mobile : un PNJ est trouve a 200 blocs du doigt");
+    /* Point de clic invalide : on ne devine pas. */
+    check(npcs.npcNearPoint(null, null, null) === null, "mobile : un clic sans position trouve quand meme un PNJ");
+}
+
+/* ==========================================================================
+   11. CHANGEMENT DE TEAM : QUETE DE LA NOUVELLE TEAM, KILLS CONSERVES
+   ==========================================================================
+   Chez un recruteur, la quete suit la nouvelle team : meme quete (donc meme
+   palier, donc meme niveau), mais la cible et le marqueur sont ceux de la
+   nouvelle team, et la progression deja faite est CONSERVEE (demande 90).
+   Sans quete en cours, on n'en lance pas une a la place du joueur. */
+
+{
+    /* UI en tete du bundle : c'est l'ordre d'initialisation de Bloxd (UI lit la
+       table des quetes au chargement). L'inverse laisse `quests` undefined. */
+    const quest = await loadModules("core/UI.js", ["gameplay/quest.js", "utils/data.js"]);
+    installApi({});
+
+    db.pQuest = { lvl: 5, team: "PIRATES", questId: "starter1", questProgress: 4 };
+    check(quest.refreshQuestTeam("pQuest") === true, "team : la quete n'est pas remappee au changement de team");
+    check(
+        quest.playerQuest.pQuest && quest.playerQuest.pQuest.targetMob[0] === "Pirate 1",
+        "team : la cible de la quete n'est pas celle des pirates",
+    );
+
+    /* Le joueur devient marine : la cible et le marqueur changent... */
+    db.pQuest.team = "MARINES";
+    check(quest.refreshQuestTeam("pQuest") === true, "team : la quete ne suit pas le passage chez les marines");
+    check(
+        quest.playerQuest.pQuest && quest.playerQuest.pQuest.targetMob[0] === "Marine 1",
+        `team : la cible de la quete est restee « ${quest.playerQuest.pQuest && quest.playerQuest.pQuest.targetMob[0]} »`,
+    );
+    check(
+        JSON.stringify(quest.playerQuest.pQuest.position) === JSON.stringify([1054.5, -912, -294.5]),
+        "team : le marqueur de la quete n'est pas celui des marines",
+    );
+    /* ...mais les kills deja faits restent acquis. */
+    check(quest.questProgress.pQuest === 4, `team : la progression est passee de 4 a ${quest.questProgress.pQuest}`);
+    check(db.pQuest.questProgress === 4, `team : la progression sauvegardee est passee a ${db.pQuest.questProgress}`);
+    check(db.pQuest.questId === "starter1", `team : la quete a change d'identifiant (${db.pQuest.questId})`);
+
+    /* Aucune quete en cours : rien n'est lance d'office. */
+    db.pNoQuest = { lvl: 5, team: "PIRATES" };
+    check(quest.refreshQuestTeam("pNoQuest") === false, "team : une quete est lancee alors que le joueur n'en avait pas");
+    check(db.pNoQuest.questId === undefined, "team : une quete a ete ecrite en base sans que le joueur en demande une");
+}
+
+/* ==========================================================================
+   12. MACHINE A FRUITS : L'ARGENT D'ABORD, LE FRUIT ENSUITE
+   ==========================================================================
+   Le joueur s'est plaint de tirages ou le PNJ « ne prend pas l'argent »
+   (demande 90). On rejoue donc des tirages COMPLETS, minuteur compris, avec
+   une api simulee qui compte les items donnes :
+     a) un tirage encaisse EXACTEMENT le prix affiche, puis donne le fruit ;
+     b) un sac plein (giveItem echoue) rembourse integralement : jamais de
+        fruit gratuit, jamais d'argent perdu ;
+     c) deux clics pendant l'animation ne font pas deux tirages ;
+     d) apres un tirage, la machine n'est pas bloquee (on peut relancer).
+   ========================================================================== */
+
+{
+    const inv = {};
+    const given = [];
+    let giveAmount = 1;
+    installApi({
+        getInventoryItemAmount: (pid, name) => (inv[pid] && inv[pid][name]) || 0,
+        giveItem: (pid, name, amount) => {
+            given.push({ pid, name, amount });
+            if (giveAmount < 1) return giveAmount;
+            inv[pid] = inv[pid] || {};
+            inv[pid][name] = (inv[pid][name] || 0) + amount;
+            return amount;
+        },
+    });
+    const fruit = await loadModules("fruit/index.js", ["utils/timer.js", "utils/data.js"]);
+    const run = (steps) => { for (let i = 0; i < steps; i++) fruit.step(); };
+    const price = fruit.fruitRollPrice(12, 0);
+
+    /* a) Un tirage : premier clic = annonce, second clic = tirage. */
+    db.pFruit = { money: 10000, lvl: 12, team: "PIRATES" };
+    check(fruit.rollFruit("pFruit", 1) === null, "machine a fruits : le premier clic lance le tirage sans confirmation");
+    fruit.rollFruit("pFruit", 1);
+    run(400);
+    check(
+        db.pFruit.money === 10000 - price,
+        `machine a fruits : solde ${db.pFruit.money} au lieu de ${10000 - price} apres un tirage a ${price}`,
+    );
+    check(
+        given.length === 1 && given[0].pid === "pFruit" && given[0].amount === 1,
+        "machine a fruits : l'argent est encaisse mais le fruit n'est pas donne",
+    );
+
+    /* c) Deux clics de plus pendant l'animation : un seul tirage. */
+    db.pFruit.money = 10000;
+    fruit.rollFruit("pFruit", 1);
+    fruit.rollFruit("pFruit", 1);
+    const paidAfterStart = db.pFruit.money;
+    given.length = 0;
+    fruit.rollFruit("pFruit", 1);
+    fruit.rollFruit("pFruit", 1);
+    run(400);
+    check(
+        db.pFruit.money === paidAfterStart - price,
+        `machine a fruits : ${paidAfterStart - db.pFruit.money} car. debites pour un seul tirage (${price} attendus)`,
+    );
+    check(given.length === 1, `machine a fruits : ${given.length} fruit(s) donnes pour un seul tirage`);
+
+    /* d) La machine n'est pas bloquee apres un tirage : on peut relancer. */
+    fruit.rollFruit("pFruit", 1);
+    const restarted = fruit.rollFruit("pFruit", 1);
+    check(typeof restarted === "string", "machine a fruits : impossible de relancer apres un tirage");
+    run(400);
+
+    /* b) Sac plein : giveItem ne donne rien -> remboursement integral. */
+    giveAmount = 0;
+    db.pFruitFull = { money: 5000, lvl: 12, team: "PIRATES" };
+    fruit.rollFruit("pFruitFull", 1);
+    fruit.rollFruit("pFruitFull", 1);
+    run(400);
+    check(
+        db.pFruitFull.money === 5000,
+        `machine a fruits : sac plein, le joueur a perdu ${5000 - db.pFruitFull.money} car. sans fruit`,
+    );
+}
+
+/* ==========================================================================
    BILAN
    ========================================================================== */
 
@@ -754,5 +960,5 @@ if (errors.length) {
     process.exit(1);
 }
 console.log(
-    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI, chat Global en bleu fonce).`,
+    `Regles : ${checked} verifications (name tags, prime anti-farm, chat lecture seule, boss sans CC, zero emoji, item de dash, aucun pseudo en dur, ancienne UI, chat Global en bleu fonce, PNJ sous le doigt, quete au changement de team, machine a fruits payee avant remise).`,
 );

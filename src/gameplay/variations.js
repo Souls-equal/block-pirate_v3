@@ -305,6 +305,17 @@ function teamSpawn(sea, teamId) {
     return sea.teams[teamId] || sea.teams.NONE || null;
 }
 
+/* Amene le joueur au spawn de sa TEAM dans la mer 1 — l'ile de depart — sans
+   matchmaking ni changement de variation. Sert au changement de team chez un
+   recruteur (demande 90) : un joueur qui devient pirate arrive chez les
+   pirates, tout de suite, variations coupees ou non. */
+export function teleportToTeamSpawn(playerId, teamId) {
+    if (!playerId) return false;
+    const sea = SEAS[1];
+    const pos = sea ? teamSpawn(sea, teamId) : null;
+    return teleport(playerId, pos || LOBBY.spawn);
+}
+
 /* Ecrit la position d'arrivee avant un changement de variation : elle sera
    appliquee au join (le saut de variation recharge le joueur). */
 function setPending(playerId, pos) {

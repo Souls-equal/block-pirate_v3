@@ -1,6 +1,6 @@
 // NPCs.js
 import { buyArmamentHaki, startGarpBoss } from "../utils/haki"
-import { startQuest } from "./quest";
+import { refreshQuestTeam, startQuest } from "./quest";
 import { buyItem, changeMoney, confirmAction, CONFIRM_MS } from "../utils/data";
 import { setInterval, setTimeout } from "../utils/timer";
 import { getPlayerTeam, getTeamData } from "../core/team";
@@ -10,6 +10,7 @@ import { markAggro } from "../fruit/func-abilities";
 import { applyNameTag, safeEntityName, safeEntityType } from "../utils/lifeform";
 import { buyFightingStyle } from "./fightingStyles";
 import { saberOldMan, saberRichMan, saberShanks } from "./saber";
+import { teleportToTeamSpawn } from "./variations";
 import { clearItem, scanAllItems } from "./customItem";
 /* ══════════════════════════════════════════════════════════════════════════
    RECRUTEURS DE TEAM
@@ -81,6 +82,9 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
         txt("? You are ", C.INFO),
         txt(current === "NONE" ? "in no team" : "a " + teamLabel(current).replace(/s$/, ""), C.INFO),
         txt(", and your weapons become " + target + " weapons.", C.INFO),
+        txt("\n", C.INFO),
+        ic("fa-solid fa-map-marker-check", C.INFO),
+        txt(" Clicking again also sends you to your team's island.", C.INFO),
     ])) return;
 
     if (!applyTeamChoice(playerId, teamId)) {
@@ -92,14 +96,34 @@ function handleTeamRecruiter(playerId, npcName, teamId) {
         return;
     }
 
+    /* Le joueur part a l'ile de depart de SA nouvelle team : un pirate arrive
+       chez les pirates, pas au milieu des marines (demande 90). */
+    let moved = false;
+    try { moved = teleportToTeamSpawn(playerId, teamId); } catch (e) { moved = false; }
+
+    /* Puis la quete de la nouvelle team, sans perdre les kills deja faits. */
+    let questKept = false;
+    try { questKept = refreshQuestTeam(playerId); } catch (e) { questKept = false; }
+
     try { api.playSound(playerId, "exp_levelup", 1, 1.1); } catch (e) {}
-    say(playerId, [
+    const lines = [
         ic("fa-solid fa-flag", color),
         bold(" TEAM  ", color),
         txt("You are now a ", C.INFO),
         bold(target.replace(/s$/, ""), color),
-        txt(".", C.INFO),
-    ]);
+        txt(".\n", C.INFO),
+        ic("fa-solid fa-map-marker-check", moved ? C.INFO : C.DANGER),
+        txt(moved ? " Sent to your team's island." : " Could not move you to your island.", moved ? C.INFO : C.DANGER),
+    ];
+    if (questKept) {
+        lines.push(
+            txt("\n", C.INFO),
+            ic("fa-solid fa-file-lines", C.XP),
+            bold(" QUEST  ", C.XP),
+            txt("Now your team's quest. Your progress is kept.", C.INFO)
+        );
+    }
+    say(playerId, lines);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -516,6 +540,38 @@ export function forgetNPC(mobId) {
     for (const entry of NPC_REGISTRY.values()) {
         if (entry.id === mobId) entry.id = null;
     }
+}
+
+/* ── PNJ SOUS LE DOIGT (mobile) ──────────────────────────────────────────────
+   Sur un ecran tactile il n'y a pas de visee d'entite : onPlayerClick arrive
+   avec `targetEId` NUL, et le clic ne trouvait donc aucun PNJ — les
+   recruteurs (et tous les marchands) etaient muets sur mobile. On retrouve ici
+   le PNJ le plus proche du point touche, dans un petit cube : assez petit pour
+   ne jamais voler un clic de combat. Retourne null s'il n'y en a pas. */
+const NPC_TOUCH_RADIUS = 3;
+
+export function npcNearPoint(x, y, z, radius) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    const r = radius || NPC_TOUCH_RADIUS;
+    let around = [];
+    try {
+        around = api.getEntitiesInRect([x - r, y - r, z - r], [x + r, y + r, z + r]) || [];
+    } catch (e) {
+        return null;
+    }
+    let best = null, bestD = Infinity;
+    for (let i = 0; i < around.length; i++) {
+        const id = around[i];
+        try {
+            if (api.getEntityType(id) !== "NPC") continue;
+            const p = api.getPosition(id);
+            if (!p) continue;
+            const dx = p[0] - x, dy = p[1] - y, dz = p[2] - z;
+            const d = dx * dx + dy * dy + dz * dz;
+            if (d < bestD) { bestD = d; best = id; }
+        } catch (e2) {}
+    }
+    return best;
 }
 
 export function isProtectedNPC(mobId) {

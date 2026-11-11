@@ -1,7 +1,8 @@
 // stamina.js
 
-import { setInterval, setTimeout } from "../utils/timer";
-import { say, txt } from "../core/theme";
+import { setInterval } from "../utils/timer";
+import { C, ic, txt } from "../core/theme";
+import { isMobilePlayer } from "../utils/data";
 
 /* PARAMÈTRES — modifiez tout ici */
 export const STAMINA_CONFIG = {
@@ -350,101 +351,91 @@ function dashAnim(playerId) {
     } catch (e) {}
 }
 
-/* ── DASH : une touche sur PC, un item sur mobile (demande 75) ───────────────
+/* ── DASH : une touche sur PC, un BOUTON TACTILE sur mobile ─────────────────
    PC     : bouton personnalise « dash » (api.setClientOption customButtons,
             KeyQ) -> onPlayerPressedButton -> tryDash.
-   MOBILE : un item dans l'inventaire, tenu en main puis touche : il n'a pas de
-            clic droit, c'est le seul moyen de dasher a l'ecran. Le clic passe
-            par onPlayerClick -> handleDashItemClick -> tryDash.
+   MOBILE : un bouton tactile dedie (client option touchscreenActionButton)
+            -> onTouchscreenActionButton -> handleDashButton -> tryDash.
+            Aucun item a sortir, aucun slot perdu : le dash ne depend plus de
+            ce que le joueur tient en main (demande 90).
 
-   L'item doit etre INERTE. « Snowdash » ne l'etait pas : il propulse le joueur
-   tout seul, et sur mobile ce dash-la ne peut pas etre annule (le
-   « preventAction » d'onPlayerAltAction n'arrete que l'action secondaire, pas
-   l'effet de l'item). Le joueur partait donc deux fois, ou partait sans payer
-   de stamina. « Moonstone Dust » (une matiere, donc sans effet) ne fait rien
-   par lui-meme : seul notre dash existe, avec son cout et son animation.
+   L'item « Moonstone Dust » n'est donc PLUS donne : il servait de dash mobile
+   en occupant un slot, et son clic sur un PNJ partait en dash au lieu de
+   parler. Un inventaire d'une version d'avant peut encore en contenir : son
+   clic dash toujours (handleDashItemClick), et il est retire au join sur PC.
+   Il est INERTE a dessein (voir la demande 75 : « Snowdash » propulsait tout
+   seul, donc un second dash impossible a annuler sur mobile).
 
-   L'item est a USAGE UNIQUE et n'est jamais rendu au joueur : un ancien
-   « Snowdash » qui traine dans un inventaire ou dans le Moonstone Chest est
-   du reliquat sans effet (il ne declenche plus rien), on ne le ramasse pas.
-
-   L'item n'est jamais nomme au moment du give : son nom et sa description
-   viennent de ITEM_LOOKS, dans gameplay/customItem.js (regle de la demande 63). */
+   Son nom et sa description viennent de ITEM_LOOKS, dans gameplay/customItem.js
+   (regle de la demande 63 : jamais un nom d'item au moment du give). */
 
 export const DASH_ITEM = "Moonstone Dust";
 
-const DASH_RETRY_TICKS = 100; // ~5 s
-const DASH_RETRY_MAX = 60;    // ~5 min
-const dashGrant = {};
-
-export function dashItemAmount(playerId) {
-    let n = 0;
-    try { n = api.getInventoryItemAmount(playerId, DASH_ITEM); } catch (e) { n = 0; }
-    return typeof n === "number" && n > 0 ? n : 0;
-}
-
-export function hasDashItem(playerId) {
-    return dashItemAmount(playerId) > 0;
-}
-
-/* Bloxd ne signale pas un inventaire plein : on verifie donc la presence. */
-function giveDashItem(playerId) {
-    try { api.giveItem(playerId, DASH_ITEM, 1); } catch (e) { return false; }
-    return hasDashItem(playerId);
-}
-
+/* Nettoie un item de dash residuel : le dash mobile a maintenant son bouton,
+   l'item ne doit plus occuper de slot. */
 export function removeDashItem(playerId) {
-    const n = dashItemAmount(playerId);
-    if (!n) return false;
-    try { api.removeItemName(playerId, DASH_ITEM, n); } catch (e) { return false; }
+    try { api.removeItemName(playerId, DASH_ITEM, 64); } catch (e) { return false; }
     return true;
 }
 
-/* Donne l'item de dash, et REESSAIE tant que l'inventaire est plein : le joueur
-   est prevenu UNE fois, on ne le harcele pas, et on s'arrete au bout de
-   DASH_RETRY_MAX essais (ou si le joueur est parti : le give echoue). */
-export function ensureDashItem(playerId, attempt) {
-    if (!playerId) return false;
-    if (hasDashItem(playerId)) { delete dashGrant[playerId]; return true; }
-    if (giveDashItem(playerId)) { delete dashGrant[playerId]; return true; }
-    const st = dashGrant[playerId] || (dashGrant[playerId] = { told: false });
-    if (!st.told) {
-        st.told = true;
-        try {
-            say(playerId, [
-                txt("[", "#94a3b8"),
-                txt("!", "#ef4444", { fontWeight: "700" }),
-                txt("] ", "#94a3b8"),
-                txt("Your inventory is full: free a slot and you will get your ", "#cbd5e1"),
-                txt("Dash", "#7dd3fc", { fontWeight: "700" }),
-                txt(" item.", "#cbd5e1"),
-            ]);
-        } catch (e) {}
-    }
-    if ((attempt || 0) >= DASH_RETRY_MAX) { delete dashGrant[playerId]; return false; }
-    /* On garde de quoi arreter la chaine : sans cela, un joueur qui quitte
-       pendant les essais continuerait d'etre sonde pendant cinq minutes. */
-    try {
-        st.timer = setTimeout(() => ensureDashItem(playerId, (attempt || 0) + 1), DASH_RETRY_TICKS);
-    } catch (e) {
-        st.timer = null;
-    }
-    return false;
+/* ── BOUTON TACTILE « DASH » (mobile) ────────────────────────────────────────
+   Le dash mobile ne passe plus par un item. Sortir « Moonstone Dust » pour
+   dasher obligeait a le tenir en main : ce slot etait perdu, et le tap qui
+   sert a parler aux PNJ ou a frapper partait en dash. Bloxd expose un bouton
+   tactile dedie :
+       api.setClientOption(id, "touchscreenActionButton", <texte style>)
+       -> onTouchscreenActionButton(id, touchDown)
+   On y met un simple « DASH » : le dash ne depend donc plus de ce que le
+   joueur a en main, et l'item n'est plus donne (les inventaires d'avant en
+   contiennent encore : son clic marche toujours, voir handleDashItemClick).
+   Sur PC le bouton est retire : le dash reste le clic droit / la touche Q. */
+const DASH_BUTTON_MIN_MS = 250;
+const dashButtonAt = {};
+
+function dashButtonParts() {
+    return [ic("fa-solid fa-bolt", C.MARINE), txt(" DASH", C.MARINE, { fontWeight: "bold" })];
 }
 
-/* Utilisation de l'item de dash (mobile). Renvoie true s'il s'agit bien de lui,
-   pour que l'appelant arrete de traiter le clic. */
+/* Pose (ou retire) le bouton tactile selon l'appareil. Appele au join et a
+   chaque changement de mode de commandes : un client ne doit jamais garder un
+   bouton qui ne correspond plus a l'appareil. */
+export function setupDashButton(playerId) {
+    if (!playerId) return false;
+    if (!isMobilePlayer(playerId)) {
+        try { api.setClientOption(playerId, "touchscreenActionButton", null); } catch (e) {}
+        return false;
+    }
+    try {
+        api.setClientOption(playerId, "touchscreenActionButton", dashButtonParts());
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/* Appui sur le bouton tactile. `touchDown` arrive aussi au relachement : on ne
+   dash qu'a l'appui. Un doigt pose peut repeter l'appui : un dash par
+   DASH_BUTTON_MIN_MS au maximum, sinon un seul appui viderait la stamina. */
+export function handleDashButton(playerId, touchDown) {
+    if (!playerId || !touchDown) return false;
+    if (!isMobilePlayer(playerId)) return false;
+    const now = Date.now();
+    if (dashButtonAt[playerId] && now - dashButtonAt[playerId] < DASH_BUTTON_MIN_MS) return true;
+    dashButtonAt[playerId] = now;
+    tryDash(playerId);
+    return true;
+}
+
+/* Clic sur un item de dash RESIDUEL (les inventaires d'avant en contiennent).
+   Le dash mobile ne passe plus par la : un item retrouve ne rend pas le
+   suivant, il declenche juste un dash comme les autres. Renvoie true s'il
+   s'agit bien de lui, pour que l'appelant arrete de traiter le clic. */
 export function handleDashItemClick(playerId, itemName) {
     if (itemName !== DASH_ITEM) return false;
-    if (!hasDashItem(playerId)) { ensureDashItem(playerId); return true; }
     tryDash(playerId);
     return true;
 }
 
 export function clearDashState(playerId) {
-    const st = dashGrant[playerId];
-    if (st && st.timer) {
-        try { st.timer.stop(); } catch (e) {}
-    }
-    delete dashGrant[playerId];
+    delete dashButtonAt[playerId];
 }
