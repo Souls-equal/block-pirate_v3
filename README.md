@@ -820,8 +820,8 @@ ici créerait le cycle `customItem → data`).
 | --- | --- | --- |
 | `Small Black Pod` | **Armament Haki** | cliquer pour armer / relâcher, ne peut pas être lâché |
 | `Moonstone Dust` | **Dash** | reliquat des anciennes versions (matière inerte) : son clic dashe encore, il n'est plus donné |
-| `Swap Orb` | **Fruit Abilities** | ouvre les boutons du fruit (mode boutons, PC **et** mobile) |
-| `Void Net` | **Fighting Style Capacities** | ouvre les boutons du style (mode boutons, PC **et** mobile) |
+| `Swap Orb` | **Fruit Abilities** | ouvre les touches du fruit (mode boutons, **PC seulement**) |
+| `Void Net` | **Fighting Style Capacities** | ouvre les touches du style (mode boutons, **PC seulement**) |
 | `Gold Grit` | **Gold Dust** | butin de la Saber Quest |
 | `Magmaward Fuel` | **Ancient Relic** | butin de la Saber Quest |
 | `Black Carpet` | **Haki Fragment** | butin du boss, se revend au Haki Buyer |
@@ -976,7 +976,7 @@ contrôle à chaque tick (`settingsSyncVariation`) s'en aperçoit tout seul.
 | `Show an island` | liste déroulante des îles **cachées** → en remontre une |
 | `Respawn` | tue le joueur pour le débloquer (coincé dans un bloc, sous la map…) |
 | `PvP Protection` | active / désactive le bouclier de 5 min accordé contre son tueur au respawn |
-| `Controls` | bascule **items ↔ boutons** ; le défaut suit l'appareil (boutons sur mobile) |
+| `Controls` | bascule **items ↔ boutons** ; **PC seulement** (le tactile reste sur les items) |
 
 **Les deux listes sont complémentaires, et c'est le code qui le garantit** : `Hide` ne propose
 que ce qui est visible, `Show` ne propose que ce qui est caché. Valider **déplace** l'île d'une
@@ -2090,56 +2090,46 @@ même préfixe de famille (`control-`, `gravity-`) et ajoute la famille dans
 
 ---
 
-## Commandes : items sur PC, boutons sur mobile (et l'inverse si on veut)
+## Commandes : items partout, boutons en option sur PC
 
-Le joueur **choisit** dans **Settings → Controls**, et son choix est enregistré
-(clé `ctl`). Sans choix, le **défaut suit l'appareil** (`getControlMode`) :
+Le joueur **choisit** dans **Settings → Controls** — **sur PC seulement** — et son choix
+est enregistré (clé `ctl`).
 
 | | Dash | Capacités | Coup de poing |
 |---|---|---|---|
 | **PC — ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
 | **PC — BUTTONS** | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
-| **MOBILE — BUTTONS (défaut)** | bouton tactile | `Swap Orb` en main → une **icône** par capacité | `Void Net` en main → M1 au clic, icônes du style |
-| **MOBILE — ITEMS** | bouton tactile | un item par capacité | M1 à main nue |
+| **MOBILE** (aucun choix) | **bouton tactile** | un item par capacité | M1 à main nue |
 
-- **Pourquoi le mobile a les boutons par défaut** : Bloxd affiche les
-  `customButtons` à l'écran des joueurs tactiles, et ils jouent **exactement le
-  même rôle qu'une touche** (`onPlayerPressedButton`). Sur un écran de cinq
-  slots, un item par capacité en mangeait jusqu'à cinq. Le réglage reste là
-  pour qui préfère les items — rien n'est retiré à personne.
-- **Les deux items qui ouvrent les boutons sont GARDÉS, et le mobile y a droit**
-  (consigne du joueur). En mode boutons, un mobile reçoit le `Swap Orb` avec son
-  fruit et le `Void Net` avec son style, exactement comme un PC : **aucun bouton
-  n'est affiché en permanence**. C'est `buttonsFor()` qui décide, avec la même
-  règle sur les deux appareils : pas d'item en main, pas de bouton.
-- **Icônes seules, jamais de texte** : un bouton mobile est minuscule, donc
-  `buttonsFor()` ne remplit pas `description` sur un écran tactile
-  (`pushButton(…, !mobile)`). L'icône porte le sens : une par type d'attaque
-  (section suivante).
-- **Le dash mobile a son propre bouton** (`touchscreenActionButton` →
-  `onTouchscreenActionButton` → `handleDashButton` → `tryDash`) : il ne dépend
-  ni du mode ni de ce que le joueur tient en main, et le clic qui sert à parler
-  aux PNJ ou à frapper n'est plus confisqué par un item. Il porte une icône
-  (`fa-bolt`) et pas de texte. La client option est posée au join, reposée au
-  respawn et à chaque bascule de réglage, et retirée sur PC (`null`).
-- **La bascule est immédiate** : `setControlMode()` écrit la clé `ctl`, puis
-  `applyControls()` (hook posé par `index.js`) retire les items du mode quitté
-  et donne ceux du mode choisi — pas besoin de se reconnecter. La carte de
-  Settings existe maintenant sur les deux appareils
-  (`toggleControlMode` ne refuse plus le tactile).
-- **Les boutons suivent l'item en main** : ils sont recalculés au changement de
-  slot, à la mise à jour d'inventaire et au respawn. `applyButtons()` ne renvoie
-  rien si la liste n'a pas changé, donc sortir puis ranger l'orb ne coûte qu'un
-  aller-retour client.
-- Les items de commande (`Swap Orb`, `Void Net`) et l'item de dash ne peuvent
-  pas être lâchés, et n'ont aucune action native : voir la section suivante.
+**Le mobile est verrouillé sur les items, et c'est un constat.** Bloxd n'affiche **qu'un
+bouton supplémentaire** à l'écran (`touchscreenActionButton`), et il est déjà pris par le
+dash. Quand la version précédente a tenté d'y mettre aussi les `customButtons`, les clics
+normaux partaient en dash : le tactile ne distingue pas assez finement un tap d'une action
+secondaire. Un écran de cinq slots supporte très bien **un item par capacité** — c'est le
+comportement historique, il ne dépend d'aucune limite du moteur.
 
-Le mode est lu une seule fois par action (`useItemControls()`), donc le fruit et
-le style savent toujours quoi donner (items de capacité, ou `Swap Orb` /
-`Void Net`) : `fruit/index` et `fightingStyles` passent tous les deux par lui,
-`ensureSwapOrb()` et `ensureVoidNet()` compris. Quand l'appareil compte vraiment
-(dash tactile, détection des PNJ au doigt, **défaut** des commandes, texte des
-boutons), c'est `isMobilePlayer()` : le drapeau est lu une fois, au join.
+- `getControlMode()` **force** `CTL_ITEMS` pour un joueur tactile : un `ctl = "buttons"`
+  laissé en base ne ressuscite pas les boutons. `buttonsFor()` renvoie `[]` pour un mobile,
+  donc `customButtons` n'est jamais envoyé — le seul bouton est celui du dash.
+- `onPlayerAltAction` **ne dashe plus sur mobile**. C'était la fuite : l'action secondaire
+  (que le tactile déclenche aussi) appelait `tryDash` en mode items. Le dash n'a désormais
+  qu'une entrée : `onTouchscreenActionButton` → `handleDashButton` → `tryDash`.
+- `handleDashItemClick` ne dashe plus sur mobile non plus : un `Moonstone Dust` résiduel y
+  est **retiré** au premier clic (et au join), sans propulser personne. Sur PC, son clic
+  dashe encore, puis il est retiré.
+- La carte `Controls` n'est **pas créée** sur un écran tactile, et `toggleControlMode` lui
+  répond que ses capacités passent par les items et que son dash est le bouton sous son
+  pouce.
+- `Swap Orb` et `Void Net` n'ouvrent que des **touches de clavier** : un mobile ne les
+  reçoit jamais. `ensureSwapOrb()` / `ensureVoidNet()` excluent l'appareil, et
+  `equipFruit` / `giveFightingStyleItems` donnent les items de capacité à un mobile.
+- **Pas de doublon d'item** : le mode « boutons » n'existe que sur PC, donc les items de
+  capacité d'un mobile ne peuvent pas cohabiter avec un orb.
+
+Le mode est lu une seule fois par action (`useItemControls()`), donc le fruit et le style
+savent toujours quoi donner. Quand l'appareil compte vraiment (dash tactile, détection des
+PNJ au doigt, verrou des commandes, texte des boutons), c'est `isMobilePlayer()` : le
+drapeau est lu une fois, au join.
 
 ### Une icône par type d'attaque
 
@@ -2168,10 +2158,8 @@ la capacité non classée, comme il refuse une icône absente de la liste blanch
 Les `keycode` envoyés sont ceux d'un clavier QWERTY (`KeyQ`, `KeyZ`…) : Bloxd
 les remappe seul sur un AZERTY, c'est la même touche physique. `ability` et
 `style` partagent `Z`/`X` **à dessein** : une seule main à la fois (`Swap Orb`
-**ou** `Void Net`), donc les deux groupes ne sont jamais actifs ensemble — vrai
-sur mobile aussi, où l'on tient l'un ou l'autre. Sur mobile il n'y a pas de
-clavier : les mêmes boutons sont des icônes à l'écran, et le `keycode` ne sert
-pas. Le dash, lui, a son bouton tactile dédié sur mobile et ne partage rien.
+**ou** `Void Net`), donc les deux groupes ne sont jamais actifs ensemble. Le
+dash, lui, est toujours là et ne partage rien.
 
 Trois détails qui comptent :
 

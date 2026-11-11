@@ -1,6 +1,6 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout, txt, ic } from "../core/theme";
-import { bestFruitTicket, confirmAction, fruitRollPrice, spendFruitTicket, useItemControls } from "../utils/data";
+import { bestFruitTicket, confirmAction, fruitRollPrice, isMobilePlayer, spendFruitTicket, useItemControls } from "../utils/data";
 let o = function () {},
   r = function () {};
 try {
@@ -506,12 +506,12 @@ export function removeSwapOrb(t) {
   return true;
 }
 
-/* L'orb n'ouvre que les BOUTONS : en mode items il ne sert a rien. En mode
-   boutons il est donne sur PC COMME sur mobile (demande 91) : c'est l'item qui
-   fait apparaitre les icones, il n'y a pas de boutons permanents. */
+/* L'orb n'ouvre que les TOUCHES du PC. Inutile en mode items, et inutile sur
+   mobile : Bloxd n'y affiche qu'un bouton supplementaire, deja pris par le dash
+   (demande 92). Un mobile garde donc un item par capacite. */
 export function ensureSwapOrb(t) {
   if (!t) return false;
-  if (useItemControls(t) || !getFruit(t)) return removeSwapOrb(t), false;
+  if (useItemControls(t) || isMobilePlayer(t) || !getFruit(t)) return removeSwapOrb(t), false;
   return giveSwapOrb(t);
 }
 
@@ -551,11 +551,11 @@ function N(t, e, o) {
   h.set(t, e);
   const r = n[e];
   if (r) {
-    /* BOUTONS (PC et mobile, demande 91) : les capacites sont sur Z/X/C/V/F,
-       donc AUCUN item de capacite dans l'inventaire — ils ne serviraient qu'a
-       encombrer les 5 slots. A la place, l'ORB : le tenir fait apparaitre les
-       boutons. ITEMS : un item par capacite, c'est la commande. */
-    if (k(t), useItemControls(t)) {
+    /* PC en mode boutons : les capacites sont sur Z/X/C/V/F, donc AUCUN item de
+       capacite — l'ORB les remplace, le tenir fait apparaitre les touches.
+       ITEMS (le defaut) : un item par capacite, et le mobile est toujours la
+       (demande 92 : un seul bouton a l'ecran, celui du dash). */
+    if (k(t), useItemControls(t) || isMobilePlayer(t)) {
       if (r.giveditems) for (const e of r.giveditems) I(t, e, r);
     } else giveSwapOrb(t);
     try {
@@ -792,7 +792,7 @@ export function restorePlayerFruit(t) {
     }
     if (missing) {
       k(t);
-      if (useItemControls(t)) {
+      if (useItemControls(t) || isMobilePlayer(t)) {
         if (r.giveditems) for (const item of r.giveditems) I(t, item, r);
       } else giveSwapOrb(t);
       try {

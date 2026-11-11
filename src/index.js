@@ -190,23 +190,22 @@ ct((t, r, a) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   COMMANDES : items ou boutons, un DEFAUT par appareil (demandes 75 et 91)
+   COMMANDES : items partout, boutons en option sur PC (demandes 75, 91)
 
    Un joueur ne peut pas passer de PC a mobile sans quitter le monde : on lit
    donc api.isMobile UNE fois, au join, et on ne relit plus.
 
    PC     : ITEMS par defaut. Un item par capacite, main nue pour frapper,
             clic droit pour dasher. Les boutons (Q, Z X C V F) sont une option
-            dans Settings -> Controls.
-   MOBILE : BOUTONS par defaut. Bloxd affiche les customButtons a l'ecran avec
-            le meme fonctionnement qu'une touche : des petites ICONES (aucun
-            texte possible). Aucun item de capacite, donc aucun slot perdu.
-            Le dash garde son bouton tactile dedie (demande 90), qui ne depend
-            d'aucun item. Les items redeviennent disponibles en passant le
-            reglage sur ITEMS.
+            dans Settings -> Controls, ouverts par Swap Orb / Void Net.
+   MOBILE : ITEMS, toujours, et un SEUL bouton a l'ecran : celui du dash
+            (touchscreenActionButton, demande 90). Bloxd n'affiche qu'un bouton
+            supplementaire, et les clics normaux partaient en dash des qu'on
+            melangeait les deux (demandes 91 puis 92). Les icones de capacite
+            n'existent donc PAS sur mobile : un item par capacite, comme avant.
 
-   Le mode est un REGLAGE (db « ctl ») : une valeur enregistree passe toujours
-   avant le defaut de l'appareil (data.getControlMode).
+   Le mode est un REGLAGE (db « ctl ») pour les joueurs PC ; un joueur tactile
+   est verrouille sur les items (data.getControlMode).
 
    Les keycodes sont ceux d'un clavier QWERTY ; Bloxd remappe tout seul pour un
    AZERTY (c'est la meme touche physique).
@@ -232,33 +231,22 @@ const CONTROLS = {
     ],
 };
 
-/* Un bouton n'a de TEXTE que sur PC : Bloxd affiche les boutons du mobile en
-   tout petit, une description y serait illisible. L'icone porte le sens
-   (demande 91 : « icones seulement »). */
-function pushButton(list, id, icon, keycode, text, withText) {
-    const button = { id: id, icon: icon, keycode: keycode };
-    if (withText && text) button.description = text;
-    list.push(button);
-    return button;
-}
-
-/* Boutons envoyes au client. LA REGLE EST LA MEME SUR LES DEUX APPAREILS
-   (demandes 76, 77 et 91) : un bouton n'apparait qu'avec l'ITEM qui l'ouvre,
-   Swap Orb ou Void Net en main. Sur mobile l'orb et le filet sont donc donnes
-   comme sur PC, et c'est le meme geste : je sors l'item, les icones
-   apparaissent, je le range, elles disparaissent.
-   Sans cette regle, le mobile aurait huit boutons en permanence a l'ecran,
-   dont deux groupes qui ne servent pas au meme moment.
-   Seule difference : le mobile n'a pas de bouton « dash » dans cette liste, il
-   a son bouton tactile dedie (demande 90). */
+/* Boutons envoyes au client : PC UNIQUEMENT.
+   Un bouton n'apparait qu'avec l'ITEM qui l'ouvre, Swap Orb ou Void Net en
+   main (demandes 76, 77 et 91). Le mobile n'en recoit JAMAIS : Bloxd n'affiche
+   qu'un bouton supplementaire a l'ecran — celui du dash, deja pris par
+   touchscreenActionButton (demande 90). Sur un ecran tactile, les capacites
+   passent donc par les items, comme avant. */
 function buttonsFor(playerId) {
-    /* Mode « items » : aucun bouton, tout passe par les items. */
-    if (useItemControls(playerId)) return [];
-    const mobile = isMobilePlayer(playerId);
+    /* Mode « items », et TOUT mobile : aucun bouton, tout passe par les items. */
+    if (useItemControls(playerId) || isMobilePlayer(playerId)) return [];
     const held = heldName(playerId);
     const list = [];
-    /* Le dash mobile a deja son bouton tactile (demande 90). */
-    if (!mobile) pushButton(list, CONTROLS.dash[0].id, CONTROLS.dash[0].icon, CONTROLS.dash[0].keycode, CONTROLS.dash[0].description, true);
+    const button = (id, icon, keycode, text) => {
+        list.push({ id: id, icon: icon, keycode: keycode, description: text });
+    };
+
+    button(CONTROLS.dash[0].id, CONTROLS.dash[0].icon, CONTROLS.dash[0].keycode, CONTROLS.dash[0].description);
 
     /* Une touche par capacite REELLE du fruit, avec l'icone de son type
        d'attaque (fruit/abilities, ATTACK_TYPES) et son nom en description :
@@ -266,19 +254,12 @@ function buttonsFor(playerId) {
     if (held === SWAP_ORB_Name) {
         const info = fruitButtonInfo(n(playerId)).slice(0, fruitAbilityCount(playerId));
         for (let i = 0; i < info.length && i < CONTROLS.ability.length; i++) {
-            pushButton(
-                list,
-                "ability" + (i + 1),
-                info[i].icon || CONTROLS.ability[i].icon,
-                CONTROLS.ability[i].keycode,
-                info[i].name || CONTROLS.ability[i].description,
-                !mobile,
-            );
+            button("ability" + (i + 1), info[i].icon || CONTROLS.ability[i].icon, CONTROLS.ability[i].keycode, info[i].name || CONTROLS.ability[i].description);
         }
     } else if (held === VOID_NET_Name && fsStyle(playerId)) {
         /* Les deux attaques du style, et seulement si le joueur en a un. */
         for (let i = 0; i < CONTROLS.style.length; i++) {
-            pushButton(list, CONTROLS.style[i].id, CONTROLS.style[i].icon, CONTROLS.style[i].keycode, CONTROLS.style[i].description, !mobile);
+            button(CONTROLS.style[i].id, CONTROLS.style[i].icon, CONTROLS.style[i].keycode, CONTROLS.style[i].description);
         }
     }
     return list;
@@ -296,10 +277,10 @@ function applyButtons(playerId) {
     try { api.setClientOption(playerId, "customButtons", list); } catch (e) { _t("buttons", e); }
 }
 
-/* Les deux items de commande (PC ET mobile). Ils ne SERVENT a rien d'autre
-   qu'a ouvrir des boutons : tout ce que le jeu ferait d'eux (lancer, poser,
-   manger, echanger, charger, lacher) est donc bloque. Sans ca, un clic droit
-   lance la « Devil Fruit Orb » et la consomme. */
+/* Les deux items de commande (PC). Ils ne SERVENT a rien d'autre qu'a ouvrir
+   des touches : tout ce que le jeu ferait d'eux (lancer, poser, manger,
+   echanger, charger, lacher) est donc bloque. Sans ca, un clic droit lance la
+   « Devil Fruit Orb » et la consomme. */
 function isCommandItemName(name) {
     return name === SWAP_ORB_Name || name === VOID_NET_Name;
 }
@@ -321,20 +302,22 @@ function setupDevice(playerId) {
 
 /* Pose les commandes du mode courant, et RIEN de l'autre :
      « items »   : items de capacite + items de style, main nue pour frapper ;
-     « buttons » : les boutons (icones), aucun item de capacite.
-   Le BOUTON TACTILE du dash est mobile et ne depend pas du mode : il est pose
-   dans les deux cas (demande 90), et retire sur PC.
+     « buttons » : les boutons (icones), aucun item de capacite. PC seulement.
+   Le BOUTON TACTILE du dash est le SEUL bouton du mobile : il est pose dans les
+   deux modes (demande 90) et retire sur PC.
    Appele au join, au respawn et a chaque bascule des Settings. */
 function setupControls(playerId) {
     const mobile = isMobilePlayer(playerId);
     setupDashBtn(playerId);
-    if (useItemControls(playerId)) {
+    if (mobile || useItemControls(playerId)) {
         lastButtons[playerId] = null;
         try { api.setClientOption(playerId, "customButtons", []); } catch (e) {}
         dropSwap(playerId), dropNet(playerId);
-        /* Un item de dash residuel d'une ancienne version est nettoye sur PC
-           (le mobile garde le sien : son clic dashe toujours). */
-        if (!mobile) dropDash(playerId);
+        /* L'item de dash ne sert plus a rien : le dash a son bouton tactile
+           sur mobile, et le clic droit sur PC. Un reliquat d'inventaire est
+           retire dans les deux cas — sur mobile il faisait dasher chaque clic
+           (demande 92). */
+        dropDash(playerId);
         /* Les items du fruit et du style reviennent (restore ne redonne que ce
            qui manque, donc un joueur deja equipe ne recoit rien en double). */
         Gt("controls.fruit", () => g(playerId));
@@ -380,12 +363,9 @@ function clickPoint(playerId) {
 onTouchscreenActionButton = (playerId, touchDown) => {
     Gt("dashButton", () => dashButton(playerId, touchDown));
 },
-/* Bouton presse : par une touche sur PC, par un tap sur MOBILE (Bloxd affiche
-   les customButtons a l'ecran des joueurs tactiles, avec le meme
-   fonctionnement — demande 91).
+/* Bouton presse (PC : les customButtons n'existent que la, demande 92).
    Le bouton n'existe que si le bon item est en main, mais on revérifie ici :
-   un client peut garder un bouton residuel, et c'est LE MEME controle sur les
-   deux appareils. */
+   un client peut garder un bouton residuel d'une session precedente. */
 onPlayerPressedButton = (playerId, buttonId) => {
     if (!playerId || !buttonId) return;
     if (buttonId === "dash") {
@@ -518,12 +498,17 @@ onPlayerSelectInventorySlot = (t, slot) => {
     /* Zone neutre du lobby : aucune capacite (armement, fruit, style de
        combat, clic d'attaque). Le dialogue PNJ reste possible. */
     if (idInSafeZone(t) && !(m && isNPCEntity(m))) return void safeZoneBlocked(t);
-    /* Item de dash RESIDUEL (versions d'avant la demande 90) : un clic suffit,
-       et il ne fait rien d'autre (pas de coup de poing a travers). Le dash
-       mobile ne passe plus par la : voir le bouton tactile plus bas. */
+    /* Item de dash RESIDUEL (versions d'avant la demande 90). Sur PC, son clic
+       dashe encore (c'est un raccourci comme un autre) puis il est retire. Sur
+       MOBILE, il ne dashe JAMAIS : le dash n'a qu'une entree, le bouton tactile
+       (demande 92 — les clics normaux partaient en dash). */
     let heldDash = null;
     try { heldDash = api.getHeldItem(t); } catch (e) { heldDash = null; }
-    if (heldDash && heldDash.name === DASH_ITEM_Name) return void dashItemClick(t, heldDash.name);
+    if (heldDash && heldDash.name === DASH_ITEM_Name) {
+        if (isMobilePlayer(t)) dropDash(t);
+        else dashItemClick(t, heldDash.name);
+        return;
+    }
     /* Void Net (PC) : en main, le clic EST le coup de poing du style. Le filet
        n'est pas un item de capacite, donc aucun clic ne part ailleurs. */
     /* Devil Fruit Orb : un clic ne doit RIEN lancer. On sort ici, avant le
@@ -607,22 +592,25 @@ onPlayerStartChargingItem = (t, itemName) => {
     /* L'item de dash. « Moonstone Dust » n'a aucun effet propre : preventAction
        n'annule donc rien d'utile, il empeche seulement de le lancer (ou de
        l'utiliser) par erreur. Le dash, lui, vient de notre code : cout en
-       stamina, animation, verrou anti-coup de poing. Sur PC cet item est
-       retire ; un item residuel ne doit rien declencher non plus. */
+       stamina, animation, verrou anti-coup de poing. Ce chemin est celui du PC
+       (clic droit) : sur MOBILE le dash n'a qu'une entree, son bouton tactile,
+       donc l'item residuel est retire et ne declenche rien (demande 92). */
+    const mobileDash = isMobilePlayer(t);
     let held = null;
     try { held = api.getHeldItem(t); } catch (e) { held = null; }
     const heldItem = held && held.name;
     if (heldItem === DASH_ITEM_Name) {
-        if (isMobilePlayer(t)) dashItemClick(t, heldItem);
-        else dropDash(t);
+        if (mobileDash) dropDash(t);
+        else dashItemClick(t, heldItem);
         return "preventAction";
     }
     /* Clic droit sur un item de commande : rien du tout. */
     if (isCommandItemName(heldItem)) return "preventAction";
-    /* Mode « items » (le defaut) : l'action secondaire EST le dash, comme
-       avant la demande 76. En mode « buttons » le dash est sur Q, donc on ne
-       l'appelle pas ici (sinon un clic droit ferait deux dashs). */
-    if (useItemControls(t) && !heldItem && m && 1 !== m.type && !api.isPlayerCrouching(t)) {
+    /* Mode « items » (le defaut) : l'action secondaire EST le dash sur PC,
+       comme avant la demande 76. En mode « buttons » le dash est sur Q, donc on
+       ne l'appelle pas ici (sinon un clic droit ferait deux dashs). Sur mobile,
+       aucune action secondaire ne dashe : c'est le bouton tactile, et lui seul. */
+    if (!mobileDash && useItemControls(t) && !heldItem && m && 1 !== m.type && !api.isPlayerCrouching(t)) {
         try { if (ot(t)) return; } catch (e) { _t("onPlayerAltAction.dash", e); }
     }
     return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;

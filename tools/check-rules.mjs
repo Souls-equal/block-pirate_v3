@@ -35,10 +35,9 @@
 //      sans perdre les kills deja faits.
 //  12. MACHINE A FRUITS. Un tirage encaisse exactement son prix puis donne le
 //      fruit ; un echec de remise rembourse tout. Jamais de fruit gratuit.
-//  13. COMMANDES PAR APPAREIL, ET LE RESET. Le mobile a les BOUTONS par
-//      defaut (des icones, pas de texte), le PC les ITEMS ; une valeur
-//      enregistree passe avant le defaut. Et un reset SUPPRIME le style de
-//      combat au lieu de le laisser en base.
+//  13. COMMANDES PAR APPAREIL, ET LE RESET. Le mobile est VERROUILLE sur les
+//      items (un seul bouton a l'ecran, celui du dash), le PC choisit. Et un
+//      reset SUPPRIME le style de combat au lieu de le laisser en base.
 //
 // Les couleurs, elles, ne sont plus verifiees : quelques teintes hors palette
 // sont un choix assume du jeu (elles restent lisibles et coherentes).
@@ -989,20 +988,24 @@ const installed = await (async () => {
     game.setDevice("pPc", false);
     db.pMob = {};
     db.pPc = {};
-    check(game.getControlMode("pMob") === "buttons", `commandes : le mobile n'a pas les boutons par defaut (${game.getControlMode("pMob")})`);
+    check(game.getControlMode("pMob") === "items", `commandes : le mobile n'est pas en mode items (${game.getControlMode("pMob")})`);
     check(game.getControlMode("pPc") === "items", `commandes : le PC n'a pas les items par defaut (${game.getControlMode("pPc")})`);
-    check(game.useItemControls("pMob") === false, "commandes : le mobile reste en mode items");
+    check(game.useItemControls("pMob") === true, "commandes : le mobile n'est pas en mode items");
     check(game.useItemControls("pPc") === true, "commandes : le PC est passe en mode boutons sans le demander");
 
-    /* Un choix enregistre passe TOUJOURS avant le defaut, dans les deux sens. */
-    db.pMob.ctl = game.CTL_ITEMS;
+    /* Le PC choisit, le mobile NON : un `ctl` laisse par l'ancienne version ne
+       doit pas ressusciter les boutons tactiles (demande 92). */
+    db.pMob.ctl = game.CTL_BUTTONS;
     db.pPc.ctl = game.CTL_BUTTONS;
-    check(game.getControlMode("pMob") === "items", "commandes : le mobile ne peut pas revenir aux items");
+    check(game.getControlMode("pMob") === "items", "commandes : le mobile peut repasser en mode boutons");
+    check(game.useItemControls("pMob") === true, "commandes : un reglage en base met le mobile en mode boutons");
     check(game.getControlMode("pPc") === "buttons", "commandes : le PC ne peut pas passer aux boutons");
 
-    /* Le mode est bien relu apres bascule. */
-    game.setControlMode("pMob", "buttons");
-    check(db.pMob.ctl === "buttons" && game.getControlMode("pMob") === "buttons", "commandes : la bascule vers les boutons ne tient pas");
+    /* Le mode est bien relu apres bascule — pour un PC. */
+    game.setControlMode("pPc", "items");
+    check(db.pPc.ctl === "items" && game.getControlMode("pPc") === "items", "commandes : la bascule vers les items ne tient pas");
+    game.setControlMode("pPc", "buttons");
+    check(game.getControlMode("pPc") === "buttons", "commandes : la bascule vers les boutons ne tient pas");
 
     /* b) Le reset retire le style, le mode de commande et l'inventaire. */
     game.setDevice("pReset", true);
@@ -1021,82 +1024,64 @@ const installed = await (async () => {
     game.clearFightingStyle("pStyle");
     check(!("fs" in db.pStyle), "reset : clearFightingStyle laisse la cle du style en base");
 
-    /* c) Le code, lui : plus de verrou mobile, et des boutons sans item. */
+    /* c) Le code, lui : aucun bouton sur mobile, et une seule entree pour le
+       dash (le bouton tactile). */
     const indexSrc = readFileSync(join(SRC, "index.js"), "utf8");
+    const cut = indexSrc.slice(indexSrc.indexOf("function buttonsFor"), indexSrc.indexOf("function applyButtons"));
     check(
-        indexSrc.indexOf("const mobile = isMobilePlayer(playerId)") >= 0,
-        "boutons : buttonsFor ne distingue plus le mobile du PC",
-    );
-    /* LES DEUX ITEMS RESTENT LA PORTE DES BOUTONS, SUR LES DEUX APPAREILS
-       (consigne du joueur apres la 91). Un bouton n'apparait qu'avec son item
-       en main ; aucun bouton ne doit dependre de l'appareil. */
-    check(
-        indexSrc.indexOf("(mobile || held === SWAP_ORB_Name)") < 0,
-        "boutons : les capacites ne dependent plus de l'item en main (Swap Orb)",
+        cut.indexOf("useItemControls(playerId) || isMobilePlayer(playerId)") >= 0,
+        "boutons : buttonsFor envoie encore des boutons a un mobile",
     );
     check(
-        indexSrc.indexOf("(mobile || held === VOID_NET_Name)") < 0,
-        "boutons : les attaques de style ne dependent plus de l'item en main (Void Net)",
-    );
-    check(
-        indexSrc.indexOf("if (held === SWAP_ORB_Name) {") >= 0,
+        cut.indexOf("if (held === SWAP_ORB_Name) {") >= 0,
         "boutons : le Swap Orb n'ouvre plus les capacites du fruit",
     );
     check(
-        indexSrc.indexOf("else if (held === VOID_NET_Name") >= 0,
+        cut.indexOf("else if (held === VOID_NET_Name") >= 0,
         "boutons : le Void Net n'ouvre plus les attaques du style",
     );
+    /* Le dash mobile n'a qu'UNE entree : le bouton tactile (demande 92). */
+    const altCut = indexSrc.slice(indexSrc.indexOf("onPlayerAltAction ="), indexSrc.indexOf("onMobDamagingPlayer ="));
     check(
-        indexSrc.indexOf("const byTouch") < 0,
-        "boutons : l'appui tactile ne passe plus par l'item en main",
+        altCut.indexOf("!mobileDash && useItemControls(t)") >= 0,
+        "dash : l'action secondaire dashe encore sur mobile",
     );
-    /* L'orb et le filet sont donnes sur mobile aussi : la fonction qui les pose
-       ne doit plus exclure l'appareil. */
+    const clickCut = indexSrc.slice(indexSrc.indexOf("onPlayerClick ="), indexSrc.indexOf("onPlayerClickUp ="));
+    check(
+        clickCut.indexOf("if (isMobilePlayer(t)) dropDash(t);") >= 0,
+        "dash : un clic sur l'item de dash residuel dashe encore sur mobile",
+    );
+    /* L'orb et le filet n'ouvrent que des touches de clavier : jamais sur mobile. */
     const fruitSrc = readFileSync(join(SRC, "fruit/index.js"), "utf8");
     const fsSrc = readFileSync(join(SRC, "gameplay/fightingStyles.js"), "utf8");
     check(
-        fruitSrc.indexOf("isMobilePlayer(t) || !getFruit(t)") < 0,
-        "items : le Swap Orb n'est plus donne sur mobile",
+        fruitSrc.indexOf("isMobilePlayer(t) || !getFruit(t)") >= 0,
+        "items : le Swap Orb est encore donne a un mobile",
     );
     check(
-        fsSrc.indexOf("isMobilePlayer(playerId) || !styleName") < 0,
-        "items : le Void Net n'est plus donne sur mobile",
+        fsSrc.indexOf("isMobilePlayer(playerId) || !styleName") >= 0,
+        "items : le Void Net est encore donne a un mobile",
     );
-    check(
-        fsSrc.indexOf("isMobilePlayer(playerId) ? true : giveVoidNet") < 0,
-        "items : un style appris sur mobile ne donne plus le Void Net",
-    );
-    /* Aucun texte sur mobile : les boutons y sont minuscules, une description
-       serait illisible (et Bloxd l'afficherait sous l'icone). */
-    check(
-        indexSrc.indexOf("if (withText && text) button.description = text;") >= 0,
-        "boutons : la description n'est plus reservee au PC (icones seules sur mobile)",
-    );
-    check(
-        indexSrc.indexOf("description: info[i].name") < 0,
-        "boutons : une capacite repasse par une description en dur",
-    );
-    /* Mobile : les deux groupes sont affiches ensemble, donc leurs touches ne
-       doivent pas etre les memes (un clavier physique reste possible). */
-
     const uiSrc = readFileSync(join(SRC, "core/UI.js"), "utf8");
     check(
-        uiSrc.indexOf("Touch screens always use items") < 0,
-        "reglage : le panneau refuse toujours le changement de commandes au mobile",
+        uiSrc.indexOf("Touch screens always use items") >= 0,
+        "reglage : le panneau ne dit plus au mobile qu'il reste sur les items",
     );
     check(
-        uiSrc.indexOf("createShopItemForPlayer(playerId, SETTINGS_CATEGORY, \"set_controls\"") >= 0,
-        "reglage : la carte Controls n'est plus creee",
+        uiSrc.indexOf('if (!isMobilePlayer(playerId)) {') >= 0
+            && uiSrc.indexOf('SETTINGS_CATEGORY, "set_controls"') >= 0,
+        "reglage : la carte Controls est encore proposee au mobile",
     );
 }
 
 /* ==========================================================================
-   14. LES DEUX ITEMS OUVRENT LES BOUTONS, MOBILE COMPRIS
+   14. MOBILE : LES ITEMS, ET UN SEUL BOUTON — CELUI DU DASH (92)
    ==========================================================================
-   Consigne du joueur apres la 91 : on GARDE le systeme des deux items qui
-   font apparaitre les boutons, et il vaut aussi pour le mobile. En mode
-   boutons, un mobile recoit donc le Swap Orb (fruit) et le Void Net (style)
-   exactement comme un PC, et aucun bouton n'apparait sans eux.
+   Le joueur a tranche apres avoir essaye la 91 : Bloxd n'affiche qu'un bouton
+   supplementaire a l'ecran, et les clics normaux partaient en dash des qu'on
+   melangeait boutons et items. Le mobile revient donc aux ITEMS, et le DASH
+   n'a plus qu'une entree : le bouton tactile.
+   On rejoue le vrai chemin (activateFruit -> equipFruit) et le clic.
    ========================================================================== */
 
 {
@@ -1106,50 +1091,52 @@ const installed = await (async () => {
         removeItemName: () => 1,
         setItemSlot: () => {},
         getInventoryItemAmount: () => 0,
-        getHeldItem: () => null,
+        getHeldItem: () => ({ name: "Heatwarp Flounder" }),
+        getPlayerPhysicsState: () => ({ pos: [0, 64, 0], vel: [0, 0, 0], dir: [0, 0, 1], type: 0 }),
+        getPlayerFacingInfo: () => ({ dir: [0, 0, 1], camPos: [0, 65.45, 0] }),
     });
     const game = await loadModules("fruit/index.js", ["utils/data.js", "gameplay/fightingStyles.js", "fruit/abilities.js", "utils/timer.js"]);
     const run = (steps) => { for (let i = 0; i < steps; i++) game.step(); };
-    game.setDevice("pOrbMob", true);
-    game.setDevice("pItemsMob", true);
+    game.setDevice("pMob", true);
+    game.setDevice("pPc", false);
 
-    /* Mode BOUTONS sur mobile : l'orb arrive avec le fruit. On passe par
-       activateFruit (le joueur mange un fruit), qui suit le meme chemin que le
-       join : equiperFruit -> giveSwapOrb. */
-    let held = { name: "Heatwarp Flounder" };
-    api.getHeldItem = () => held;
-    db.pOrbMob = { ctl: "buttons" };
+    /* Mobile : les items de capacite, jamais l'orb — meme avec `ctl` en base. */
+    db.pMob = { ctl: "buttons" };
     given.length = 0;
-    game.activateFruit("pOrbMob");
+    game.activateFruit("pMob");
+    run(40);
+    check(given.length > 0, `items : le mobile ne recoit aucun item de capacite (${given.map((g) => g.name).join(", ")})`);
+    check(
+        !given.some((g) => g.name === "Swap Orb"),
+        "items : le mobile recoit encore le Swap Orb",
+    );
+
+    /* PC en mode boutons : l'orb, aucun item de capacite. */
+    db.pPc = { ctl: "buttons" };
+    given.length = 0;
+    game.activateFruit("pPc");
     run(40);
     check(
-        given.some((g) => g.pid === "pOrbMob" && g.name === "Swap Orb"),
-        `items : le mobile en mode boutons ne recoit pas le Swap Orb (${given.map((g) => g.name).join(", ")})`,
+        given.some((g) => g.pid === "pPc" && g.name === "Swap Orb"),
+        "items : le PC en mode boutons ne recoit pas le Swap Orb",
+    );
+    check(
+        !given.some((g) => g.pid === "pPc" && g.name !== "Swap Orb"),
+        "items : le PC en mode boutons recoit encore des items de capacite",
     );
 
-    /* Mode ITEMS sur mobile : un item par capacite, JAMAIS l'orb. */
-    db.pItemsMob = { ctl: "items" };
+    /* Le style suit la meme regle : items pour le mobile, filet pour le PC. */
     given.length = 0;
-    game.activateFruit("pItemsMob");
-    run(40);
-    check(
-        given.length > 0 && !given.some((g) => g.name === "Swap Orb"),
-        "items : le mobile en mode items recoit encore le Swap Orb (ou aucun item de capacite)",
-    );
-    held = null;
-
-    /* Le style suit la meme regle : le filet en mode boutons, les items en mode items. */
-    given.length = 0;
-    game.equipFightingStyle("pOrbMob", "Combat", true);
-    check(
-        given.some((g) => g.pid === "pOrbMob" && g.name === "Void Net"),
-        "items : le mobile en mode boutons ne recoit pas le Void Net en apprenant un style",
-    );
-    given.length = 0;
-    game.equipFightingStyle("pItemsMob", "Combat", true);
+    game.equipFightingStyle("pMob", "Combat", true);
     check(
         given.length > 0 && !given.some((g) => g.name === "Void Net"),
-        "items : le mobile en mode items recoit le Void Net au lieu des items du style",
+        "items : un style appris sur mobile donne le Void Net au lieu des items",
+    );
+    given.length = 0;
+    game.equipFightingStyle("pPc", "Combat", true);
+    check(
+        given.some((g) => g.pid === "pPc" && g.name === "Void Net"),
+        "items : le PC en mode boutons ne recoit pas le Void Net",
     );
 }
 

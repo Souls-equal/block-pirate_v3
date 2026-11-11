@@ -361,8 +361,9 @@ function dashAnim(playerId) {
 
    L'item « Moonstone Dust » n'est donc PLUS donne : il servait de dash mobile
    en occupant un slot, et son clic sur un PNJ partait en dash au lieu de
-   parler. Un inventaire d'une version d'avant peut encore en contenir : son
-   clic dash toujours (handleDashItemClick), et il est retire au join sur PC.
+   parler. Un inventaire d'une version d'avant peut encore en contenir : sur PC
+   son clic dashe encore, sur mobile il est retire au join et ne dashe JAMAIS
+   (le bouton tactile est la seule entree, demande 92).
    Il est INERTE a dessein (voir la demande 75 : « Snowdash » propulsait tout
    seul, donc un second dash impossible a annuler sur mobile).
 
@@ -385,8 +386,9 @@ export function removeDashItem(playerId) {
    tactile dedie :
        api.setClientOption(id, "touchscreenActionButton", <texte style>)
        -> onTouchscreenActionButton(id, touchDown)
-   On y met une ICONE (un eclat) et rien d'autre : les boutons du mobile sont
-   petits, le texte n'y tient pas (demande 91). Le dash ne depend donc plus de
+   On y met une ICONE (un eclat) et rien d'autre : c'est le SEUL bouton
+   supplementaire que Bloxd affiche sur mobile, il porte donc tout le sens
+   (demandes 91 et 92). Le dash ne depend donc plus de
    ce que le joueur a en main, et l'item n'est plus donne (les inventaires
    d'avant en contiennent encore : son clic marche toujours, voir
    handleDashItemClick). Sur PC le bouton est retire : le dash reste le clic
@@ -429,11 +431,18 @@ export function handleDashButton(playerId, touchDown) {
 }
 
 /* Clic sur un item de dash RESIDUEL (les inventaires d'avant en contiennent).
-   Le dash mobile ne passe plus par la : un item retrouve ne rend pas le
-   suivant, il declenche juste un dash comme les autres. Renvoie true s'il
-   s'agit bien de lui, pour que l'appelant arrete de traiter le clic. */
+   Sur PC, ce clic dashe encore : c'est un raccourci comme un autre.
+   Sur MOBILE, il ne dashe PAS : le dash n'a qu'une entree, le bouton tactile
+   (demande 92, les clics normaux partaient en dash). L'item est retire au
+   passage, donc le clic suivant est un clic normal.
+   Renvoie true s'il s'agit bien de cet item, pour que l'appelant arrete de
+   traiter le clic. */
 export function handleDashItemClick(playerId, itemName) {
     if (itemName !== DASH_ITEM) return false;
+    if (isMobilePlayer(playerId)) {
+        removeDashItem(playerId);
+        return true;
+    }
     tryDash(playerId);
     return true;
 }
