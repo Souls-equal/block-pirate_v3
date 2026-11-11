@@ -2099,25 +2099,23 @@ est enregistré (clé `ctl`).
 |---|---|---|---|
 | **PC — ITEMS (défaut)** | clic droit | un item par capacité | M1 à main nue |
 | **PC — BUTTONS** | `Q` | `Swap Orb` en main → `Z X C V F` | `Void Net` en main → M1 au clic, `Z X` = attaques du style |
-| **MOBILE** (aucun choix) | **bouton `dash`** | un item par capacité | M1 à main nue |
+| **MOBILE** (aucun choix) | **bouton tactile** | un item par capacité | M1 à main nue |
 
-**Le mobile est verrouillé sur les items, plus UN bouton.** Bloxd affiche les boutons
-personnalisés (`customButtons`) à l'écran des joueurs tactiles, et **un seul** y tient sans
-gêner le jeu : c'est celui du dash. Les capacités restent donc des **items**.
+**Le mobile est verrouillé sur les items, et son dash a un bouton tactile.** Les
+`customButtons`, eux, sont des **touches de clavier** : Bloxd ne les déclenche que par
+`onPlayerPressedButton`, donc jamais depuis un écran tactile. Un mobile n'en reçoit **aucun**.
 
 - `getControlMode()` **force** `CTL_ITEMS` pour un joueur tactile : un `ctl = "buttons"`
-  laissé en base ne ressuscite pas les capacités en boutons. `buttonsFor()` renvoie
-  **exactement une entrée** pour un mobile — `{ id: "dash", icon: "zap", keycode: "KeyQ" }`.
-- **`touchscreenActionButton` n'est JAMAIS utilisé** (demande 93). Ce n'est pas un bouton de
-  plus : c'est le **contenu du bouton d'action principal**, celui qui frappe et qui casse
-  les blocs. Son callback, `onTouchscreenActionButton`, arrive donc à **chaque** appui : le
-  joueur dashait en frappant, en parlant à un PNJ, en minant. L'option est remise à `null`
-  au join, au respawn et à chaque bascule (`clearActionButton`), et le callback n'est même
-  plus défini.
-- `onPlayerAltAction` **ne dashe plus sur mobile**. C'était une autre fuite : l'action
-  secondaire (que le tactile déclenche aussi) appelait `tryDash` en mode items. Le dash
-  mobile n'a désormais **qu'une entrée** : le bouton `dash` → `onPlayerPressedButton` →
-  `tryDash`.
+  laissé en base ne ressuscite pas les boutons. `buttonsFor()` renvoie `[]` pour un mobile,
+  et `onPlayerPressedButton` refuse de son côté tout appui venu d'un tactile.
+- Le dash mobile passe par `touchscreenActionButton` (une icône d'éclair) →
+  `onTouchscreenActionButton` → `handleDashButton` → `tryDash`, posé au join et au respawn.
+  **Attention** : cette option ne crée pas un bouton de plus, elle donne son **contenu au
+  bouton d'action principal** (celui qui frappe et qui casse les blocs). Le même callback
+  arrive donc aussi pour un coup de poing ou un tap sur un PNJ — c'est le défaut à l'étude,
+  et une **sonde temporaire** (voir plus bas) relève ce qui arrive dans chaque cas.
+- `onPlayerAltAction` **ne dashe jamais sur mobile** : l'action secondaire y est déclenchée
+  par le tactile aussi, et elle ne doit pas propulser.
 - `handleDashItemClick` ne dashe plus sur mobile non plus : un `Moonstone Dust` résiduel y
   est **retiré** au premier clic (et au join), sans propulser personne. Sur PC, son clic
   dashe encore, puis il est retiré.
@@ -2183,10 +2181,16 @@ Trois détails qui comptent :
    depuis `getPosition`, `getPlayerFacingInfo().dir/camPos`, `targetBlock()` et
    `pickTarget(…, 40, 0.6)`, puis appelle `handleAbilitySlot(id, n)` — le même
    dispatcher que le clic.
-4. **Le dash mobile est un bouton, pas le bouton d'action.** Bloxd n'offre qu'un
-   `customButtons` sur un écran tactile : c'est le dash (`zap`, `KeyQ`), et il
-   passe par `onPlayerPressedButton`, comme sur PC. Le bouton d'action, lui,
-   garde son rôle — frapper et casser des blocs — et ne dashe jamais.
+4. **Le bouton tactile ne se répète pas.** `onTouchscreenActionButton` arrive
+   à l'appui **et** au relâchement : seul l'appui dashe, et un même doigt posé
+   ne peut pas enchaîner deux dashs (`DASH_BUTTON_MIN_MS`). Il n'existe que sur
+   mobile : sur PC le dash reste le clic droit ou `Q`.
+5. **Sonde temporaire (demande 94).** Le bloc `SONDE DES ENTREES TACTILES` en
+   fin de `src/index.js` enveloppe les callbacks et envoie au joueur tactile une
+   ligne de chat par rafale d'appels (~400 ms) : `TSd`/`TSu` (bouton),
+   `clk[bloc|entité]`, `clkup`, `alt`/`xalt`, `btn[id]`, `chg[item]`,
+   `blk[avant>après]`. Elle ne change **rien** au jeu — elle rend juste visible
+   ce que Bloxd envoie. À retirer une fois la question tranchée.
 
 `npm run check` verrouille tout ça : chaque bouton doit avoir une icône de la
 liste blanche (`zap`, `fire`, `snowflake`, `crosshairs`, `swords`, `gem`), une
