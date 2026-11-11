@@ -11,6 +11,22 @@ et les capacités des fruits empaquetées sous `code-blocks/`.
 
 ---
 
+## Documentation du jeu (FR / EN)
+
+Les documents de référence, dans **[`docs/`](docs/)** :
+
+| Document | Contenu |
+|---|---|
+| [`docs/UPDATES.md`](docs/UPDATES.md) | Toutes les versions, de V3.0.0 à aujourd'hui |
+| [`docs/FRUITS.fr.md`](docs/FRUITS.fr.md) · [`docs/FRUITS.en.md`](docs/FRUITS.en.md) | Les 41 fruits, leurs 181 capacités, recharge et description |
+| [`docs/ITEMS.fr.md`](docs/ITEMS.fr.md) · [`docs/ITEMS.en.md`](docs/ITEMS.en.md) | Items de commande, de quête, bons, armes, bateaux, fruits |
+| [`docs/FIGHTING-STYLES.fr.md`](docs/FIGHTING-STYLES.fr.md) · [`docs/FIGHTING-STYLES.en.md`](docs/FIGHTING-STYLES.en.md) | Les 4 styles de combat et leurs 8 attaques |
+
+La version **française** est la version visuelle ; la version **anglaise** découpe chaque
+fruit, item et style dans un bloc de code, à copier-coller tel quel (Discord, par exemple).
+
+---
+
 ## Démarrage rapide (copier-coller dans Bloxd.io)
 
 > **Où trouver les fichiers à coller ?** Dans **[`world-code/`](world-code/)** :
