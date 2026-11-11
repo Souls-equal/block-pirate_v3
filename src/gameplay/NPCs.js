@@ -24,6 +24,7 @@ import { clearItem, scanAllItems } from "./customItem";
 export const TEAM_RECRUITERS = {
     "Pirate Recruiter": "PIRATES",
     "Marine Recruiter": "MARINES",
+    "None Recruiter": "NONE",
 };
 
 function teamLabel(teamId) {
