@@ -558,12 +558,14 @@ Budgets : `BUDGET_SIDEBAR` = 1 200 caractères (textes collés à l'écran :
 sérialisée d'un payload.
 
 La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
-caractères : une seule couleur par partie, `fontSize` réservé au titre, textes
-libres (fruit, style, cible de quête) bornés, **barres natives 250 × 24 px sans
-dégradé** (~89 caractères de JSON chacune), et blocs secondaires retirés **par
-ordre de priorité** si nécessaire — jamais tout le message. Mesuré : 1 088
-caractères pour un joueur nu, 1 096 pour un nouveau joueur avec tutoriel et
-quête, 1 189 pour un joueur chargé.
+caractères : une seule couleur par partie, **deux tailles de police seulement**
+(le titre, et tout le reste — une partie sans `fontSize` repartirait à la taille
+par défaut du client), textes libres (fruit, style, cible de quête) bornés,
+**barres natives sans dégradé** (~90 caractères de JSON chacune : 250 × 24 px
+sur PC, 210 × 18 px sur mobile), et blocs secondaires retirés **par ordre de
+priorité** si nécessaire — jamais tout le message. Mesuré : 948 caractères pour
+un joueur nu, 1 121 pour un nouveau joueur avec tutoriel et quête (1 121 aussi
+sur mobile), 1 155 pour un joueur chargé.
 
 ---
 
