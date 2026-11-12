@@ -212,7 +212,7 @@ function drawSidebar(playerId){
        3 espaces avant (ceux de droite ne se voient pas). */
     const PAD_L = "\u00A0\u00A0\u00A0";
     block([
-        txt(FRAME_TOP + PAD_L + "𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮" + "\n" + FRAME_BOT, LEGACY_TITLE, {fontWeight: "bold", fontSize: TITLE_SIZE}),
+        txt(FRAME_TOP + PAD_L + "  𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮\n" + FRAME_BOT, LEGACY_TITLE, {fontWeight: "bold", fontSize: TITLE_SIZE}),
     ]);
 
     /* == THE PIRATE : qui il est, et ce qu'il a en poche. ==================
@@ -224,7 +224,7 @@ function drawSidebar(playerId){
     let playerName = "Unknown";
     try { playerName = api.getEntityName(playerId) || "Unknown"; } catch (e) {}
     block([
-        body(" \u2726 THE PIRATE\n \u25C8 " + short(playerName, 16) + " \u25AA " + seaLabel + "\n", COLOUR_FRAME),
+        body(" \u2726 𝒫𝓁𝒶𝓎𝑒𝓇\n \u25C8 " + short(playerName, 16) + " \u25AA " + seaLabel + "\n", COLOUR_FRAME),
     ], true, 16);
 
     {
@@ -235,7 +235,7 @@ function drawSidebar(playerId){
     }
 
     /* == THE VOYAGE : la progression. ====================================== */
-    block([body(FRAME_MID + " \u2726 THE VOYAGE\n", COLOUR_FRAME)], true, 12);
+    block([body(FRAME_MID + " \u2726 𝐿𝑒𝓋𝑒𝓁𝒾𝓃𝑔\n", COLOUR_FRAME)], true, 12);
 
     block([body(" LVL " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold"})], true, 5);
 
@@ -266,7 +266,7 @@ function drawSidebar(playerId){
        sous une barre sans titre. */
     if (fruit || styleLabel) {
         block([
-            body("\n" + FRAME_MID + " \u2726 THE POWERS\n", COLOUR_FRAME),
+            body("\n" + FRAME_MID + " \u2726 𝒜𝒷𝒾𝓁𝒾𝓉𝒾𝑒𝓈/𝒞𝒶𝓅𝒶𝒸𝒾𝓉𝒾𝑒𝓈\n", COLOUR_FRAME),
         ], true, 11);
         if (fruit) {
             block([body(" \u25C8 Fruit: " + fruit + "\n", C.PIRATE, {fontWeight: "bold"})], true, 10);
@@ -281,7 +281,7 @@ function drawSidebar(playerId){
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
-            body("\n" + FRAME_MID + " \u2726 THE PATH\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
+            body("\n" + FRAME_MID + " \u2726 𝒬𝓊𝑒𝓈𝓉𝓈\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
         ], true, 0);
     }
 
