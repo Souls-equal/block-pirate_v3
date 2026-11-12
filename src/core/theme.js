@@ -803,6 +803,11 @@ export function bar(progress, colours, extra) {
     const ratio = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
     /* 3 decimales suffisent : au-dela on paie des caracteres pour une
        difference invisible a l'ecran (0.3333333 > 0.333). */
+    /* La taille NE s'ecrit PAS ici : elle arrive par `extra` (BAR_SIZE /
+       BAR_SIZE_MOBILE ci-dessus), et la boucle de la ligne suivante ecrase
+       toute valeur posee dans cet objet. C'est exactement pour ca qu'un
+       `width` ajoute a la main ici ne changeait rien en jeu : la boucle
+       `for (const key in extra)` le recouvrait avec la taille de la sidebar. */
     const out = { type: "ProgressBar", progress: Math.round(ratio * 1000) / 1000 };
     if (colours) out.colours = colours;
     if (extra) for (const key in extra) out[key] = extra[key];

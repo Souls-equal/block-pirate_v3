@@ -33,7 +33,7 @@ Recopie **chaque fichier dans le fichier de meme nom** de ton World Code
 | `core/admin.js` | 52 083 | 91 664 |
 | `core/ranks.js` | 2 276 | 5 392 |
 | `core/team.js` | 16 261 | 48 087 |
-| `core/theme.js` | 18 178 | 41 529 |
+| `core/theme.js` | 18 178 | 41 906 |
 | `core/UI.js` | 15 513 | 50 851 |
 | `fruit/abilities.js` | 38 178 | 52 633 |
 | `fruit/fruitData.js` | 4 331 | 6 209 |
