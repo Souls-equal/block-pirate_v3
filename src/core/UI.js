@@ -81,7 +81,9 @@ export function updateSidebarLight(playerId){
    partie {str|icon, style} coute 40 a 80 caracteres de JSON, et Bloxd refuse
    un textStyling trop gros (« InternalError: Argument too large », qui remonte
    en « World code tick: ... »). Regles appliquees ici :
-     - une seule couleur par partie, fontSize reserve au titre ;
+     - une seule couleur par partie, et DEUX tailles seulement (le titre et
+       le reste, demande 98) : une partie sans `fontSize` repart a la taille
+       par defaut du client et casse l'uniformite ;
      - segments de meme style fusionnes, lignes regroupees (moins de parties) ;
      - les textes libres (fruit, style, cible de quete) sont bornes ;
      - si ca depasse quand meme SIDEBAR_BUDGET, on retire les blocs
@@ -161,84 +163,104 @@ function drawSidebar(playerId){
          - LE BUDGET. Une partie coute 40 a 80 caracteres de JSON et la sidebar
            est plafonnee a 1 200 : les lignes d'un meme style sont donc
            regroupees dans UNE partie (un \n coute 2 caracteres, une partie en
-           coute 50), et fontSize reste reserve au titre.
+           coute 50). Le prix de la reduction de la demande 98, elle, est
+           paye une fois par partie (une vingtaine de caracteres de `fontSize`)
+           et se compense en supprimant des parties : une seule ligne de titre,
+           en-tete et premiere ligne d'une section dans la meme partie, saut de
+           ligne porte par la partie suivante.
 
        L'ordre est celui du joueur (titre, identite, progression, pouvoirs,
        quete) ; la quete reste TOUT EN BAS (demande 87) et l'objectif du
        tutoriel juste avant elle, en priorite 0 pour ne jamais etre sacrifie.
 
        Budget : le premier bloc sacrifie est la ligne decorative du pied (18),
-       puis le nom (17), la prime et les pieces (6), le niveau (5), la stamina
-       (3), l'XP (2), la quete (1).
-       Le titre, lui, n'est pas optionnel : il n'est JAMAIS retire.
+       puis l'identite (nom + mer, 16), la prime et les pieces (6), le niveau
+       (5), la stamina (3), l'XP (2). Le tutoriel (0) et la quete (1) passent
+       avant tout le reste ; le titre et le pied du cadre, eux, ne sont pas
+       optionnels : ils ne partent JAMAIS.
        ========================================================================== */
 
     /* Le cadre. Un seul jeu de caracteres, reutilise partout : la largeur est
        donc la meme sur toutes les lignes, y compris celles des barres. */
-    const FRAME_TOP = "╔════════ ✦ ════════╗\n";
-    const FRAME_MID = "╠════════ ✦ ════════╣\n";
-    const FRAME_END = "╚════════ ✦ ════════╝\n";
+    const FRAME_MID = "\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563\n";
+    const FRAME_END = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n";
+    /* La banniere du titre est PLUS COURTE (17 caracteres au lieu de 21) mais
+       ecrite plus gros : a l'ecran, les deux font la meme largeur (~250 px, la
+       largeur d'une barre), donc le cadre du haut s'aligne sur les separateurs
+       au lieu de deborder de 40 % comme avant. */
+    const FRAME_TOP = "\u2554\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2557\n";
+    const FRAME_BOT = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u255D\n";
 
-    /* LE TITRE : le nom du jeu, en gros, jamais sacrifie (demande 88). */
+    /* == LES TAILLES (demande 98) ==========================================
+       Le panneau de droite a une largeur fixe : la seule facon de le faire
+       tenir, c'est de reduire la police de chaque partie. Deux tailles
+       seulement, comme sur la reference : le titre un cran au-dessus, tout le
+       reste pareil (les titres de section se distinguent par le cadre et le
+       gras du titre, pas par une taille de plus). Sur mobile on descend d'un cran de
+       plus : l'ecran est plus petit et la sidebar y mange la moitie de la
+       largeur. Les barres suivent la meme logique (250x24 sur PC, 210x18 sur
+       mobile), sinon elles jurent avec le texte reduit. */
+    const mob = isMobilePlayer(playerId);
+    const TITLE_SIZE = mob ? "0.95em" : "1.05em";
+    const BODY_SIZE = mob ? "0.7em" : "0.8em";
+    const BAR_PX = mob ? { height: "18px", width: "210px" } : BAR_SIZE;
+    const body = (str, color, extra) => txt(str, color, Object.assign({ fontSize: BODY_SIZE }, extra || {}));
+
+    /* LE TITRE : le nom du jeu, jamais sacrifie (demande 88).
+       Le cadre et le nom sont dans la MEME partie (une seule taille) et le nom
+       est centre par des ESPACES INSECABLES : le client avale les espaces
+       ordinaires en debut de ligne, un \u00A0 est un caractere comme un autre
+       et reste. La banniere fait 17 caracteres et « Block Pirate » en occupe
+       11,4 a la meme taille : il reste 2,8 caracteres de chaque cote, d'ou
+       3 espaces avant (ceux de droite ne se voient pas). */
+    const PAD_L = "\u00A0\u00A0\u00A0";
     block([
-        txt(FRAME_TOP + "    𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮\n" + FRAME_END, LEGACY_TITLE, {fontWeight: "bold", fontSize: title}),
+        txt(FRAME_TOP + PAD_L + "𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮" + "\n" + FRAME_BOT, LEGACY_TITLE, {fontWeight: "bold", fontSize: TITLE_SIZE}),
     ]);
 
-    /* ── LE PIRATE : qui il est, et ce qu'il a en poche. ─────────────────── */
-    block([
-        txt("\n  ✦ THE PIRATE\n", COLOUR_FRAME),
-    ], true, 16);
-
-    /* Le nom du joueur : c'est la ligne la plus decorative des trois (il lit
-       deja son propre nom sur son name tag), donc la premiere sacrifiee. */
+    /* == THE PIRATE : qui il est, et ce qu'il a en poche. ==================
+       L'en-tete et l'identite sont dans UNE partie (meme couleur) : deux
+       parties se paient deux fois, et surtout l'en-tete pouvait etre sacrifie
+       seul par le budget — une section « THE PIRATE » vide, ou pire, des
+       pieces d'or sous aucun titre. Une partie = un bloc : tout ou rien.
+       Le nom et la mer tiennent sur la meme ligne (« Nom - Sea 1 »). */
     let playerName = "Unknown";
     try { playerName = api.getEntityName(playerId) || "Unknown"; } catch (e) {}
     block([
-        txt("  ◈ Name: " + short(playerName, 16) + "\n", C.INFO),
-        txt("  ◈ Sea: " + seaLabel + "\n", C.INFO),
-    ], true, 17);
+        body(" \u2726 THE PIRATE\n \u25C8 " + short(playerName, 16) + " \u25AA " + seaLabel + "\n", COLOUR_FRAME),
+    ], true, 16);
 
-    /* La prime et les pieces : l'or, dans sa teinte d'or. La prime ne coute
-       rien quand elle vaut 0 : pas de ligne « Bounty 0 » (demande 89). */
     {
-        const moneyLine = "  ★ Coins: " + nfmt(money) + "\n";
+        const moneyLine = " \u2605 Coins: " + nfmt(money) + "\n";
         block([
-            txt(bounty > 0 ? "  ★ Bounty: " + nfmt(bounty) + "\n" + moneyLine : moneyLine, C.MONEY, {fontWeight: "bold"}),
+            body(bounty > 0 ? " \u2605 Bounty: " + nfmt(bounty) + "\n" + moneyLine : moneyLine, C.MONEY),
         ], true, 6);
     }
 
-    /* ── THE VOYAGE : la progression. ────────────────────────────────────── */
-    block([
-        txt(FRAME_MID + "  ✦ THE VOYAGE\n", COLOUR_FRAME),
-    ], true, 12);
+    /* == THE VOYAGE : la progression. ====================================== */
+    block([body(FRAME_MID + " \u2726 THE VOYAGE\n", COLOUR_FRAME)], true, 12);
 
-    block([
-        txt("  LVL " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold"}),
-    ], true, 5);
+    block([body(" LVL " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold"})], true, 5);
 
-    /* L'XP : la ligne de chiffres, puis sa barre juste dessous. Un seul saut
-       de ligne apres la barre : la barre native fait 24 px de haut, elle se
-       separe deja du bloc suivant. */
+    /* L'XP : la ligne de chiffres, puis sa barre juste dessous. Le saut de
+       ligne qui suit la barre est porte par la partie SUIVANTE : une partie
+       « \n » seule coute 12 caracteres de JSON pour un caractere affiche. */
     block([
-        txt("  XP " + nfmt(xp) + "/" + nfmt(xpNeeded) + "  " + xpData.percent + "%\n", COLOUR_XP),
-        bar(xpData.ratio, BAR_XP, BAR_SIZE),
-        txt("\n"),
+        body(" XP " + nfmt(xp) + "/" + nfmt(xpNeeded) + "  " + xpData.percent + "%\n", COLOUR_XP),
+        bar(xpData.ratio, BAR_XP, BAR_PX),
     ], true, 2);
+
+    /* La stamina, meme disposition que l'XP. */
+    block([
+        body("\n \u2727 Stamina " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        bar(stData.ratio, BAR_STAMINA, BAR_PX),
+    ], true, 3);
 
     /* Les points de stat, seulement s'il y en a : « Skill Points: 0 » ne dit
        rien et coute une partie entiere. */
     if (sp > 0) {
-        block([
-            txt("  \u2727 Skill Points: " + sp + "\n", C.INFO, {fontWeight: "bold"}),
-        ], true, 13);
+        block([body("\n \u2727 Skill Points: " + sp + "\n", C.INFO)], true, 13);
     }
-
-    /* La stamina, meme disposition que l'XP. */
-    block([
-        txt("  \u2727 Stamina " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
-        bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
-        txt("\n"),
-    ], true, 3);
 
     /* == THE POWERS : le fruit et le style de combat =======================
        Rien du tout quand le joueur n'en a pas : ni section vide, ni « No
@@ -247,13 +269,13 @@ function drawSidebar(playerId){
        sous une barre sans titre. */
     if (fruit || styleLabel) {
         block([
-            txt(FRAME_MID + "  \u2726 THE POWERS\n", COLOUR_FRAME),
+            body("\n" + FRAME_MID + " \u2726 THE POWERS\n", COLOUR_FRAME),
         ], true, 11);
         if (fruit) {
-            block([txt("  \u25c8 Fruit: " + fruit + "\n", C.PIRATE, {fontWeight: "bold"})], true, 10);
+            block([body(" \u25C8 Fruit: " + fruit + "\n", C.PIRATE, {fontWeight: "bold"})], true, 10);
         }
         if (styleLabel) {
-            block([txt("  \u25c8 Style: " + styleLabel + "\n", styleColor, {fontWeight: "bold"})], true, 9);
+            block([body(" \u25C8 Style: " + styleLabel + "\n", styleColor, {fontWeight: "bold"})], true, 9);
         }
     }
 
@@ -262,23 +284,23 @@ function drawSidebar(playerId){
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
-            txt("\n  \u2726 THE PATH\n  \u25b8 " + short(tut, 44) + "\n", C.SUCCESS),
+            body("\n" + FRAME_MID + " \u2726 THE PATH\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
         ], true, 0);
     }
 
-    /* LA QUETE, TOUT EN BAS (demande 87) : la cible, puis la progression et
-       l'ile sur une seconde ligne courte, pour ne pas deborder du cadre. */
+    /* LA QUETE, TOUT EN BAS (demande 87) : l'en-tete et ses deux lignes de
+       detail dans la MEME partie (meme couleur), la cible puis la progression
+       et l'ile. */
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 22);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            txt(FRAME_MID + "  \u2726 THE HUNT\n", COLOUR_FRAME),
-            txt("  \u25b8 " + targetText + "\n  \u25b8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", C.INFO),
+            body("\n" + FRAME_MID + " \u2726 THE HUNT\n \u25B8 " + targetText + "\n \u25B8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", COLOUR_FRAME),
         ], true, 1);
     }
 
     /* Le pied du cadre, JAMAIS retire : un cadre ouvert se lit mal. */
-    block([txt(FRAME_END, COLOUR_FRAME)]);
+    block([body(FRAME_END, COLOUR_FRAME)]);
 
     /* La ligne decorative de la Grand Line, sur PC seulement. C'est la seule
        chose purement decorative de la carte : elle est donc la PREMIERE
@@ -286,8 +308,8 @@ function drawSidebar(playerId){
        lisible sans elle. Sur mobile elle n'existe pas du tout : un ecran
        tactile est plus court, une ligne de decor y prend la place d'une vraie
        information. */
-    if (!isMobilePlayer(playerId)) {
-        block([txt("   \u3014 \u2726 T H E   G R A N D   L I N E \u2726 \u3015\n", COLOUR_FRAME)], true, 18);
+    if (!mob) {
+        block([body("  \u3014 \u2726 T H E   G R A N D   L I N E \u2726 \u3015\n", COLOUR_FRAME)], true, 18);
     }
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires

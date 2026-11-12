@@ -253,7 +253,7 @@ const SLOPPY_GLOBALS = [
     "startBoss", "startTutorial", "withEffectSource",
 ];
 
-async function renderSidebar(db, tutorialLine, quest) {
+async function renderSidebar(db, tutorialLine, quest, mobile) {
     for (const n of SLOPPY_GLOBALS) globalThis[n] = () => false;
     let sidebar = null;
     globalThis.api = new Proxy(
@@ -279,7 +279,8 @@ async function renderSidebar(db, tutorialLine, quest) {
         stdin: {
             contents:
                 `export * from ${JSON.stringify(join(ROOT, "src/core/UI.js"))};` +
-                `export { playerQuest, questProgress } from ${JSON.stringify(join(ROOT, "src/gameplay/quest.js"))};`,
+                `export { playerQuest, questProgress } from ${JSON.stringify(join(ROOT, "src/gameplay/quest.js"))};` +
+                `export { setDevice } from ${JSON.stringify(join(ROOT, "src/utils/data.js"))};`,
             resolveDir: ROOT,
             loader: "js",
         },
@@ -292,6 +293,9 @@ async function renderSidebar(db, tutorialLine, quest) {
     });
     const url = "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64");
     const ui = await import(url);
+    /* `devices` vit dans le module : on le remet a chaque scenario, sinon le
+       scenario mobile contamine les suivants (le bundle est mis en cache). */
+    ui.setDevice("p1", mobile === true);
     ui.setTutorialLineLookup(tutorialLine ? () => tutorialLine : null);
     if (quest) {
         ui.playerQuest.p1 = { targetMob: quest.targetMob, killAmount: quest.killAmount, island: quest.island };
@@ -342,13 +346,20 @@ const RICH = {
    sidebar artificiellement plus legere (la ligne « QUEST  <cible> » manquait),
    donc le pire cas reel n'etait jamais mesure. */
 const NEWBIE = { targetMob: ["Sky Bandit"], killAmount: 5, island: "Jungle", progress: 3 };
+/* Le dernier est un joueur MOBILE avec le pire cas de contenu : c'est la
+   demande 98 (« il faut la reduire encore plus pour mobile »). Ses tailles
+   sont comparees a celles du meme joueur sur PC juste apres. */
+const MOBILE_LABEL = "nouveau joueur mobile + tutoriel + quete";
 const scenarios = [
     ["joueur nu", POOR, null, null],
     ["joueur charge + objectif de tutoriel", RICH, "Buy your first weapon at the Combat Teacher", null],
     ["nouveau joueur + tutoriel + quete", POOR, "Kill 3 Sky Bandits in the Lower Skyl", NEWBIE],
+    [MOBILE_LABEL, POOR, "Kill 3 Sky Bandits in the Lower Skyl", NEWBIE, true],
 ];
-for (const [label, db, tutorialLine, quest] of scenarios) {
-    const sidebar = await renderSidebar(db, tutorialLine, quest);
+const RENDERED = {};
+for (const [label, db, tutorialLine, quest, mobile] of scenarios) {
+    const sidebar = await renderSidebar(db, tutorialLine, quest, mobile);
+    RENDERED[label] = sidebar;
     if (!Array.isArray(sidebar)) {
         errors.push(`${label} : aucune sidebar envoyee`);
         continue;
@@ -534,6 +545,66 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
                 details++;
             }
             if (details > 4) errors.push(`${label} : ${details} lignes de detail apres la quete (attendu 3 au plus)`);
+        }
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAILLES DE LA SIDEBAR (demande 98 : « beaucoup trop grande »)
+
+   Deux regles, et elles se verifient sur le payload reel :
+     - UNE seule taille de texte pour tout, sauf le titre : des qu'une partie
+       n'a pas de `fontSize`, elle repart a la taille par defaut du client et
+       la sidebar redevient heterogene ;
+     - le titre reste le plus grand, mais SOUS 1.2em : au-dela (1.9em avant),
+       la banniere etait presque deux fois plus large que les separateurs ;
+     - sur mobile, TOUT est plus petit : texte et barres.
+   ══════════════════════════════════════════════════════════════════════════ */
+function fontSizes(sidebar) {
+    const sizes = [];
+    for (const p of sidebar) {
+        if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
+        const size = p.style && p.style.fontSize;
+        if (size !== undefined) sizes.push(parseFloat(size));
+    }
+    return sizes;
+}
+for (const [label, , , , mobile] of scenarios) {
+    const sidebar = RENDERED[label];
+    if (!Array.isArray(sidebar)) continue;
+    checked++;
+    const missing = sidebar.filter(
+        (p) => p && typeof p.str === "string" && p.str.trim() && !(p.style && p.style.fontSize),
+    );
+    if (missing.length)
+        errors.push(`${label} : ${missing.length} partie(s) sans fontSize (« ${(missing[0].str || "").trim().slice(0, 18)} » a la taille par defaut)`);
+    const sizes = fontSizes(sidebar);
+    const big = Math.max.apply(null, sizes.concat([0]));
+    if (!(big > 0)) errors.push(`${label} : aucune taille de police`);
+    else if (big > 1.2) errors.push(`${label} : le titre est a ${big}em (1.2em au plus)`);
+    /* Le titre est la PLUS GRANDE partie : s'il y en a une autre de sa taille,
+       c'est que deux tailles ont ete melangees. */
+    if (sizes.filter((s) => s === big).length !== 1)
+        errors.push(`${label} : ${sizes.filter((s) => s === big).length} parties a la taille du titre (une seule attendue)`);
+}
+{
+    const pc = RENDERED["nouveau joueur + tutoriel + quete"];
+    const mobile = RENDERED[MOBILE_LABEL];
+    checked++;
+    if (!Array.isArray(pc) || !Array.isArray(mobile)) {
+        errors.push("mobile : sidebar absente");
+    } else {
+        const maxOf = (s) => Math.max.apply(null, fontSizes(s).concat([0]));
+        const barOf = (s) => (s || []).find((p) => p && p.type === "ProgressBar");
+        if (!(maxOf(mobile) < maxOf(pc)))
+            errors.push(`mobile : texte ${maxOf(mobile)}em contre ${maxOf(pc)}em sur PC (doit etre plus petit)`);
+        const bp = barOf(pc), bm = barOf(mobile);
+        if (!bp || !bm) errors.push("mobile : barre absente");
+        else {
+            if (!(parseInt(bm.width, 10) < parseInt(bp.width, 10)))
+                errors.push(`mobile : barres ${bm.width} contre ${bp.width} sur PC (doivent etre plus etroites)`);
+            if (!(parseInt(bm.height, 10) < parseInt(bp.height, 10)))
+                errors.push(`mobile : barres ${bm.height} de haut contre ${bp.height} sur PC`);
         }
     }
 }
