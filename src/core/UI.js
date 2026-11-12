@@ -4,13 +4,13 @@ import { applyControls, confirmAction, getControlMode, isMobilePlayer, setContro
 import { playerQuest, questProgress } from "../gameplay/quest";
 import { getCrewName } from "./team";
 import { getFruit } from "../fruit/index";
-import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyles";
+import { getFightingStyle } from "../gameplay/fightingStyles";
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
 import { isOwner } from "./ranks";
 import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, seaFromVariation, variationsSupported } from "../gameplay/variations";
 import { getLastDamager } from "../utils/killAttribution";
-import { BAR_SIZE, BAR_SIZE_MOBILE, C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
+import { BAR_SIZE, BAR_SIZE_MOBILE, BUDGET_SIDEBAR, C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
 
 /* Ligne du tutoriel dans la sidebar. UI n'importe PAS gameplay/tutorial (data
    importe UI : ce serait un cycle de plus) : index.js pose la fonction, qui
@@ -53,14 +53,29 @@ function makeBar(value, max){
 const LEGACY_TITLE = "#00BFFF"; // cyan d'origine : titre et quete
 const LEGACY_LEVEL = "#FF8C00"; // orange d'origine : niveau
 
-/* Le bleu marine du cadre et des titres de section : c'est lui qui donne
-   son unite a la carte (mer, ocean). */
-const COLOUR_FRAME = C.MARINE;
+/* == LA PALETTE DE LA CARTE (demande 101) : QUATRE couleurs, pas une de plus.
+   Chaque couleur distincte est un style distinct dans le message : en reduire
+   le nombre reduit le `customTextStyling` envoye au client et laisse de la
+   marge sous le budget (demande 100). On est passe de huit teintes (cyan du
+   titre, bleu du cadre, orange du niveau, cyan de l'XP, bleu de la stamina,
+   rouge du fruit, couleur libre du style, vert du tutoriel) a ces quatre-la :
 
-const COLOUR_XP = C.XP;          // cyan : texte d'XP, icone, barre
-const COLOUR_STAMINA = C.MARINE; // bleu clair : stamina
-const BAR_XP = [COLOUR_XP];
-const BAR_STAMINA = [COLOUR_STAMINA];
+     1. CYAN   #00BFFF — LA CARTE : cadre, titre, en-tetes de section, ligne
+        d'XP et sa barre, quete. C'est le cyan d'origine (demande 88) ;
+     2. OR     #FFD700 — LA CARTE DU JOUEUR : nom, mer, prime et pieces ;
+     3. ORANGE #FF8C00 — LE NIVEAU, et rien d'autre (teinte d'origine, 88) ;
+     4. BLEU   #7DD3FC — L'EFFORT : stamina et sa barre, points de stat,
+        objectif du tutoriel.
+
+   Volontairement ecartes : la couleur propre d'un style de combat (une teinte
+   libre par style = une couleur de plus, et un rendu qui change d'un joueur a
+   l'autre) et le vert du succes. Les barres prennent la couleur de leur texte :
+   une de moins a compter. */
+const SIDE_FRAME = LEGACY_TITLE;   // cyan d'origine : cadre, titres, XP, quete
+const SIDE_LEVEL = LEGACY_LEVEL;   // orange d'origine : le niveau seul
+const SIDE_SEA = C.MARINE;         // bleu clair : stamina, stat points, tutoriel
+const BAR_XP = [SIDE_FRAME];
+const BAR_STAMINA = [SIDE_SEA];
 const border = "lightgray"
 
 export function updateSidebar(playerId){
@@ -87,7 +102,11 @@ export function updateSidebarLight(playerId){
        secondaires en commencant par le moins utile, JAMAIS tout le message.
    La sidebar ne doit JAMAIS faire planter le tick. */
 
-const SIDEBAR_BUDGET = 1200;
+/* Le budget de la sidebar vient de theme.js (`BUDGET_SIDEBAR`) et non d'une
+   constante locale : le patch d'API de theme.js reapplique `fit(...)` avec
+   CETTE valeur-la sur `RightInfoText`. Deux constantes separees, c'est deux
+   occasions de tronquer la sidebar en douce apres coup. */
+const SIDEBAR_BUDGET = BUDGET_SIDEBAR;
 
 /* Coupe un texte libre trop long (nom de fruit, d'ile, liste de cibles). */
 function short(text, max){
@@ -107,9 +126,7 @@ function drawSidebar(playerId){
     const fruitName = getFruit(playerId);
     const fruit = fruitName ? short(fruitName, 20) : "";
     const styleName = getFightingStyle(playerId);
-    const styleInfo = getFightingStyleInfo(styleName);
     const styleLabel = styleName ? short(styleName, 18) : "";
-    const styleColor = (styleInfo && styleInfo.color) || C.INFO;
     const xpNeeded = xpToNext(lvl);
     const xpData = makeBar(xp, xpNeeded);
 
@@ -141,139 +158,129 @@ function drawSidebar(playerId){
     };
 
     /* ==========================================================================
-       LA CARTE DU NAVIRE (demande 97)
+       LA CARTE DU NAVIRE (demandes 97, 98 et 100)
 
        Le joueur a fourni la mise en page d'une sidebar d'un autre jeu et a
        demande la meme chose ici. Trois contraintes ont guide chaque ligne :
 
          - AUCUNE ICONE, ni Bloxd (« Hunger ») ni Font Awesome : le cadre, les
-           ornements (✦ ✧ ★ ◈ ≈) et les mots portent tout le sens. Les signes
+           ornements (✦ ✧ ★ ◈ ▸) et les mots portent tout le sens. Les signes
            choisis passent tous la liste noire d'emojis de `npm run check` ;
-           l'ancre, le voilier, la tete de mort et la fleur de lys sont
-           pictographiques (carre vide sur certains clients), donc
-           volontairement absents ;
-         - LE THEME : la mer. Cadre et titres de section en bleu marine
-           (C.MARINE), l'or du tresor pour la prime et les pieces (C.MONEY),
-           le cyan d'origine pour le titre, l'XP et la quete, l'orange
-           d'origine pour le niveau (demande 88 : ces deux teintes-la sont
-           dans KEEP_AS_IS) ;
-         - LE BUDGET. Une partie coute 40 a 80 caracteres de JSON et la sidebar
-           est plafonnee a 1 200 : les lignes d'un meme style sont donc
-           regroupees dans UNE partie (un \n coute 2 caracteres, une partie en
-           coute 50). Le prix de la reduction de la demande 98, elle, est
-           paye une fois par partie (une vingtaine de caracteres de `fontSize`)
-           et se compense en supprimant des parties : une seule ligne de titre,
-           en-tete et premiere ligne d'une section dans la meme partie, saut de
-           ligne porte par la partie suivante.
+         - LE THEME : la mer, en QUATRE couleurs, pas une de plus (demande
+           101) : cyan d'origine (#00BFFF) pour le cadre, les titres, XP, fruit,
+           style et quete ; or (#FFD700) pour la carte du joueur ; orange
+           d'origine (#FF8C00) pour LVL seul ; bleu clair (#7DD3FC) pour
+           stamina, points de stat et tutoriel. Le titre cyan et LVL orange
+           restent dans KEEP_AS_IS (demande 88) ;
+         - LE BUDGET, et c'est lui qui a cause les deux bugs de la demande 100.
 
-       L'ordre est celui du joueur (titre, identite, progression, pouvoirs,
-       quete) ; la quete reste TOUT EN BAS (demande 87) et l'objectif du
-       tutoriel juste avant elle, en priorite 0 pour ne jamais etre sacrifie.
+       DEUX REGLES DE STRUCTURE (demande 100), et il faut les comprendre avant
+       de toucher a ce bloc :
 
-       Budget : le premier bloc sacrifie est la ligne decorative du pied (18),
-       puis l'identite (nom + mer, 16), la prime et les pieces (6), le niveau
-       (5), la stamina (3), l'XP (2). Le tutoriel (0) et la quete (1) passent
-       avant tout le reste ; le titre et le pied du cadre, eux, ne sont pas
-       optionnels : ils ne partent JAMAIS.
+         1. UNE SECTION = UN BLOC. L'en-tete, ses lignes et ses couleurs vivent
+            dans le MEME bloc (`block([...])`), qui est garde ou retire ENTIER
+            par le budget. Avant, l'en-tete et ses lignes etaient des blocs
+            separes avec des priorites differentes : quand l'en-tete
+            « 𝒜𝒷𝒾𝓁𝒾𝓉𝒾𝑒𝓈 » etait retire, la ligne « ◈ Fruit » restait — un fruit
+            sans titre, et surtout une ligne sans le \n que portait l'en-tete.
+         2. CHAQUE BLOC COMMENCE PAR UN \n, sauf le titre qui ouvre la carte.
+            Le saut de ligne n'est JAMAIS porte par le bloc precedent : sinon,
+            des que ce bloc-la est retire, la section suivante se colle a la
+            barre de progression (le fruit qui « saute » d'une ligne a l'autre).
+            Corollaire : aucune constante de cadre ne contient de \n.
+
+       Ordre d'affichage : titre, identite, progression, pouvoirs, tutoriel,
+       quete (tout en bas, demande 87), pied du cadre.
+
+       Budget : `priority` = ordre de SACRIFICE (petit = garde en premier).
+       Obligatoires, jamais retires : le titre, la section progression
+       (en-tete + niveau + les deux barres) et le pied du cadre.
+       Ensuite : tutoriel (0), quete (1), pouvoirs (8), carte du joueur (10 :
+       nom, mer, prime, pieces). Les points de stat sont colles a la stamina et
+       le pied du cadre a la derniere section : deux parties de moins, ~120
+       caracteres de JSON economises.
        ========================================================================== */
 
-    /* Le cadre. Un seul jeu de caracteres, reutilise partout : la largeur est
-       donc la meme sur toutes les lignes, y compris celles des barres. */
-    const FRAME_MID = "\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563\n";
-    const FRAME_END = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n";
-    /* La banniere du titre est PLUS COURTE (17 caracteres au lieu de 21) mais
-       ecrite plus gros : a l'ecran, les deux font la meme largeur (~250 px, la
-       largeur d'une barre), donc le cadre du haut s'aligne sur les separateurs
-       au lieu de deborder de 40 % comme avant. */
-    const FRAME_TOP = "\u2554\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2557\n";
-    const FRAME_BOT = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u255D\n";
+    /* Le cadre. Aucune de ces constantes ne finit par \n : c'est chaque bloc
+       qui ouvre son texte par un saut de ligne (regle 2 ci-dessus). */
+    const FRAME_TOP = "\u2554\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2557";
+    const FRAME_BOT = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u255D";
+    const FRAME_MID = "\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563";
+    const FRAME_END = "\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 \u2726 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D";
 
     /* == LES TAILLES (demande 98) ==========================================
-       Le panneau de droite a une largeur fixe : la seule facon de le faire
-       tenir, c'est de reduire la police de chaque partie. Deux tailles
-       seulement, comme sur la reference : le titre un cran au-dessus, tout le
-       reste pareil (les titres de section se distinguent par le cadre et le
-       gras du titre, pas par une taille de plus). Sur mobile on descend d'un cran de
-       plus : l'ecran est plus petit et la sidebar y mange la moitie de la
-       largeur. Les barres suivent la meme logique (250x24 sur PC, 210x18 sur
-       mobile), sinon elles jurent avec le texte reduit. */
+       Deux tailles seulement, comme sur la reference : le titre un cran
+       au-dessus, tout le reste pareil. Sur mobile on descend d'un cran de plus,
+       et les barres suivent (elles viennent de theme.js, demande 99). */
     const mob = isMobilePlayer(playerId);
     const TITLE_SIZE = mob ? "0.95em" : "1.05em";
     const BODY_SIZE = mob ? "0.7em" : "0.8em";
     const BAR_PX = mob ? BAR_SIZE_MOBILE : BAR_SIZE;
     const body = (str, color, extra) => txt(str, color, Object.assign({ fontSize: BODY_SIZE }, extra || {}));
 
-    /* LE TITRE : le nom du jeu, jamais sacrifie (demande 88).
-       Le cadre et le nom sont dans la MEME partie (une seule taille) et le nom
-       est centre par des ESPACES INSECABLES : le client avale les espaces
+    /* LE TITRE : le nom du jeu, jamais sacrifie (demande 88). Le nom est
+       centre par des ESPACES INSECABLES : le client avale les espaces
        ordinaires en debut de ligne, un \u00A0 est un caractere comme un autre
-       et reste. La banniere fait 17 caracteres et « Block Pirate » en occupe
-       11,4 a la meme taille : il reste 2,8 caracteres de chaque cote, d'ou
-       3 espaces avant (ceux de droite ne se voient pas). */
+       et reste. */
     const PAD_L = "\u00A0\u00A0\u00A0";
     block([
-        txt(FRAME_TOP + PAD_L + "  𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮\n" + FRAME_BOT, LEGACY_TITLE, {fontWeight: "bold", fontSize: TITLE_SIZE}),
+        txt(FRAME_TOP + "\n" + PAD_L + "  𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮\n" + FRAME_BOT, LEGACY_TITLE, {fontWeight: "bold", fontSize: TITLE_SIZE}),
     ]);
 
-    /* == THE PIRATE : qui il est, et ce qu'il a en poche. ==================
-       L'en-tete et l'identite sont dans UNE partie (meme couleur) : deux
-       parties se paient deux fois, et surtout l'en-tete pouvait etre sacrifie
-       seul par le budget — une section « THE PIRATE » vide, ou pire, des
-       pieces d'or sous aucun titre. Une partie = un bloc : tout ou rien.
-       Le nom et la mer tiennent sur la meme ligne (« Nom - Sea 1 »). */
+    /* == IDENTITE : qui il est, et ce qu'il a en poche (un seul bloc). ======
+       Nom, mer, prime et pieces : une seule PARTIE, donc un seul style. La
+       prime de 0 ne s'affiche pas : « Bounty: 0 » ne dit rien et coute une
+       ligne entiere. */
     let playerName = "Unknown";
     try { playerName = api.getEntityName(playerId) || "Unknown"; } catch (e) {}
     block([
-        body(" \u2726 𝒫𝓁𝒶𝓎𝑒𝓇\n \u25C8 " + short(playerName, 16) + " \u25AA " + seaLabel + "\n", COLOUR_FRAME),
-    ], true, 16);
+        body("\n \u2726 𝒫𝓁𝒶𝓎𝑒𝓇\n \u25C8 " + short(playerName, 16) + " \u25AA " + seaLabel + (bounty > 0 ? "\n \u2605 Bounty: " + nfmt(bounty) : "") + "\n \u2605 Coins: " + nfmt(money), C.MONEY),
+    ], true, 10);
 
-    {
-        const moneyLine = " \u2605 Coins: " + nfmt(money) + "\n";
-        block([
-            body(bounty > 0 ? " \u2605 Bounty: " + nfmt(bounty) + "\n" + moneyLine : moneyLine, C.MONEY),
-        ], true, 6);
-    }
-
-    /* == THE VOYAGE : la progression. ====================================== */
-    block([body(FRAME_MID + " \u2726 𝐿𝑒𝓋𝑒𝓁𝒾𝓃𝑔\n", COLOUR_FRAME)], true, 12);
-
-    block([body(" LVL " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold"})], true, 5);
-
-    /* L'XP : la ligne de chiffres, puis sa barre juste dessous. Le saut de
-       ligne qui suit la barre est porte par la partie SUIVANTE : une partie
-       « \n » seule coute 12 caracteres de JSON pour un caractere affiche. */
+    /* == PROGRESSION : l'en-tete, le niveau et les deux barres. =============
+       Obligatoire : sans le niveau ni les deux barres, la carte ne dit plus
+       ou en est le joueur. L'en-tete et le niveau sont dans le meme bloc
+       (couleurs differentes, c'est permis : un bloc est un GROUPE de parties,
+       le budget ne regarde que leur somme). */
     block([
-        body(" XP " + nfmt(xp) + "/" + nfmt(xpNeeded) + "  " + xpData.percent + "%\n", COLOUR_XP),
+        body("\n" + FRAME_MID + "\n \u2726 𝐿𝑒𝓋𝑒𝓁𝒾𝓃𝑔", SIDE_FRAME),
+        body("\n LVL " + lvl, SIDE_LEVEL),
+    ]);
+
+    /* L'XP : la ligne de chiffres, puis sa barre juste dessous. La partie
+       suivante ouvre par un \n, donc la barre est bien suivie d'un retour. */
+    block([
+        body("\n XP " + nfmt(xp) + "/" + nfmt(xpNeeded) + "  " + xpData.percent + "%\n", SIDE_FRAME),
         bar(xpData.ratio, BAR_XP, BAR_PX),
-    ], true, 2);
+    ]);
 
-    /* La stamina, meme disposition que l'XP. */
+    /* La stamina, meme disposition que l'XP. Les points de stat sont sur la
+       meme PARTIE (une ligne en dessous, avant la barre) : meme couleur, donc
+       un style de moins dans le message. Le `body("")` precedent, quand le
+       joueur n'avait aucun point, envoyait carrement une partie `undefined`. */
     block([
-        body("\n \u2727 Stamina " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
+        body(
+            "\n \u2727 Stamina " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n" +
+            (sp > 0 ? " \u2727 Skill Points: " + sp + "\n" : ""),
+            SIDE_SEA
+        ),
         bar(stData.ratio, BAR_STAMINA, BAR_PX),
-    ], true, 3);
+    ]);
 
-    /* Les points de stat, seulement s'il y en a : « Skill Points: 0 » ne dit
-       rien et coute une partie entiere. */
-    if (sp > 0) {
-        block([body("\n \u2727 Skill Points: " + sp + "\n", C.INFO)], true, 13);
-    }
-
-    /* == THE POWERS : le fruit et le style de combat =======================
-       Rien du tout quand le joueur n'en a pas : ni section vide, ni « No
-       fruit » (demande 89). L'en-tete de section passe AVANT ses lignes dans
-       l'ordre de sacrifice (11 avant 10 et 9), sinon le fruit s'afficherait
-       sous une barre sans titre. */
+    /* == POUVOIRS : le fruit et le style de combat, dans UN bloc. ==========
+       Rien du tout quand le joueur n'en a pas (demande 89 : ni section vide, ni
+       « No fruit »). Comme l'en-tete fait partie du bloc, il ne peut plus
+       s'afficher sans ses lignes ni disparaitre en les laissant seules. */
     if (fruit || styleLabel) {
+        /* L'en-tete et ses lignes dans la MEME partie : tout est en
+           SIDE_FRAME, donc un seul style au lieu de deux (demande 101). Les
+           lignes gardent leur place sous l'en-tete grace a leur \n. */
+        const powerLines = [];
+        if (fruit) powerLines.push("\n \u25C8 Fruit: " + fruit);
+        if (styleLabel) powerLines.push("\n \u25C8 Style: " + styleLabel);
         block([
-            body("\n" + FRAME_MID + " \u2726 𝒜𝒷𝒾𝓁𝒾𝓉𝒾𝑒𝓈/𝒞𝒶𝓅𝒶𝒸𝒾𝓉𝒾𝑒𝓈\n", COLOUR_FRAME),
-        ], true, 11);
-        if (fruit) {
-            block([body(" \u25C8 Fruit: " + fruit + "\n", C.PIRATE, {fontWeight: "bold"})], true, 10);
-        }
-        if (styleLabel) {
-            block([body(" \u25C8 Style: " + styleLabel + "\n", styleColor, {fontWeight: "bold"})], true, 9);
-        }
+            body("\n" + FRAME_MID + "\n \u2726 𝒜𝒷𝒾𝓁𝒾𝓉𝒾𝑒𝓈/𝒞𝒶𝓅𝒶𝒸𝒾𝓉𝒾𝑒𝓈" + powerLines.join(""), SIDE_FRAME),
+        ], true, 8);
     }
 
     /* L'OBJECTIF DU TUTORIEL, juste avant la quete. Priorite 0 : garde en
@@ -281,33 +288,22 @@ function drawSidebar(playerId){
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
-            body("\n" + FRAME_MID + " \u2726 𝒯𝓊𝓉𝑜𝓇𝒾𝒶𝓁\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
+            body("\n" + FRAME_MID + "\n \u2726 𝒯𝓊𝓉𝑜𝓇𝒾𝒶𝓁\n \u25B8 " + short(tut, 44), SIDE_SEA),
         ], true, 0);
     }
 
-    /* LA QUETE, TOUT EN BAS (demande 87) : l'en-tete et ses deux lignes de
-       detail dans la MEME partie (meme couleur), la cible puis la progression
-       et l'ile. */
+    /* LA QUETE, TOUT EN BAS (demande 87) : l'en-tete, la cible, puis la
+       progression et l'ile, dans un seul bloc. */
     if (quest) {
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 22);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            body("\n" + FRAME_MID + " \u2726 𝒬𝓊𝑒𝓈𝓉𝓈\n \u25B8 " + targetText + "\n \u25B8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", COLOUR_FRAME),
+            body("\n" + FRAME_MID + "\n \u2726 𝒬𝓊𝑒𝓈𝓉𝓈\n \u25B8 " + targetText + "\n \u25B8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14), SIDE_FRAME),
         ], true, 1);
     }
 
-    /* Le pied du cadre, JAMAIS retire : un cadre ouvert se lit mal. */
-    block([body(FRAME_END, COLOUR_FRAME)]);
 
-    /* La ligne decorative de la Grand Line, sur PC seulement. C'est la seule
-       chose purement decorative de la carte : elle est donc la PREMIERE
-       sacrifiee (priorite 18, avant le nom), et la sidebar reste fermee et
-       lisible sans elle. Sur mobile elle n'existe pas du tout : un ecran
-       tactile est plus court, une ligne de decor y prend la place d'une vraie
-       information. */
-    if (!mob) {
-        block([body("  \u3014 \u2726 T H E   G R A N D   L I N E \u2726 \u3015\n", COLOUR_FRAME)], true, 18);
-    }
+
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
        sont ajoutes du plus utile au moins utile tant que ca tient, et
@@ -318,6 +314,27 @@ function drawSidebar(playerId){
        souvent l'objectif du tutoriel, qui a pourtant la priorite la plus haute
        (0 = garde en premier). Les barres natives, plus lourdes en JSON que les
        anciennes suites de « █ », ont rendu le probleme visible. */
+    /* Le pied du cadre, JAMAIS retire : un cadre ouvert se lit mal. Il n'est
+       pas un bloc a part entiere — il se recolle a la derniere partie de texte
+       (~60 caracteres de JSON economises). `withFooter` rend donc la liste
+       REELLE qui partira au client, et c'est ELLE que le budget mesure :
+       mesurer sans le pied liait la selection a une taille qui n'existe pas. */
+    const withFooter = (list) => {
+        const out = list.slice();
+        const at = out.length - 1;
+        const last = out[at];
+        /* On ALLONGE la derniere partie, on ne la remplace pas. La version
+           precedente fusionnait les deux dernieres parties : elle jetait donc
+           le texte de la derniere (le tutoriel en priorite 0, ou la quete) —
+           exactement le « il manque une section » de la demande 100. */
+        if (last && typeof last.str === "string") {
+            out[at] = Object.assign({}, last, { str: last.str + "\n" + FRAME_END });
+        } else {
+            out.push(body("\n" + FRAME_END, SIDE_FRAME));
+        }
+        return out;
+    };
+
     const chosen = [];
     for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i];
@@ -327,17 +344,19 @@ function drawSidebar(playerId){
     const optional = blocks.filter((b) => b.optional).sort((a, b) => a.priority - b.priority);
     for (let i = 0; i < optional.length; i++) {
         const trial = chosen.concat(optional[i].parts);
-        if (measure(trial) > SIDEBAR_BUDGET) continue;
+        if (measure(withFooter(trial)) > SIDEBAR_BUDGET) continue;
         for (let j = 0; j < optional[i].parts.length; j++) chosen.push(optional[i].parts[j]);
         optional[i].keptUnderBudget = true;
     }
 
-    const parts = [];
+    const picked = [];
     for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i];
         if (b.optional && !b.keptUnderBudget) continue;
-        for (let j = 0; j < b.parts.length; j++) parts.push(b.parts[j]);
+        for (let j = 0; j < b.parts.length; j++) picked.push(b.parts[j]);
     }
+    const parts = withFooter(picked);
+
 
     try {
         api.setClientOption(playerId, "RightInfoText", fit(parts, SIDEBAR_BUDGET));

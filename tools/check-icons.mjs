@@ -237,12 +237,23 @@ for (const file of files) {
    une `api` simulee et on inspecte exactement ce qui part dans
    `setClientOption(pid, "RightInfoText", …)`. */
 
-const BUDGET_SIDEBAR = 1200; // cf. core/theme.js (BUDGET_SIDEBAR)
+/* Une SEULE source pour le budget (demande 100) : celle de theme.js. La copie
+   en dur qui vivait ici (1200) avait survecu au passage a 1400, donc le test
+   mesurait les sidebars contre un plafond qui n'etait plus le vrai. */
+const BUDGET_SIDEBAR = (() => {
+    const m = /export const BUDGET_SIDEBAR\s*=\s*(\d+)/.exec(theme);
+    if (!m) throw new Error("BUDGET_SIDEBAR introuvable dans theme.js");
+    return Number(m[1]);
+})();
+/* Demande 101 : la carte n'a que QUATRE couleurs (cyan de la carte, or de la
+   bourse, orange du niveau, bleu de la stamina). Chaque couleur de plus est un
+   style de plus dans le message ; on refuse la cinquieme. */
+const SIDEBAR_COLOUR_MAX = 4;
 /* Repères de la sidebar (demande 97) : le titre en lettres gothiques et
    l'en-tête de la quête. On cherche ces chaînes-là, pas une position : le
    budget peut retirer des blocs, jamais le titre ni la quête. */
 const TITLE_MARK = "𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮";
-const QUEST_MARK = "THE HUNT";
+const QUEST_MARK = "𝒬𝓊𝑒𝓈𝓉𝓈"; // le titre de la section quete
 
 /* Bloxd evalue ses fichiers en mode sloppy : ces noms sont assignes sans
    declaration dans src/ et deviennent des globals. Hors de Bloxd (ESM strict)
@@ -283,7 +294,8 @@ async function renderSidebar(db, tutorialLine, quest, mobile) {
                 `export * from ${JSON.stringify(join(ROOT, "src/core/UI.js"))};` +
                 `export { playerQuest, questProgress } from ${JSON.stringify(join(ROOT, "src/gameplay/quest.js"))};` +
                 `export { setDevice } from ${JSON.stringify(join(ROOT, "src/utils/data.js"))};` +
-                `export { BAR_SIZE, BAR_SIZE_MOBILE } from ${JSON.stringify(join(ROOT, "src/core/theme.js"))};`,
+                `export { BAR_SIZE, BAR_SIZE_MOBILE } from ${JSON.stringify(join(ROOT, "src/core/theme.js"))};` +
+                `export { restorePlayerFruit, getFruit } from ${JSON.stringify(join(ROOT, "src/fruit/index.js"))};`,
             resolveDir: ROOT,
             loader: "js",
         },
@@ -299,6 +311,12 @@ async function renderSidebar(db, tutorialLine, quest, mobile) {
     /* `devices` vit dans le module : on le remet a chaque scenario, sinon le
        scenario mobile contamine les suivants (le bundle est mis en cache). */
     ui.setDevice("p1", mobile === true);
+    /* Un fruit se pose par la db, comme en jeu : sans ca, la ligne « Fruit »
+       n'etait jamais rendue et la demande 100 (le fruit qui saute) n'etait
+       pas testee du tout. */
+    if (db.fruit) {
+        try { ui.restorePlayerFruit("p1"); } catch (e) {}
+    }
     ui.setTutorialLineLookup(tutorialLine ? () => tutorialLine : null);
     if (quest) {
         ui.playerQuest.p1 = { targetMob: quest.targetMob, killAmount: quest.killAmount, island: quest.island };
@@ -337,6 +355,7 @@ function hueOf(hex) {
 }
 
 const SIDEBAR_SIZES = [];
+const COLOURS_SEEN = new Set();
 const POOR = {};
 const RICH = {
     money: 1234567, lvl: 87, xp: 4321, sp: 12,
@@ -354,10 +373,21 @@ const NEWBIE = { targetMob: ["Sky Bandit"], killAmount: 5, island: "Jungle", pro
    demande 98 (« il faut la reduire encore plus pour mobile »). Ses tailles
    sont comparees a celles du meme joueur sur PC juste apres. */
 const MOBILE_LABEL = "nouveau joueur mobile + tutoriel + quete";
+/* Fruit et style de combat poses sur les pires cas : c'est l'etat d'un joueur
+   qui a avance (demande 101). Sans eux, la section « Pouvoirs » n'etait jamais
+   rendue, et le « fruit qui saute d'une ligne a l'autre » de la demande 100
+   passait inapercu. La cle est celle de la db (`fruit`), comme en jeu. */
+const CHARGED_FRUIT = Object.assign({}, RICH, { fruit: "Rocket", fs: "Combat", bounty: 1440 });
+const CHARGED_LONG_FRUIT = Object.assign({}, CHARGED_FRUIT, { fruit: "Lightning" });
+const FULL_TUTORIAL = "Kill 3 Sky Bandits in the Lower Skyl";
+const POWER_LINE = "Fruit:";
 const scenarios = [
     ["joueur nu", POOR, null, null],
     ["joueur charge + objectif de tutoriel", RICH, "Buy your first weapon at the Combat Teacher", null],
     ["nouveau joueur + tutoriel + quete", POOR, "Kill 3 Sky Bandits in the Lower Skyl", NEWBIE],
+    ["joueur charge + fruit + style + tutoriel + quete", CHARGED_FRUIT, FULL_TUTORIAL, NEWBIE],
+    ["joueur charge + fruit long + style + tutoriel + quete", CHARGED_LONG_FRUIT, FULL_TUTORIAL, NEWBIE],
+    ["joueur charge mobile + fruit + style + tutoriel + quete", CHARGED_FRUIT, FULL_TUTORIAL, NEWBIE, true],
     [MOBILE_LABEL, POOR, "Kill 3 Sky Bandits in the Lower Skyl", NEWBIE, true],
 ];
 const RENDERED = {};
@@ -374,9 +404,40 @@ for (const [label, db, tutorialLine, quest, mobile] of scenarios) {
     if (size > BUDGET_SIDEBAR)
         errors.push(`${label} : sidebar de ${size} car. > budget ${BUDGET_SIDEBAR}`);
 
+    /* DEMANDE 101 : peu de couleurs, donc peu de styles. On compte les
+       couleurs REELLEMENT envoyees (textes et barres) et on refuse la
+       cinquieme : chaque teinte de plus, c'est un customTextStyling de plus et
+       de la marge en moins sous le budget. */
+    {
+        const used = new Set();
+        for (const p of sidebar) {
+            if (!p) { errors.push(`${label} : partie vide (undefined) dans la sidebar`); continue; }
+            if (p.style && typeof p.style.color === "string") used.add(p.style.color.toLowerCase());
+            if (Array.isArray(p.colours)) for (const c of p.colours) used.add(String(c).toLowerCase());
+            checked++;
+            /* Une partie sans texte ni barre ne s'affiche pas : c'est le trou
+               de la ligne « Skill Points: 0 » (un body("") renvoyait
+               undefined). */
+            if (typeof p.str !== "string" && p.type !== "ProgressBar")
+                errors.push(`${label} : partie sans texte ni barre (${JSON.stringify(p).slice(0, 40)})`);
+            if (p.str === "") errors.push(`${label} : partie de texte vide dans la sidebar`);
+        }
+        checked++;
+        if (used.size > SIDEBAR_COLOUR_MAX)
+            errors.push(`${label} : ${used.size} couleurs dans la sidebar (${[...used].join(", ")}) au lieu de ${SIDEBAR_COLOUR_MAX}`);
+        for (const c of used) COLOURS_SEEN.add(c);
+    }
+
+    /* Le fruit du joueur doit s'afficher, avec le style, quand il en a un. */
+    if (db.fruit) {
+        checked++;
+        const shown = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf(POWER_LINE) !== -1);
+        if (!shown) errors.push(`${label} : le fruit du joueur ne s'affiche pas`);
+    }
+
     /* Demande 97 : AUCUNE icone dans la sidebar, ni Bloxd (« Hunger ») ni Font
        Awesome. Le cadre, les ornements (✦ ✧ ★ ◈ ▸) et les mots suffisent, et
-       une icone coute plus cher qu'un caractere dans un budget de 1200. */
+       une icone coute plus cher qu'un caractere dans un budget de 1400. */
     for (const p of sidebar) {
         checked++;
         if (p && p.icon) errors.push(`${label} : icone « ${p.icon} » dans la sidebar (caracteres seulement)`);
@@ -550,6 +611,34 @@ for (const [label, db, tutorialLine, quest, mobile] of scenarios) {
             }
             if (details > 4) errors.push(`${label} : ${details} lignes de detail apres la quete (attendu 3 au plus)`);
         }
+    }
+}
+
+/* Deux noms de fruit de longueurs differentes ne doivent pas changer la
+   STRUCTURE du textStyling (demande 100 : aucune alternance de tick). On
+   compare nombre/ordre des parties, couleur, taille et nombre de lignes, sans
+   comparer le texte variable du fruit lui-meme. */
+{
+    const shortLabel = "joueur charge + fruit + style + tutoriel + quete";
+    const longLabel = "joueur charge + fruit long + style + tutoriel + quete";
+    const shape = (sidebar) => sidebar.map((p) => ({
+        type: p.type || "text",
+        color: p.style && p.style.color ? p.style.color.toLowerCase() : null,
+        fontSize: p.style && p.style.fontSize ? p.style.fontSize : null,
+        lines: typeof p.str === "string" ? (p.str.match(/\n/g) || []).length : 0,
+    }));
+    checked++;
+    if (JSON.stringify(shape(RENDERED[shortLabel])) !== JSON.stringify(shape(RENDERED[longLabel])))
+        errors.push("noms de fruit courts/longs : structure customTextStyling differente");
+    for (const label of [shortLabel, longLabel]) {
+        const sidebar = RENDERED[label] || [];
+        checked++;
+        if (!sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("Bounty: 1,440") !== -1))
+            errors.push(`${label} : prime absente du cas de test`);
+        if (!sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("Skill Points: 12") !== -1))
+            errors.push(`${label} : points de stat absents du cas de test`);
+        if (!sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("Style: Combat") !== -1))
+            errors.push(`${label} : style de combat absent du cas de test`);
     }
 }
 
@@ -1065,6 +1154,7 @@ if (unique.length) {
 }
 console.log("Textes : " + checked + " verifications (icones + " + SIDEBAR_SIZES.length + " sidebars + barres), tout est valide.");
 console.log("  Sidebars : " + SIDEBAR_SIZES.join(" | ") + " (budget " + BUDGET_SIDEBAR + ").");
+console.log("  Couleurs de la carte : " + COLOURS_SEEN.size + " (" + [...COLOURS_SEEN].join(", ") + "), maximum " + SIDEBAR_COLOUR_MAX + ".");
 console.log("  Boutons PC : dash " + entries.dash.length + " | capacites " + entries.ability.length + " | style " + entries.style.length + " (icones, touches, ids).");
 console.log("  Capacites classees : " + ATTACK_TYPE_COUNT + " (16 types d'attaque, icones verifiees).");
 console.log("  Noms d'items : " + ITEM_LOOKS_COUNT + " (nom + description, aucun renommage au give).");
