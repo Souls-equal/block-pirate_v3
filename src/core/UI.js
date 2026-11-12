@@ -8,7 +8,7 @@ import { getFightingStyle, getFightingStyleInfo } from "../gameplay/fightingStyl
 import { getMaxStamina, getStamina } from "../gameplay/stamina";
 import { isOwner } from "./ranks";
 import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
-import { LOBBY, currentVariation, variationsSupported } from "../gameplay/variations";
+import { LOBBY, currentVariation, seaFromVariation, variationsSupported } from "../gameplay/variations";
 import { getLastDamager } from "../utils/killAttribution";
 import { C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
 
@@ -34,7 +34,7 @@ function makeBar(value, max){
     };
 }
 
-const title = "1.9em", title2 = "1.5em";
+const title = "1.9em";
 
 /* Barres natives. REGLE : une barre a la couleur de SON TEXTE, pour que
    « XP 1260/23980  5% » et sa barre se lisent comme un seul bloc (demande 74).
@@ -54,6 +54,10 @@ const title = "1.9em", title2 = "1.5em";
    refonte 81 que le joueur vient de refuser. */
 const LEGACY_TITLE = "#00BFFF"; // cyan d'origine : titre et quete
 const LEGACY_LEVEL = "#FF8C00"; // orange d'origine : niveau
+
+/* Le bleu marine du cadre et des titres de section : c'est lui qui donne
+   son unite a la carte (mer, ocean). */
+const COLOUR_FRAME = C.MARINE;
 
 const COLOUR_XP = C.XP;          // cyan : texte d'XP, icone, barre
 const COLOUR_STAMINA = C.MARINE; // bleu clair : stamina
@@ -116,6 +120,13 @@ function drawSidebar(playerId){
     const stMaxSafe = Number.isFinite(stMax) && stMax > 0 ? stMax : 100;
     const stData = makeBar(stSafe, stMaxSafe);
 
+    /* La prime (0 = pas de ligne) et la mer ou le joueur navigue : « Sea 1 »,
+       « Sea 2 » ou « Lobby ». Les variations etant coupees, c'est toujours la
+       mer 1 - la ligne n'en est pas moins vraie le jour ou elles reviennent. */
+    const bounty = bountyOf(playerId);
+    const seaInfo = seaFromVariation(currentVariation());
+    const seaLabel = (seaInfo && seaInfo.title) || "Sea 1";
+
     const quest = playerQuest[playerId];
     const progress = questProgress[playerId] || 0;
 
@@ -131,95 +142,119 @@ function drawSidebar(playerId){
     };
 
     /* ==========================================================================
-       LA SIDEBAR D'ORIGINE, A L'IDENTIQUE (demande 89)
+       LA CARTE DU NAVIRE (demande 97)
 
-       Le joueur a demande de la remettre telle qu'elle etait, sans la ligne
-       d'equipe : celle-ci faisait doublon avec la couleur du name tag et celle
-       du classement du lobby, ou l'equipe se lit deja. L'ordre est donc
-       exactement celui du depart :
+       Le joueur a fourni la mise en page d'une sidebar d'un autre jeu et a
+       demande la meme chose ici. Trois contraintes ont guide chaque ligne :
 
-           titre  ->  argent  ->  fruit  ->  style  ->  niveau
-                  ->  XP  ->  stamina  ->  points de stat  ->  quete
+         - AUCUNE ICONE, ni Bloxd (« Hunger ») ni Font Awesome : le cadre, les
+           ornements (✦ ✧ ★ ◈ ≈) et les mots portent tout le sens. Les signes
+           choisis passent tous la liste noire d'emojis de `npm run check` ;
+           l'ancre, le voilier, la tete de mort et la fleur de lys sont
+           pictographiques (carre vide sur certains clients), donc
+           volontairement absents ;
+         - LE THEME : la mer. Cadre et titres de section en bleu marine
+           (C.MARINE), l'or du tresor pour la prime et les pieces (C.MONEY),
+           le cyan d'origine pour le titre, l'XP et la quete, l'orange
+           d'origine pour le niveau (demande 88 : ces deux teintes-la sont
+           dans KEEP_AS_IS) ;
+         - LE BUDGET. Une partie coute 40 a 80 caracteres de JSON et la sidebar
+           est plafonnee a 1 200 : les lignes d'un meme style sont donc
+           regroupees dans UNE partie (un \n coute 2 caracteres, une partie en
+           coute 50), et fontSize reste reserve au titre.
 
-       Le fruit et le style restent a leur place d'origine (entre l'argent et
-       le niveau) : c'est la que le joueur les a toujours vus.
+       L'ordre est celui du joueur (titre, identite, progression, pouvoirs,
+       quete) ; la quete reste TOUT EN BAS (demande 87) et l'objectif du
+       tutoriel juste avant elle, en priorite 0 pour ne jamais etre sacrifie.
 
-       Cinq choses ne bougent pas, parce qu'elles ont ete demandees apres et
-       qu'elles ne changent pas la mise en page :
-         - les barres natives 250x24 px (demandes 70 et 72) ;
-         - une barre a la couleur de SON texte, juste sous sa ligne de chiffres
-           (demande 74) ;
-         - la quete tout en bas (demande 87) ;
-         - deux teintes d'origine gardees telles quelles : #00BFFF (titre,
-           quete) et #FF8C00 (niveau). Elles sont declarees dans KEEP_AS_IS
-           (theme.js), sinon le passage a la palette les ramene sur MARINE et
-           DANGER — c'est-a-dire a l'interface de la refonte 81 ;
-         - aucune ligne inutile : pas de « No fruit », pas de « QUEST no active
-           quest », pas d'equipe. Chacune coutait 80 a 150 caracteres dans une
-           sidebar plafonnee a 1 200.
-
-       Budget : le bloc secondaire sacrifie en premier est celui des points de
-       stat (13), puis le fruit (10), le style (9) et enfin le titre (8).
+       Budget : le premier bloc sacrifie est la ligne decorative du pied (18),
+       puis le nom (17), la prime et les pieces (6), le niveau (5), la stamina
+       (3), l'XP (2), la quete (1).
+       Le titre, lui, n'est pas optionnel : il n'est JAMAIS retire.
        ========================================================================== */
 
-    /* LE TITRE, en gros : c'est lui qui donne son visage a la sidebar. */
-    block([
-        txt("╔ BLOCK PIRATES ╗\n\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title}),
-    ], true, 8);
+    /* Le cadre. Un seul jeu de caracteres, reutilise partout : la largeur est
+       donc la meme sur toutes les lignes, y compris celles des barres. */
+    const FRAME_TOP = "╔════════ ✦ ════════╗\n";
+    const FRAME_MID = "╠════════ ✦ ════════╣\n";
+    const FRAME_END = "╚════════ ✦ ════════╝\n";
 
-    /* L'ARGENT. */
+    /* LE TITRE : le nom du jeu, en gros, jamais sacrifie (demande 88). */
     block([
-        ic("fa-solid fa-coins", C.MONEY, {fontSize: title2}),
-        txt(" " + nfmt(money) + "\n\n", C.MONEY, {fontSize: title2}),
+        txt(FRAME_TOP + "    𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮\n" + FRAME_END, LEGACY_TITLE, {fontWeight: "bold", fontSize: title}),
     ]);
 
-    /* LE FRUIT, avec l'icone « Hunger » du jeu (pas une icone Font Awesome). */
-    if (fruit) {
+    /* ── LE PIRATE : qui il est, et ce qu'il a en poche. ─────────────────── */
+    block([
+        txt("\n  ✦ THE PIRATE\n", COLOUR_FRAME),
+    ], true, 16);
+
+    /* Le nom du joueur : c'est la ligne la plus decorative des trois (il lit
+       deja son propre nom sur son name tag), donc la premiere sacrifiee. */
+    let playerName = "Unknown";
+    try { playerName = api.getEntityName(playerId) || "Unknown"; } catch (e) {}
+    block([
+        txt("  ◈ Name: " + short(playerName, 16) + "\n", C.INFO),
+        txt("  ◈ Sea: " + seaLabel + "\n", C.INFO),
+    ], true, 17);
+
+    /* La prime et les pieces : l'or, dans sa teinte d'or. La prime ne coute
+       rien quand elle vaut 0 : pas de ligne « Bounty 0 » (demande 89). */
+    {
+        const moneyLine = "  ★ Coins: " + nfmt(money) + "\n";
         block([
-            ic("Hunger", undefined, {fontSize: title2}),
-            txt(" " + fruit + "\n\n", C.PIRATE, {fontWeight: "bold", fontSize: title2}),
-        ], true, 10);
+            txt(bounty > 0 ? "  ★ Bounty: " + nfmt(bounty) + "\n" + moneyLine : moneyLine, C.MONEY, {fontWeight: "bold"}),
+        ], true, 6);
     }
 
-    /* LE STYLE DE COMBAT. */
-    if (styleLabel) {
-        block([
-            ic("fa-solid fa-hand-fist", styleColor),
-            txt(" " + styleLabel + "\n", styleColor),
-        ], true, 9);
-    }
-
-    /* LE NIVEAU : icone et libelle en orange, valeur en gras. */
+    /* ── THE VOYAGE : la progression. ────────────────────────────────────── */
     block([
-        ic("fa-solid fa-angle-double-up", LEGACY_LEVEL, {fontSize: title2}),
-        txt(" LVL: " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold", fontSize: title2}),
-    ]);
+        txt(FRAME_MID + "  ✦ THE VOYAGE\n", COLOUR_FRAME),
+    ], true, 12);
 
-    /* L'XP : la ligne de chiffres, puis sa barre juste en dessous. Un seul
-       saut de ligne apres la barre (et non une ligne vide) : la barre native
-       fait 24 px de haut, elle se separe deja du bloc suivant. */
     block([
-        txt("XP: " + xp + "/" + xpNeeded + "  " + xpData.percent + "%\n", C.XP),
+        txt("  LVL " + lvl + "\n", LEGACY_LEVEL, {fontWeight: "bold"}),
+    ], true, 5);
+
+    /* L'XP : la ligne de chiffres, puis sa barre juste dessous. Un seul saut
+       de ligne apres la barre : la barre native fait 24 px de haut, elle se
+       separe deja du bloc suivant. */
+    block([
+        txt("  XP " + nfmt(xp) + "/" + nfmt(xpNeeded) + "  " + xpData.percent + "%\n", COLOUR_XP),
         bar(xpData.ratio, BAR_XP, BAR_SIZE),
         txt("\n"),
     ], true, 2);
 
-    /* LA STAMINA, meme disposition. */
+    /* Les points de stat, seulement s'il y en a : « Skill Points: 0 » ne dit
+       rien et coute une partie entiere. */
+    if (sp > 0) {
+        block([
+            txt("  \u2727 Skill Points: " + sp + "\n", C.INFO, {fontWeight: "bold"}),
+        ], true, 13);
+    }
+
+    /* La stamina, meme disposition que l'XP. */
     block([
-        ic("fa-solid fa-bolt", C.MARINE),
-        txt(" " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", C.MARINE),
+        txt("  \u2727 Stamina " + Math.round(stSafe) + "/" + Math.round(stMaxSafe) + "  " + stData.percent + "%\n", COLOUR_STAMINA),
         bar(stData.ratio, BAR_STAMINA, BAR_SIZE),
         txt("\n"),
     ], true, 3);
 
-    /* LES POINTS DE STAT, seulement s'il y en a : « Stat Points 0 » ne disait
-       rien et coutait ~150 caracteres. */
-    if (sp > 0) {
+    /* == THE POWERS : le fruit et le style de combat =======================
+       Rien du tout quand le joueur n'en a pas : ni section vide, ni « No
+       fruit » (demande 89). L'en-tete de section passe AVANT ses lignes dans
+       l'ordre de sacrifice (11 avant 10 et 9), sinon le fruit s'afficherait
+       sous une barre sans titre. */
+    if (fruit || styleLabel) {
         block([
-            ic("fa-solid fa-star", C.MONEY),
-            txt(" Stat Points ", C.INFO),
-            txt(String(sp) + "\n\n", C.INFO, {fontWeight: "bold"}),
-        ], true, 13);
+            txt(FRAME_MID + "  \u2726 THE POWERS\n", COLOUR_FRAME),
+        ], true, 11);
+        if (fruit) {
+            block([txt("  \u25c8 Fruit: " + fruit + "\n", C.PIRATE, {fontWeight: "bold"})], true, 10);
+        }
+        if (styleLabel) {
+            block([txt("  \u25c8 Style: " + styleLabel + "\n", styleColor, {fontWeight: "bold"})], true, 9);
+        }
     }
 
     /* L'OBJECTIF DU TUTORIEL, juste avant la quete. Priorite 0 : garde en
@@ -227,23 +262,33 @@ function drawSidebar(playerId){
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
-            ic("fa-solid fa-list", C.SUCCESS),
-            txt(" " + short(tut, 40) + "\n\n", C.SUCCESS),
+            txt("\n  \u2726 THE PATH\n  \u25b8 " + short(tut, 44) + "\n", C.SUCCESS),
         ], true, 0);
     }
 
-    /* LA QUETE, TOUT EN BAS, dans sa mise en page d'origine : « QUEST » en
-       cyan, la cible en clair, puis la progression et l'ile. */
+    /* LA QUETE, TOUT EN BAS (demande 87) : la cible, puis la progression et
+       l'ile sur une seconde ligne courte, pour ne pas deborder du cadre. */
     if (quest) {
-        const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 26);
+        const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 22);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            ic("fa-solid fa-globe", LEGACY_TITLE, {fontSize: title2}),
-            txt(" QUEST\n", LEGACY_TITLE, {fontWeight: "bold", fontSize: title2}),
-            txt(targetText + "\n" + progress + "/" + quest.killAmount + " (" + percent + "%) " + short(quest.island, 18) + "\n", C.INFO, {fontWeight: "bold"}),
+            txt(FRAME_MID + "  \u2726 THE HUNT\n", COLOUR_FRAME),
+            txt("  \u25b8 " + targetText + "\n  \u25b8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", C.INFO),
         ], true, 1);
     }
-    /* Pas de quete : AUCUNE ligne. */
+
+    /* Le pied du cadre, JAMAIS retire : un cadre ouvert se lit mal. */
+    block([txt(FRAME_END, COLOUR_FRAME)]);
+
+    /* La ligne decorative de la Grand Line, sur PC seulement. C'est la seule
+       chose purement decorative de la carte : elle est donc la PREMIERE
+       sacrifiee (priorite 18, avant le nom), et la sidebar reste fermee et
+       lisible sans elle. Sur mobile elle n'existe pas du tout : un ecran
+       tactile est plus court, une ligne de decor y prend la place d'une vraie
+       information. */
+    if (!isMobilePlayer(playerId)) {
+        block([txt("   \u3014 \u2726 T H E   G R A N D   L I N E \u2726 \u3015\n", COLOUR_FRAME)], true, 18);
+    }
 
     /* Budget : les blocs obligatoires passent toujours, puis les secondaires
        sont ajoutes du plus utile au moins utile tant que ca tient, et

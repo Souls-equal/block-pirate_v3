@@ -238,6 +238,11 @@ for (const file of files) {
    `setClientOption(pid, "RightInfoText", …)`. */
 
 const BUDGET_SIDEBAR = 1200; // cf. core/theme.js (BUDGET_SIDEBAR)
+/* Repères de la sidebar (demande 97) : le titre en lettres gothiques et
+   l'en-tête de la quête. On cherche ces chaînes-là, pas une position : le
+   budget peut retirer des blocs, jamais le titre ni la quête. */
+const TITLE_MARK = "𝓑𝓵𝓸𝓬𝓴 𝓟𝓲𝓻𝓪𝓽𝓮";
+const QUEST_MARK = "THE HUNT";
 
 /* Bloxd evalue ses fichiers en mode sloppy : ces noms sont assignes sans
    declaration dans src/ et deviennent des globals. Hors de Bloxd (ESM strict)
@@ -354,6 +359,13 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
     if (size > BUDGET_SIDEBAR)
         errors.push(`${label} : sidebar de ${size} car. > budget ${BUDGET_SIDEBAR}`);
 
+    /* Demande 97 : AUCUNE icone dans la sidebar, ni Bloxd (« Hunger ») ni Font
+       Awesome. Le cadre, les ornements (✦ ✧ ★ ◈ ▸) et les mots suffisent, et
+       une icone coute plus cher qu'un caractere dans un budget de 1200. */
+    for (const p of sidebar) {
+        checked++;
+        if (p && p.icon) errors.push(`${label} : icone « ${p.icon} » dans la sidebar (caracteres seulement)`);
+    }
     const bars = sidebar.filter((p) => p && p.type === "ProgressBar");
     if (bars.length !== 2) {
         errors.push(`${label} : ${bars.length} barre(s) au lieu de 2 (XP + stamina)`);
@@ -416,24 +428,26 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
         if (!shown) errors.push(`${label} : l'objectif du tutoriel est coupe alors qu'il est prioritaire`);
     }
     /* Les deux barres sont une exigence du joueur (demande 70/71) : elles ne
-       doivent jamais etre sacrifiees, meme quand la place manque. Le titre,
-       lui, a la priorite de sacrifice la plus faible (12). */
+       doivent jamais etre sacrifiees, meme quand la place manque. Le titre et
+       le pied du cadre ne sont pas optionnels : ils ne partent jamais. */
     if (bars.length !== 2) errors.push(`${label} : une barre a ete sacrifiee (${bars.length}/2)`);
     if (quest) {
-        const shownQuest = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf("QUEST") !== -1);
+        const shownQuest = sidebar.some((p) => typeof p.str === "string" && p.str.indexOf(QUEST_MARK) !== -1);
         if (!shownQuest) errors.push(`${label} : le bloc de quete a ete coupe`);
     }
 
     /* ══════════════════════════════════════════════════════════════════════
-       ORDRE DE LA SIDEBAR (la mise en page d'origine, demande 89)
+       ORDRE DE LA SIDEBAR (la carte du navire, demande 97)
 
-         titre -> argent -> fruit -> style -> niveau
-                -> XP -> stamina -> points de stat -> QUETE
+         titre -> THE PIRATE (nom, mer, pieces) -> THE VOYAGE (niveau,
+         XP, points de stat, stamina) -> THE POWERS (fruit, style)
+         -> THE PATH (tutoriel) -> THE HUNT (quete) -> pied du cadre
 
        La quete est en dernier bloc : c'est la demande explicite (« la quete
        tout en bas, absolument »). Elle reste prioritaire au budget (elle n'est
-       jamais coupee), mais elle s'AFFICHE en dernier. On verifie l'ordre reel
-       du tableau envoye au client, pas l'intention du code.
+       jamais coupee), mais elle s'AFFICHE en dernier, juste avant le pied du
+       cadre. On verifie l'ordre reel du tableau envoye au client, pas
+       l'intention du code.
        ══════════════════════════════════════════════════════════════════════ */
     const at = (needle) => sidebar.findIndex((p) => p && typeof p.str === "string" && p.str.indexOf(needle) !== -1);
     const lastBar = (() => {
@@ -447,10 +461,10 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
           y avait BlockPirate ecrit en gros en haut »). Il ne doit plus etre le
           premier sacrifie par le budget : un joueur charge qui perd son titre
           ne reconnait plus son interface. */
-    const titlePart = sidebar.find((p) => typeof p.str === "string" && p.str.indexOf("BLOCK PIRATES") !== -1);
+    const titlePart = sidebar.find((p) => typeof p.str === "string" && p.str.indexOf(TITLE_MARK) !== -1);
     checked++;
     if (!titlePart) {
-        errors.push(`${label} : le titre « BLOCK PIRATES » a ete coupe`);
+        errors.push(`${label} : le titre « ${TITLE_MARK} » a ete coupe`);
     } else {
         checked++;
         if (!titlePart.style || !titlePart.style.fontSize)
@@ -458,7 +472,7 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
         for (let i = 0; i < sidebar.length; i++) {
             const p = sidebar[i];
             if (!p || typeof p.str !== "string" || !p.str.trim()) continue;
-            if (p.str.indexOf("BLOCK PIRATES") === -1)
+            if (p.str.indexOf(TITLE_MARK) === -1)
                 errors.push(`${label} : un bloc passe avant le titre (« ${p.str.trim().slice(0, 20)} »)`);
             break;
         }
@@ -486,7 +500,7 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
     if (lvlAt !== -1 && lastBar !== -1 && lvlAt > lastBar)
         errors.push(`${label} : le niveau est sous les barres (les stats doivent etre en haut)`);
     if (quest) {
-        const questAt = at("QUEST");
+        const questAt = at(QUEST_MARK);
         if (questAt !== -1 && lastBar !== -1 && questAt < lastBar)
             errors.push(`${label} : la quete n'est pas sous les barres`);
     }
@@ -501,7 +515,7 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
           c'est-a-dire aucun autre bloc. Un bloc a icone apres la quete = un
           bloc qui a ete pousse sous elle. */
     if (quest) {
-        const questAt = at("QUEST");
+        const questAt = at(QUEST_MARK);
         checked++;
         if (questAt !== -1) {
             let details = 0;
@@ -513,6 +527,10 @@ for (const [label, db, tutorialLine, quest] of scenarios) {
                     continue;
                 }
                 if (typeof p.str !== "string" || !p.str.trim()) continue;
+                /* Le pied du cadre (╚…╝) et la ligne decorative de la Grand
+                   Line ferment la carte : ce ne sont pas des informations
+                   poussees sous la quete, elles doivent rester la. */
+                if (p.str.indexOf("\u255A") !== -1 || p.str.indexOf("\u3014") !== -1) continue;
                 details++;
             }
             if (details > 4) errors.push(`${label} : ${details} lignes de detail apres la quete (attendu 3 au plus)`);
