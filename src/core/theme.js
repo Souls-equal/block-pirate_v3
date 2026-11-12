@@ -788,6 +788,17 @@ export function ic(name, color, extra) {
    L'objet est un element de CustomTextStyling comme un autre — il n'a ni `str`
    ni `icon`, donc format() et fit() le laissent intact, et measure() le compte
    a sa taille JSON reelle (d'ou l'interet de ne pas le surcharger). */
+/* TAILLE DES BARRES (demande 99) : elle vit ICI, a cote de `bar()`, et pas
+   dans core/UI.js — c'est le genre de reglage qu'on cherche naturellement dans
+   theme.js. Une seule source, lue par la sidebar (et par tout futur ecran qui
+   affiche une barre), pour qu'une modification ici se voie vraiment en jeu.
+   Le ratio suit celui de la reference (~10 pour 1) : une barre plus large que
+   haute, lisible sans prendre la moitie de la hauteur de la carte.
+   `height` et `width` DOIVENT rester des tailles CSS en px : sans `width`,
+   Bloxd etire la barre sur toute la ligne et elle redevient un fil. */
+export const BAR_SIZE = { height: "18px", width: "150px" };        /* PC */
+export const BAR_SIZE_MOBILE = { height: "14px", width: "120px" }; /* mobile */
+
 export function bar(progress, colours, extra) {
     const ratio = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
     /* 3 decimales suffisent : au-dela on paie des caracteres pour une

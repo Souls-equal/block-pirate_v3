@@ -386,14 +386,17 @@ dessine la barre, on ne fabrique plus une suite de `█`/`▒`. La sidebar s'en 
 pour l'**XP** (verte) et la **stamina** (bleue) :
 
 ```js
-bar(0.43, ["#4ADE80"], { height: "24px", width: "250px" })
-// => { type: "ProgressBar", progress: 0.43, colours: ["#4ADE80"], height: "24px", width: "250px" }
+bar(0.43, ["#4ADE80"], { height: "18px", width: "150px" })
+// => { type: "ProgressBar", progress: 0.43, colours: ["#4ADE80"], height: "18px", width: "150px" }
 ```
 
-La taille est **250 × 24 px**, réglée en jeu (demande 71) : sans `width`, la barre
-prenait la largeur de la ligne et restait très fine. En px, sa taille ne dépend
-plus de la police du joueur. Coût : ~89 caractères de JSON par barre (contre 79
-sans `width`), pris dans la marge du budget — voir « La sidebar : budget ».
+La taille est **150 × 18 px** sur PC et **120 × 14 px** sur mobile, et elle se
+règle **dans `core/theme.js` uniquement** (`BAR_SIZE` / `BAR_SIZE_MOBILE`, juste
+au-dessus de `bar()`) : la sidebar les importe au lieu de les redéfinir, donc une
+modification là-bas se voit partout. Sans `width`, la barre prenait la largeur de
+la ligne et restait très fine ; en px, sa taille ne dépend plus de la police du
+joueur. Coût : ~90 caractères de JSON par barre (contre 79 sans `width`), pris
+dans la marge du budget — voir « La sidebar : budget ».
 
 * `progress` est un **ratio 0..1** (borné, arrondi à 3 décimales : au-delà on
   paie des caractères pour une différence invisible) ;
@@ -561,8 +564,8 @@ La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
 caractères : une seule couleur par partie, **deux tailles de police seulement**
 (le titre, et tout le reste — une partie sans `fontSize` repartirait à la taille
 par défaut du client), textes libres (fruit, style, cible de quête) bornés,
-**barres natives sans dégradé** (~90 caractères de JSON chacune : 250 × 24 px
-sur PC, 210 × 18 px sur mobile), et blocs secondaires retirés **par ordre de
+**barres natives sans dégradé** (~90 caractères de JSON chacune : 150 × 18 px
+sur PC, 120 × 14 px sur mobile, réglées dans `theme.js`), et blocs secondaires retirés **par ordre de
 priorité** si nécessaire — jamais tout le message. Mesuré : 948 caractères pour
 un joueur nu, 1 121 pour un nouveau joueur avec tutoriel et quête (1 121 aussi
 sur mobile), 1 155 pour un joueur chargé.

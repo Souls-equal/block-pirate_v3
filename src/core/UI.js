@@ -10,7 +10,7 @@ import { isOwner } from "./ranks";
 import { ISLAND_WARPS_BY_SEA, currentIslands, isVanished } from "./admin";
 import { LOBBY, currentVariation, seaFromVariation, variationsSupported } from "../gameplay/variations";
 import { getLastDamager } from "../utils/killAttribution";
-import { C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
+import { BAR_SIZE, BAR_SIZE_MOBILE, C, bar, fit, measure, nfmt, say, txt, bold, ic } from "./theme";
 
 /* Ligne du tutoriel dans la sidebar. UI n'importe PAS gameplay/tutorial (data
    importe UI : ce serait un cycle de plus) : index.js pose la fonction, qui
@@ -34,8 +34,6 @@ function makeBar(value, max){
     };
 }
 
-const title = "1.9em";
-
 /* Barres natives. REGLE : une barre a la couleur de SON TEXTE, pour que
    « XP 1260/23980  5% » et sa barre se lisent comme un seul bloc (demande 74).
    Le vert de succes reste reserve aux messages de succes : sur la sidebar, il
@@ -43,10 +41,10 @@ const title = "1.9em";
    meme constante — impossible qu'ils divergent.
    Une seule couleur par barre (un degrade couterait ~20 caracteres de JSON de
    plus pour un ecart invisible).
-   Taille : 250x24 px, reglee en jeu (demande 71). Sans `width`, la barre prenait
-   la largeur de la ligne et restait tres fine ; en px elle est lisible et sa
-   taille ne depend plus de la police du joueur. Cout : 26 caracteres de JSON,
-   pris dans la marge du budget. */
+   Taille : elle ne se regle PLUS ici mais dans theme.js (`BAR_SIZE` et
+   `BAR_SIZE_MOBILE`, demande 99), a cote de `bar()`. Sans `width`, la barre
+   prenait la largeur de la ligne et restait tres fine ; en px elle est lisible
+   et sa taille ne depend plus de la police du joueur. */
 /* Deux teintes d'AVANT, gardees telles quelles (demande 88) : le cyan du
    titre et de la quete, l'orange du niveau. Elles sont declarees dans
    KEEP_AS_IS (theme.js), sinon le passage a la palette les ramenerait sur
@@ -63,7 +61,6 @@ const COLOUR_XP = C.XP;          // cyan : texte d'XP, icone, barre
 const COLOUR_STAMINA = C.MARINE; // bleu clair : stamina
 const BAR_XP = [COLOUR_XP];
 const BAR_STAMINA = [COLOUR_STAMINA];
-const BAR_SIZE = { height: "24px", width: "250px" };
 const border = "lightgray"
 
 export function updateSidebar(playerId){
@@ -203,7 +200,7 @@ function drawSidebar(playerId){
     const mob = isMobilePlayer(playerId);
     const TITLE_SIZE = mob ? "0.95em" : "1.05em";
     const BODY_SIZE = mob ? "0.7em" : "0.8em";
-    const BAR_PX = mob ? { height: "18px", width: "210px" } : BAR_SIZE;
+    const BAR_PX = mob ? BAR_SIZE_MOBILE : BAR_SIZE;
     const body = (str, color, extra) => txt(str, color, Object.assign({ fontSize: BODY_SIZE }, extra || {}));
 
     /* LE TITRE : le nom du jeu, jamais sacrifie (demande 88).

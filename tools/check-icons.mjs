@@ -253,6 +253,8 @@ const SLOPPY_GLOBALS = [
     "startBoss", "startTutorial", "withEffectSource",
 ];
 
+let MODULE = null; // le bundle rendu, pour lire les constantes de theme.js
+
 async function renderSidebar(db, tutorialLine, quest, mobile) {
     for (const n of SLOPPY_GLOBALS) globalThis[n] = () => false;
     let sidebar = null;
@@ -280,7 +282,8 @@ async function renderSidebar(db, tutorialLine, quest, mobile) {
             contents:
                 `export * from ${JSON.stringify(join(ROOT, "src/core/UI.js"))};` +
                 `export { playerQuest, questProgress } from ${JSON.stringify(join(ROOT, "src/gameplay/quest.js"))};` +
-                `export { setDevice } from ${JSON.stringify(join(ROOT, "src/utils/data.js"))};`,
+                `export { setDevice } from ${JSON.stringify(join(ROOT, "src/utils/data.js"))};` +
+                `export { BAR_SIZE, BAR_SIZE_MOBILE } from ${JSON.stringify(join(ROOT, "src/core/theme.js"))};`,
             resolveDir: ROOT,
             loader: "js",
         },
@@ -302,6 +305,7 @@ async function renderSidebar(db, tutorialLine, quest, mobile) {
         ui.questProgress.p1 = quest.progress;
     }
     ui.updateSidebar("p1");
+    MODULE = ui;
     return sidebar;
 }
 
@@ -598,6 +602,23 @@ for (const [label, , , , mobile] of scenarios) {
         const barOf = (s) => (s || []).find((p) => p && p.type === "ProgressBar");
         if (!(maxOf(mobile) < maxOf(pc)))
             errors.push(`mobile : texte ${maxOf(mobile)}em contre ${maxOf(pc)}em sur PC (doit etre plus petit)`);
+        /* Demande 99 : la taille des barres se regle dans theme.js et NULLE
+           PART ailleurs. On compare donc le payload a la constante du module :
+           si quelqu'un remet une taille en dur dans UI.js, ca casse ici. */
+        const want = MODULE && MODULE.BAR_SIZE;
+        const wantM = MODULE && MODULE.BAR_SIZE_MOBILE;
+        if (want && wantM) {
+            checked++;
+            const got = barOf(pc), gotM = barOf(mobile);
+            if (!got || got.width !== want.width || got.height !== want.height)
+                errors.push(`barres PC : ${got && got.width}x${got && got.height} au lieu de ${want.width}x${want.height} (BAR_SIZE de theme.js)`);
+            if (!gotM || gotM.width !== wantM.width || gotM.height !== wantM.height)
+                errors.push(`barres mobile : ${gotM && gotM.width}x${gotM && gotM.height} au lieu de ${wantM.width}x${wantM.height} (BAR_SIZE_MOBILE de theme.js)`);
+            if (parseInt(want.width, 10) > 250 || parseInt(wantM.width, 10) > parseInt(want.width, 10))
+                errors.push(`taille de barre inattendue (${want.width} / ${wantM.width})`);
+        } else {
+            errors.push("BAR_SIZE / BAR_SIZE_MOBILE absents de theme.js");
+        }
         const bp = barOf(pc), bm = barOf(mobile);
         if (!bp || !bm) errors.push("mobile : barre absente");
         else {
