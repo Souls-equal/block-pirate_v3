@@ -281,7 +281,7 @@ function drawSidebar(playerId){
     const tut = tutorialLineLookup ? tutorialLineLookup(playerId) : null;
     if (tut) {
         block([
-            body("\n" + FRAME_MID + " \u2726 𝒬𝓊𝑒𝓈𝓉𝓈\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
+            body("\n" + FRAME_MID + " \u2726 𝒯𝓊𝓉𝑜𝓇𝒾𝒶𝓁\n \u25B8 " + short(tut, 44) + "\n", C.SUCCESS),
         ], true, 0);
     }
 
@@ -292,7 +292,7 @@ function drawSidebar(playerId){
         const targetText = short(Array.isArray(quest.targetMob) ? quest.targetMob.join(" / ") : quest.targetMob, 22);
         const percent = quest.killAmount > 0 ? Math.floor((progress / quest.killAmount) * 100) : 0;
         block([
-            body("\n" + FRAME_MID + " \u2726 THE HUNT\n \u25B8 " + targetText + "\n \u25B8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", COLOUR_FRAME),
+            body("\n" + FRAME_MID + " \u2726 𝒬𝓊𝑒𝓈𝓉𝓈\n \u25B8 " + targetText + "\n \u25B8 " + progress + "/" + quest.killAmount + " (" + percent + "%)  " + short(quest.island, 14) + "\n", COLOUR_FRAME),
         ], true, 1);
     }
 
