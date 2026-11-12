@@ -537,7 +537,12 @@ function outStyle(style) {
                       envoyes a chaque tick -> budget serre ;
      BUDGET         : messages ordinaires (chat, boutiques, textes flottants) ;
      BUDGET_SHOP    : panneaux de boutique, ou l'on accepte un peu plus gros. */
-export const BUDGET_SIDEBAR = 1200;
+/* 1400 = la valeur du chat, qui passe en jeu en permanence : c'est la plus
+   grosse taille de textStyling dont on soit SUR qu'elle est acceptee. La
+   sidebar complete (fruit + style + tutoriel + quete) pese 1398 caracteres ;
+   au-dela, elle perd des blocs par ordre de priorite plutot que d'etre refusee
+   (erreur « Argument too large », qui casse le tick). */
+export const BUDGET_SIDEBAR = 1400;
 export const BUDGET = 1400;
 export const BUDGET_SHOP = 1500;
 

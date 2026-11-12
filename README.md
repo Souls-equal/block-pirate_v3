@@ -396,7 +396,8 @@ au-dessus de `bar()`) : la sidebar les importe au lieu de les redéfinir, donc u
 modification là-bas se voit partout. Sans `width`, la barre prenait la largeur de
 la ligne et restait très fine ; en px, sa taille ne dépend plus de la police du
 joueur. Coût : ~90 caractères de JSON par barre (contre 79 sans `width`), pris
-dans la marge du budget — voir « La sidebar : budget ».
+dans la marge du budget — voir « La sidebar : budget, couleurs, et ordre de
+sacrifice ».
 
 * `progress` est un **ratio 0..1** (borné, arrondi à 3 décimales : au-delà on
   paie des caractères pour une différence invisible) ;
@@ -410,48 +411,68 @@ Ce sont des objets comme les autres dans le tableau de parties : `format()` et
 `fit()` les laissent **intacts** (ils n'ont ni `str` ni `icon`), et `measure()`
 les compte à leur taille réelle — d'où l'importance du budget ci-dessous.
 
-### La sidebar : budget, et l'ordre de sacrifice
+### La sidebar : budget, couleurs, et ordre de sacrifice
 
-Chaque bloc optionnel est accepté **en s'additionnant aux précédents**
-(`chosen`), pas testé seul : sinon plusieurs blocs passaient un par un, leur
-somme dépassait, et `fit()` coupait la fin du message — le plus souvent
-l'objectif du tutoriel.
+La carte est écrite dans `core/UI.js` (`drawSidebar`). Trois règles la
+gouvernent, et **c'est leur violation qui a produit les bugs visibles en jeu**
+(demande 100 : des sections qui disparaissent, un fruit qui saute d'une ligne à
+l'autre d'un tick au suivant).
 
-Les priorités disent dans quel ordre on sacrifie : `0` tutoriel, `1` quête,
-`2` XP, `3` stamina, `4` points de stat, `8` « pas de quête », `12` **titre**.
-`0` est une priorité valide : le code écrivait `priority || 9`, donc la priorité
-0 devenait 9 et le tutoriel était jeté **en premier** alors qu'il est documenté
-comme gardé en premier.
+**1. Une section = un bloc.** L'en-tête (`╠══ ✦ ══╣` + le titre), ses lignes et
+leurs couleurs vivent dans **le même** `block([...])`, accepté ou retiré
+**entier**. Quand l'en-tête et ses lignes étaient deux blocs de priorités
+différentes, le budget pouvait jeter l'en-tête et laisser « ◈ Fruit: … » tout
+seul : une section orpheline, sans titre.
 
-**Le titre part le premier** (priorité 12, la plus sacrifiable). Il coûte
-168 caractères à lui seul et le joueur connaît le nom du jeu. Sans ça, agrandir
-les barres faisait disparaître la barre de **stamina** chez un nouveau joueur qui
-a un objectif de tutoriel **et** une quête — c'est-à-dire exactement celui qui en
-a le plus besoin. Les barres, elles, ne sont jamais sacrifiées : `npm run check`
-le vérifie sur trois joueurs simulés.
+**2. Chaque bloc écrit son propre `\n` en tête** (sauf le titre, qui ouvre la
+carte). Le saut de ligne n'est jamais porté par le bloc **précédent** : sinon,
+dès que celui-ci est retiré, la section suivante se colle à la barre — c'est
+exactement le « le fruit alterne entre la même ligne et la ligne d'après ».
+Aucune constante de cadre (`FRAME_TOP/BOT/MID/END`) ne contient de `\n`.
 
-Deux économies qui ne se voient pas : les séparateurs `"\n\n"` n'ont **pas de
-style** (une couleur sur des sauts de ligne coûte 29 caractères pour rien), et le
-bloc « Stat Points » n'apparaît que s'il y a des points à dépenser.
+**3. Une seule constante de budget**, `BUDGET_SIDEBAR` dans `core/theme.js`,
+importée par `UI.js` (`SIDEBAR_BUDGET`) et relue par `npm run check`. Deux
+constantes concurrentes, c'est une sidebar retronquée après coup par `fit()`.
 
-Une ligne **identité** (priorité 5) affiche l'équipe et l'équipage : drapeau
-dans la couleur de l'équipe (`Pirates` / `Marines`), puis l'équipage en or.
-Rien n'est affiché **avant** le choix de l'équipe : « No Team » ne dirait rien
-et coûterait de la place. `UI.js` importait déjà `team.js` (`getCrewName`) :
-ajouter `getTeamData`/`getPlayerTeam` n'ajoute donc aucune arête au cycle
-`UI ⇄ team` qui existe depuis le début (les deux fonctions sont déclarées, donc
-lisibles à l'appel, pas à l'initialisation du module).
+Ordre de sacrifice (`priority`, **petit = gardé plus longtemps**) :
+`0` tutoriel → `1` quête → `8` pouvoirs (fruit, style) → `10` carte du joueur
+(nom, mer, prime, pièces). **Jamais retirés** : le titre, la section progression
+(en-tête + LVL + les deux barres) et le pied du cadre. Les blocs optionnels
+s'**additionnent** (`chosen`) avant d'être testés : testés seuls, plusieurs
+passaient un par un, leur somme dépassait, et `fit()` coupait la fin.
 
-`npm run check` rend la **vraie** sidebar (trois joueurs simulés : nu, chargé avec
-objectif de tutoriel, et nouveau joueur avec tutoriel **et** quête) et vérifie :
-taille ≤ 1 200, **deux `ProgressBar` dans chaque cas** (jamais une seule), ratio
-borné et arrondi, couleurs CSS acceptées, taille `width`/`height` en px,
-**teinte verte pour l'XP et bleue pour la stamina**, l'objectif du tutoriel et le
-bloc de quête toujours présents.
+Le pied `╚══ ✦ ══╝` n'est pas un bloc : il est **collé à la dernière partie de
+texte** (`withFooter`), et c'est cette liste-là qui est mesurée. Attention en y
+touchant : une version antérieure remplaçait les **deux** dernières parties au
+lieu d'allonger la dernière, et jetait donc son texte (le tutoriel en priorité 0,
+ou la quête).
 
-Mesuré : **1 088** car. (joueur nu), **1 189** (chargé + tutoriel), **1 096**
-(nouveau joueur + tutoriel + quête). Vérifié par mutation : rendre le titre
-obligatoire fait tomber la barre de stamina dans le dernier cas, et la CI refuse.
+**Quatre couleurs, pas une de plus** (demande 101). Chaque couleur distincte est
+un style distinct dans le message : en ajouter une, c'est du
+`customTextStyling` en plus et de la marge en moins sous le budget. La carte
+n'utilise donc que :
+
+| Couleur | Rôle | Où |
+| --- | --- | --- |
+| `#00BFFF` (cyan d'origine) | la carte | cadre, titre, en-têtes, XP + barre, pouvoirs, quête |
+| `#FFD700` (or) | ce que le joueur possède | nom, mer, prime, pièces |
+| `#FF8C00` (orange d'origine) | le niveau, seul | `LVL n` |
+| `#7DD3FC` (bleu clair) | l'effort | stamina + barre, points de stat, tutoriel |
+
+Deux couleurs **écartées volontairement** : la couleur propre d'un style de
+combat (une teinte libre par style = une couleur de plus, et un rendu qui change
+d'un joueur à l'autre) et le vert du succès. Les barres prennent la couleur de
+leur texte : une de moins à compter. `npm run check` refuse une cinquième
+couleur dans la carte d'un joueur qui a tout (fruit, style, tutoriel, quête).
+
+Mesuré (budget 1 400, `fit()` ne retire plus rien) : **841** car. joueur nu,
+**975** joueur chargé + tutoriel, **1 061** nouveau joueur + tutoriel + quête,
+**1 222** le nouveau joueur sur mobile, **1 282** joueur chargé complet,
+**1 285** avec un nom de fruit plus long — soit 115 caractères de marge dans
+le pire cas. Le joueur chargé complet est aussi mesuré sur mobile. Tous les
+textes libres (nom, fruit, style, cible, île, objectif) sont **bornés** par
+`short()` : la taille maximale est donc fixe, et un nom plus long ne peut plus
+faire basculer une section.
 
 ### Name tags : une seule porte de sortie
 
@@ -555,20 +576,22 @@ de jeter :
 2. suppression de `fontSize` / `fontWeight` hors titres ;
 3. troncature avec `...` en dernier recours.
 
-Budgets : `BUDGET_SIDEBAR` = 1 200 caractères (textes collés à l'écran :
+Budgets : `BUDGET_SIDEBAR` = 1 400 caractères (textes collés à l'écran :
 `RightInfoText`, `middleText*`), `BUDGET` = 1 400 (chat, textes flottants),
 `BUDGET_SHOP` = 1 500 (panneaux de boutique). `measure()` donne la taille
-sérialisée d'un payload.
+sérialisée d'un payload. 1 400 est la valeur dont l'acceptation en jeu est
+certaine (1 793 était refusé) : au-delà, on n'a aucune garantie.
 
-La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 200
-caractères : une seule couleur par partie, **deux tailles de police seulement**
+La sidebar elle-même (`core/UI.js`) est construite pour tenir dans ces 1 400
+caractères : **quatre couleurs seulement**, **deux tailles de police seulement**
 (le titre, et tout le reste — une partie sans `fontSize` repartirait à la taille
 par défaut du client), textes libres (fruit, style, cible de quête) bornés,
 **barres natives sans dégradé** (~90 caractères de JSON chacune : 150 × 18 px
-sur PC, 120 × 14 px sur mobile, réglées dans `theme.js`), et blocs secondaires retirés **par ordre de
-priorité** si nécessaire — jamais tout le message. Mesuré : 948 caractères pour
-un joueur nu, 1 121 pour un nouveau joueur avec tutoriel et quête (1 121 aussi
-sur mobile), 1 155 pour un joueur chargé.
+sur PC, 120 × 14 px sur mobile, réglées dans `theme.js`), et blocs secondaires
+retirés **par ordre de priorité** si nécessaire — jamais tout le message.
+Mesuré : 841 caractères pour un joueur nu, 1 285 pour le pire cas (joueur
+chargé avec fruit long, style, tutoriel et quête). Détail et règles : « La sidebar : budget,
+couleurs, et ordre de sacrifice ».
 
 ---
 
