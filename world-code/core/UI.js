@@ -7,7 +7,7 @@ import{applyControls as Vt,confirmAction as Ht,getControlMode as pt,isMobilePlay
  \u25C8 `+T(dt,16)+" \u25AA "+xt+`
 `,F)],!0,16);{const u=" \u2605 Coins: "+U(o)+`
 `;g([p(ct>0?" \u2605 Bounty: "+U(ct)+`
-`+u:u,r.MONEY)],!0,6)}g([p(D+` \u2726 THE VOYAGE
+`+u:u,r.MONEY)],!0,6)}g([p(D+` \u2726 𝔏𝔢𝔳𝔢𝔩𝔦𝔫𝔤
 `,F)],!0,12),g([p(" LVL "+e+`
 `,co,{fontWeight:"bold"})],!0,5),g([p(" XP "+U(n)+"/"+U(nt)+"  "+rt.percent+`%
 `,Ot),bt(rt.ratio,lo,ht)],!0,2),g([p(`
@@ -15,14 +15,14 @@ import{applyControls as Vt,confirmAction as Ht,getControlMode as pt,isMobilePlay
 `,Et),bt(ut.ratio,fo,ht)],!0,3),s>0&&g([p(`
  \u2727 Skill Points: `+s+`
 `,r.INFO)],!0,13),(l||B)&&(g([p(`
-`+D+` \u2726 THE POWERS
+`+D+` \u2726 𝔄𝔟𝔦𝔩𝔦𝔱𝔦𝔢𝔰/ℭ𝔞𝔭𝔞𝔠𝔦𝔱𝔦𝔢𝔰
 `,F)],!0,11),l&&g([p(" \u25C8 Fruit: "+l+`
 `,r.PIRATE,{fontWeight:"bold"})],!0,10),B&&g([p(" \u25C8 Style: "+B+`
 `,Mt,{fontWeight:"bold"})],!0,9));const mt=z?z(t):null;if(mt&&g([p(`
 `+D+` \u2726 THE PATH
  \u25B8 `+T(mt,44)+`
 `,r.SUCCESS)],!0,0),w){const u=T(Array.isArray(w.targetMob)?w.targetMob.join(" / "):w.targetMob,22),d=w.killAmount>0?Math.floor(ft/w.killAmount*100):0;g([p(`
-`+D+` \u2726 THE HUNT
+`+D+` \u2726 𝔔𝔲𝔢𝔰𝔱
  \u25B8 `+u+`
  \u25B8 `+ft+"/"+w.killAmount+" ("+d+"%)  "+T(w.island,14)+`
 `,F)],!0,1)}g([p(Bt,F)]),v||g([p(`  \u3014 \u2726 T H E   G R A N D   L I N E \u2726 \u3015
