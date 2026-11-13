@@ -4,6 +4,7 @@ import { addStat, confirmAction, getStat, reconcileSP, setStat } from "../utils/
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 import { C, say, txt, bold, ic } from "../core/theme";
 import { trackAnalyticsEvent } from "../utils/analytics";
+import { getDamageBonusForPoints, getDefenseReductionForPoints } from "./combat-stats";
 
 /* BASE VALUES */
 const BASE_HP = 100;
@@ -12,11 +13,7 @@ const HP_TIER1_BONUS = 20;   const HP_TIER1_MAX = 50;
 const HP_TIER2_BONUS = 15;   const HP_TIER2_MAX = 50;
 const HP_TIER3_BONUS = 10;
 
-const DMG_FIRST_POINT = 0.20;
-const DMG_EXPONENT    = 0.65;
 
-const DEF_FACTOR = 0.96;
-const DEF_FLOOR  = 0.2;
 
 /* REGEN — nerfee : a 100 points on soignait 22% toutes les 0,84 s, soit
    27 PV/s, plus vite que la plupart des degats d'abilite. Trois leviers :
@@ -46,10 +43,10 @@ const REGEN_MIN_START     = 2500;
    le titre de la carte. */
 export const STAT_CONFIG = {
     h:  { name: "Health",  color: C.SUCCESS, icon: "Health",         imageColour: "#FEE6E6", perPoint: "+20 HP up to 50 points, then +15, then +10." },
-    d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "+20% damage on the first point, less on each next." },
+    d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "Adds flat damage to every hit; the bonus grows with points spent." },
     s:  { name: "Stamina", color: C.MARINE,  icon: "Updraft",        imageColour: "white",   perPoint: "+10 max stamina, so more dashes and air jumps." },
     r:  { name: "Regen",   color: C.XP,      icon: "Health Regen",   imageColour: C.SUCCESS, perPoint: "Heal more, and sooner after a hit." },
-    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "-4% damage taken per point, never below 20%." },
+    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "Subtracts flat damage from every hit; the reduction grows with points spent." },
 };
 
 const STAT_ORDER = ["h", "d", "s", "r", "df"];
@@ -65,14 +62,6 @@ export function getHealthForPoints(h) {
     return hp;
 }
 
-export function getDamageMultiplierForPoints(d) {
-    return 1 + DMG_FIRST_POINT * Math.pow(d, DMG_EXPONENT);
-}
-
-export function getDefenseMultiplierForPoints(df) {
-    return Math.max(DEF_FLOOR, Math.pow(DEF_FACTOR, df));
-}
-
 export function getRegenInfoForPoints(r) {
     const p = 1 - Math.pow(REGEN_DECAY, r);
     return {
@@ -85,13 +74,13 @@ export function getRegenInfoForPoints(r) {
 function statEffectText(key, lvl) {
     switch (key) {
         case "h":  return "Max HP: " + round(getHealthForPoints(lvl));
-        case "d":  return "Damage x" + round(getDamageMultiplierForPoints(lvl).toFixed(2));
+        case "d":  return "Damage bonus: +" + round(getDamageBonusForPoints(lvl)) + " / hit";
         case "s":  return "Air jumps: " + lvl;
         case "r":  {
             const rg = getRegenInfoForPoints(lvl);
             return "Regen " + pct(rg.amount) + " / " + timeText(rg.interval);
         }
-        case "df": return "Damage taken: " + round(getDefenseMultiplierForPoints(lvl) * 100) + "%";
+        case "df": return "Damage reduced: " + round(getDefenseReductionForPoints(lvl)) + " / hit";
     }
     return "";
 }
@@ -159,10 +148,8 @@ function spendSP(playerId, amount) {
 export function applyStatEffects(playerId) {
     if (!playerId) return;
     const h  = getStatLevel(playerId, "h");
-    const d  = getStatLevel(playerId, "d");
     const s  = getStatLevel(playerId, "s");
     const r  = getStatLevel(playerId, "r");
-    const df = getStatLevel(playerId, "df");
 
     const regen = getRegenInfoForPoints(r);
 
@@ -174,8 +161,10 @@ export function applyStatEffects(playerId) {
         api.setClientOptions(playerId, {
             maxHealth:                 getHealthForPoints(h),
             initialHealth:             getHealthForPoints(h),
-            dealingDamageMultiplier:   getDamageMultiplierForPoints(d),
-            receivingDamageMultiplier: getDefenseMultiplierForPoints(df),
+            // Damage/Defense are applied as flat values in combat callbacks.
+            // Keep engine multipliers neutral to prevent double application.
+            dealingDamageMultiplier:   1,
+            receivingDamageMultiplier: 1,
             airJumpCount:              getMaxAirJumps(playerId),
             healthRegenAmount:         regen.amount,
             healthRegenInterval:       regen.interval,

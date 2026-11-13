@@ -1,6 +1,7 @@
 //utils/combat.js
 import { hakiBoost } from "./haki";
-import { getDamageMultiplierForPoints, getStatLevel } from "../gameplay/stats";
+import { getStatLevel } from "../gameplay/stats";
+import { getDamageBonusForPoints, getDefenseReductionForPoints, applyDamageBonus, applyDefenseReduction } from "../gameplay/combat-stats";
 import { dist2, distH2, segDist } from "./fx";
 import { creditKill, noteMobSeen, recordDamager } from "./killAttribution";
 import { noteUncreditedKill } from "./killfeed";
@@ -109,7 +110,9 @@ export function statLevel(id, key) {
 }
 
 export function strengthMult(id) {
-    try { return getDamageMultiplierForPoints(statLevel(id, "d")) || 1; }
+    // Legacy Code Block bridge for the Manifest Golem's 18-point base hit.
+    // The resulting hit is base + half the player's flat Damage bonus.
+    try { return 1 + getDamageBonusForPoints(statLevel(id, "d")) / 18; }
     catch (e) { return 1; }
 }
 
@@ -430,7 +433,7 @@ export function damage(target, rawAmount, caster, itemName) {
         // pvpGuard annule aussi la protection si c'est la victime qui attaque.
         if (pvpGuard(effectiveCaster, target)) return false;
 
-        let amt = Math.round(Math.abs(rawAmount) * strengthMult(effectiveCaster) * 1.5);
+        let amt = applyDamageBonus(Math.round(Math.abs(rawAmount) * 1.5), getDamageBonusForPoints(statLevel(effectiveCaster, "d")));
         if (amt < 1) amt = 1;
         if (amt > HARD_CAP) amt = HARD_CAP;
         amt = hakiBoost(effectiveCaster, amt);
@@ -439,6 +442,11 @@ export function damage(target, rawAmount, caster, itemName) {
             const until = marks[target];
             if (until && api.now() < until) amt = Math.floor(amt * 1.3);
         } catch (e0) {}
+
+        // Scripted attacks bypass onPlayerDamagingOtherPlayer; apply Defense here too.
+        if (!isMob) {
+            amt = applyDefenseReduction(amt, getDefenseReductionForPoints(statLevel(target, "df")));
+        }
 
         const item = typeof itemName === "string" && itemName.length ? itemName : "Ability";
         const victimName = safeEntityName(target);

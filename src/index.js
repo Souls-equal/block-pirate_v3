@@ -8,7 +8,8 @@ import { attackNPC as U, forgetNPC as B, isProtectedNPC as F, npcNearPoint as np
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { analyticsJoin, analyticsLeave, analyticsTick, setAnalyticsCategoryProvider, trackAnalyticsEvent } from "./utils/analytics";
-import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
+import { getStatLevel as getCombatStatLevel, handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
+import { applyDamageBonus as applyFlatDamageBonus, applyDefenseReduction as applyFlatDefense, getDamageBonusForPoints as getFlatDamageBonus, getDefenseReductionForPoints as getFlatDefenseReduction } from "./gameplay/combat-stats";
 import { getFightingStyle as fsStyle, ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
@@ -633,9 +634,12 @@ onPlayerStartChargingItem = (t, itemName) => {
         try { if (ot(t)) return; } catch (e) { _t("onPlayerAltAction.dash", e); }
     }
     return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
-}, onMobDamagingPlayer = (t, r) => {
+}, onMobDamagingPlayer = (t, r, a) => {
     if (A(r)) return "preventDamage";
     if (idInSafeZone(r)) return "preventDamage";
+    if (typeof a === "number" && a > 0) {
+        return applyFlatDefense(a, getFlatDefenseReduction(getCombatStatLevel(r, "df")));
+    }
 }, onPlayerDamagingOtherPlayer = (r, a, i, e) => {
     if (A(a)) return "preventDamage";
     /* Protection PvP : le tueur ne peut pas toucher sa victime juste apres son
@@ -666,6 +670,11 @@ onPlayerStartChargingItem = (t, itemName) => {
             _t("onPlayerDamagingOtherPlayer.fsM1", t);
         }
     }
+    if (res !== "preventDamage" && typeof i === "number" && i > 0) {
+        const bonus = getFlatDamageBonus(getCombatStatLevel(r, "d"));
+        const reduction = getFlatDefenseReduction(getCombatStatLevel(a, "df"));
+        return applyFlatDefense(applyFlatDamageBonus(i, bonus), reduction);
+    }
     return res;
 }, onPlayerDamagingMob = (t, r, a, i) => {
     if (Et(t, r, a, i) || isNPCEntity(r)) return "preventDamage";
@@ -689,6 +698,9 @@ onPlayerStartChargingItem = (t, itemName) => {
         if (fsM1(t, r)) return "preventDamage";
     } catch (t) {
         _t("onPlayerDamagingMob.fsM1", t);
+    }
+    if (typeof a === "number" && a > 0) {
+        return applyFlatDamageBonus(a, getFlatDamageBonus(getCombatStatLevel(t, "d")));
     }
 }, onAttemptKillPlayer = (t, r) => {
     if (A(t)) return bt(t), "preventDeath";
