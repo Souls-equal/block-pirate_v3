@@ -4,6 +4,7 @@ import { addXP, changeMoney, deleteStat, getStat, setStat } from "../utils/data"
 import { updateSidebar } from "../core/UI";
 import { computeQuestReward, spawnEnemy } from "./spawning";
 import { C, say, txt, bold, ic } from "../core/theme";
+import { trackAnalyticsEvent } from "../utils/analytics";
 
 export const quests = {
     "Starter Island": {
@@ -714,6 +715,9 @@ function completeQuest(playerId) {
         const rank = Math.min(3, Math.max(1, (quest.mob && quest.mob.rank) || 1));
         const reward = computeQuestReward(quest.killAmount, quest.levelMin, rank);
         const msg = questMessage(quest, quest);
+        /* Valeur = ile (liste courte et controlee), mesure = recompense.
+           Position utile pour la heatmap des objectifs. */
+        trackAnalyticsEvent(playerId, "quest", String(quest.island || "unknown").toLowerCase().replace(/[^a-z0-9_-]/g, "_"), reward.money, true);
 
         /* L'ETAT EST NETTOYE AVANT DE PAYER, et c'est le coeur du correctif :
            addXP() peut faire gagner plusieurs niveaux, ce qui appelle

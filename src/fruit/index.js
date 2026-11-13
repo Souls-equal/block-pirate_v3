@@ -1,6 +1,7 @@
 import { setInterval as t, setTimeout as e } from "../utils/timer";
 import { C as THEME, say, shout, txt, ic } from "../core/theme";
 import { bestFruitTicket, confirmAction, fruitRollPrice, isMobilePlayer, spendFruitTicket, useItemControls } from "../utils/data";
+import { trackAnalyticsEvent } from "../utils/analytics";
 let o = function () {},
   r = function () {};
 try {
@@ -393,6 +394,7 @@ export function activateFruit(t) {
   try {
     api.playSound(t, "exp_levelup", 0.7, 1.15);
   } catch (t) {}
+  trackAnalyticsEvent(t, "fruit", r, null, true);
   (d.set(t, r),
     (function (t) {
       try {

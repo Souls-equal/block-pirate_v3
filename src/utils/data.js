@@ -5,6 +5,7 @@ import { checkQuestValidity, quests } from "../gameplay/quest";
 import { applyStatEffects, fullHeal, totalSpent, resetStats } from "../gameplay/stats";
 import { clearFruit } from "../fruit/index";
 import { clearFightingStyle } from "../gameplay/fightingStyles";
+import { recordAnalyticsMoney, trackAnalyticsEvent } from "./analytics";
 
 /* REMISE A ZERO D'UN JOUEUR
    L'ordre compte : on retire d'abord ce qui POSSEDE des items (fruit, style),
@@ -56,7 +57,11 @@ export function deleteStat(playerId, key){
 
 export function addStat(playerId, key, amount){
     let v = getStat(playerId, key, 0);
-    return setStat(playerId, key, v + amount);
+    const ok = setStat(playerId, key, v + amount);
+    /* Agrege par analytics.js : ne pas emettre un evenement par mob tue ou
+       piece gagnee, sinon le quota de 20 evenements/minute tombe vite. */
+    if (ok && key === "money") recordAnalyticsMoney(playerId, Number(amount));
+    return ok;
 }
 
 /* utils/money.js */
@@ -377,6 +382,7 @@ export function addXP(playerId, amount){
     setStat(playerId,"lvl",lvl);
 
     if (levelsGained > 0){
+        trackAnalyticsEvent(playerId, "progression", "level_up", lvl, false);
 
         addStat(playerId, "sp", SP_PER_LEVEL * levelsGained);
         fullHeal(playerId);
