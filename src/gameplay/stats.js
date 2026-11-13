@@ -4,7 +4,7 @@ import { addStat, confirmAction, getStat, reconcileSP, setStat } from "../utils/
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 import { C, say, txt, bold, ic } from "../core/theme";
 import { trackAnalyticsEvent } from "../utils/analytics";
-import { getDamageBonusForPoints, getDefenseReductionForPoints } from "./combat-stats";
+import { getDamageBonusForPoints, getPvPDamageBonusForPoints, getDefenseReductionForPoints, getPvPDefenseReductionForPoints } from "./combat-stats";
 
 /* BASE VALUES */
 const BASE_HP = 100;
@@ -43,10 +43,10 @@ const REGEN_MIN_START     = 2500;
    le titre de la carte. */
 export const STAT_CONFIG = {
     h:  { name: "Health",  color: C.SUCCESS, icon: "Health",         imageColour: "#FEE6E6", perPoint: "+20 HP up to 50 points, then +15, then +10." },
-    d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "Adds flat damage to every hit; the bonus grows with points spent." },
+    d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "Adds flat damage per hit; PvP has a lower level-scaled bonus." },
     s:  { name: "Stamina", color: C.MARINE,  icon: "Updraft",        imageColour: "white",   perPoint: "+10 max stamina, so more dashes and air jumps." },
     r:  { name: "Regen",   color: C.XP,      icon: "Health Regen",   imageColour: C.SUCCESS, perPoint: "Heal more, and sooner after a hit." },
-    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "Subtracts flat damage from every hit; the reduction grows with points spent." },
+    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "Flat reduction per hit; stronger against mobs, capped at 8 in PvP." },
 };
 
 const STAT_ORDER = ["h", "d", "s", "r", "df"];
@@ -74,13 +74,13 @@ export function getRegenInfoForPoints(r) {
 function statEffectText(key, lvl) {
     switch (key) {
         case "h":  return "Max HP: " + round(getHealthForPoints(lvl));
-        case "d":  return "Damage bonus: +" + round(getDamageBonusForPoints(lvl)) + " / hit";
+        case "d":  return "Mob +" + round(getDamageBonusForPoints(lvl)) + " / PvP +" + round(getPvPDamageBonusForPoints(lvl)) + " / hit";
         case "s":  return "Air jumps: " + lvl;
         case "r":  {
             const rg = getRegenInfoForPoints(lvl);
             return "Regen " + pct(rg.amount) + " / " + timeText(rg.interval);
         }
-        case "df": return "Damage reduced: " + round(getDefenseReductionForPoints(lvl)) + " / hit";
+        case "df": return "Mob: -" + round(getDefenseReductionForPoints(lvl)) + "; PvP: -" + round(getPvPDefenseReductionForPoints(lvl)) + " / hit";
     }
     return "";
 }

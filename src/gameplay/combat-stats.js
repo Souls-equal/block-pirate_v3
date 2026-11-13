@@ -6,9 +6,23 @@ export function getDamageBonusForPoints(points) {
     return 1.6 * Math.pow(p, 1.35);
 }
 
+// PvP stat bonuses are tuned separately from PvE: mob-level scaling would make
+// equal-level players almost one-shot each other once Defense is reduced.
+export function getPvPDamageBonusForPoints(points) {
+    const p = Math.max(0, Number(points) || 0);
+    return 0.12 * Math.pow(p, 1.35);
+}
+
 export function getDefenseReductionForPoints(points) {
     const p = Math.max(0, Number(points) || 0);
     return 1.95 * Math.pow(p, 1.4);
+}
+
+// PvP uses a gentler flat curve and a low ceiling: the full mob-tuned curve
+// can otherwise erase ordinary player hits at equal levels.
+export function getPvPDefenseReductionForPoints(points) {
+    const p = Math.max(0, Number(points) || 0);
+    return Math.min(8, 0.4 * Math.sqrt(p));
 }
 
 export function applyDamageBonus(baseDamage, bonus) {

@@ -1,7 +1,7 @@
 //utils/combat.js
 import { hakiBoost } from "./haki";
 import { getStatLevel } from "../gameplay/stats";
-import { getDamageBonusForPoints, getDefenseReductionForPoints, applyDamageBonus, applyDefenseReduction } from "../gameplay/combat-stats";
+import { getDamageBonusForPoints, getPvPDamageBonusForPoints, getPvPDefenseReductionForPoints, getDefenseReductionForPoints, applyDamageBonus, applyDefenseReduction } from "../gameplay/combat-stats";
 import { dist2, distH2, segDist } from "./fx";
 import { creditKill, noteMobSeen, recordDamager } from "./killAttribution";
 import { noteUncreditedKill } from "./killfeed";
@@ -433,7 +433,10 @@ export function damage(target, rawAmount, caster, itemName) {
         // pvpGuard annule aussi la protection si c'est la victime qui attaque.
         if (pvpGuard(effectiveCaster, target)) return false;
 
-        let amt = applyDamageBonus(Math.round(Math.abs(rawAmount) * 1.5), getDamageBonusForPoints(statLevel(effectiveCaster, "d")));
+        const damageBonus = isMob
+            ? getDamageBonusForPoints(statLevel(effectiveCaster, "d"))
+            : getPvPDamageBonusForPoints(statLevel(effectiveCaster, "d"));
+        let amt = applyDamageBonus(Math.round(Math.abs(rawAmount) * 1.5), damageBonus);
         if (amt < 1) amt = 1;
         if (amt > HARD_CAP) amt = HARD_CAP;
         amt = hakiBoost(effectiveCaster, amt);
@@ -445,7 +448,7 @@ export function damage(target, rawAmount, caster, itemName) {
 
         // Scripted attacks bypass onPlayerDamagingOtherPlayer; apply Defense here too.
         if (!isMob) {
-            amt = applyDefenseReduction(amt, getDefenseReductionForPoints(statLevel(target, "df")));
+            amt = applyDefenseReduction(amt, getPvPDefenseReductionForPoints(statLevel(target, "df")));
         }
 
         const item = typeof itemName === "string" && itemName.length ? itemName : "Ability";

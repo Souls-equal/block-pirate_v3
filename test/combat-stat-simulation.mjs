@@ -3,7 +3,9 @@ import {
     applyDamageBonus,
     applyDefenseReduction,
     getDamageBonusForPoints,
+    getPvPDamageBonusForPoints,
     getDefenseReductionForPoints,
+    getPvPDefenseReductionForPoints,
 } from "../src/gameplay/combat-stats.js";
 
 const SP_PER_LEVEL = 3;
@@ -69,6 +71,37 @@ function simulate(playerLevel, mobLevel) {
         remainingPlayerHp: Math.max(0, player.hp), playerDamage: player.damage,
         mobHp: mobHealth(mobLevel), mobHitDamage: applyDefenseReduction(mob.damage, player.defense) };
 }
+
+function simulateEqualLevelDuel(level) {
+    const earned = SP_PER_LEVEL * (level - 1);
+    const damagePoints = earned * 0.40;
+    const defensePoints = earned * 0.25;
+    const healthPoints = earned * 0.25;
+    const maxHp = healthForPoints(healthPoints);
+    const hit = applyDefenseReduction(
+        applyDamageBonus(BASE_HIT, getPvPDamageBonusForPoints(damagePoints)),
+        getPvPDefenseReductionForPoints(defensePoints),
+    );
+    let aHp = maxHp;
+    let bHp = maxHp;
+    let hits = 0;
+    while (aHp > 0 && bHp > 0 && hits < 1000) {
+        bHp -= hit;
+        hits++;
+        if (bHp <= 0) break;
+        aHp -= hit;
+        hits++;
+    }
+    return { level, hits, hit, elapsed: Math.max(0, hits - 1) * PLAYER_HIT_INTERVAL,
+        remainingHp: Math.max(aHp, bHp, 0) };
+}
+
+const duel = simulateEqualLevelDuel(165);
+assert.ok(duel.hits <= 30, "equal-level PvP should finish promptly under the requested stat allocation");
+console.log(`165 vs 165 PvP: decisive in ${duel.hits} hits / ${duel.elapsed.toFixed(1)}s; ${duel.hit} damage per hit`);
+assert.ok(getPvPDefenseReductionForPoints(492) <= 8, "PvP Defense reduction has a flat ceiling");
+assert.ok(applyDefenseReduction(20, getPvPDefenseReductionForPoints(492)) >= 12,
+    "even a defense-heavy build should take meaningful damage from a 20-damage hit");
 
 const battles = [simulate(10, 15), simulate(1500, 1505)];
 for (const battle of battles) {
