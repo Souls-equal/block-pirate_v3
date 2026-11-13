@@ -920,8 +920,13 @@ function A(t) {
   if (!t || GONE[t]) return;
   try {
     api.setClientOption(t, "middleTextUpper", "");
-  } catch (t) {
-    f("fruitRoll.clearMiddleTextUpper", t);
+  } catch (err) {
+    f("fruitRoll.clearMiddleTextUpper", err);
+    try {
+      api.setClientOptionToDefault(t, "middleTextUpper");
+    } catch (fallbackErr) {
+      f("fruitRoll.clearMiddleTextUpper.default", fallbackErr);
+    }
   }
 }
 function D(t, e, o, r) {
@@ -933,40 +938,25 @@ function D(t, e, o, r) {
   }
 }
 function S(t) {
-  const e = String(t || "???"),
-    o = e.length > 12 ? e.slice(0, 11) + "…" : e,
-    r = 14 - o.length;
-  return " ".repeat(Math.floor(r / 2)) + o + " ".repeat(Math.ceil(r / 2));
+  const e = String(t || "???");
+  return e.length > 14 ? e.slice(0, 11) + "..." : e;
 }
-function P(t, e = "#f8fafc") {
-  const o = getFruitInfo(t);
-  return (o && o.color) || e;
-}
-function w(t, e, o, r, n, i = "#facc15") {
-  const c = [
-      txt("╔════════════════════════════════╗\n", "#facc15", {fontWeight: "700", fontSize: "20px"}),
-      txt("        FRUIT MACHINE\n\n", i, {fontWeight: "700", fontSize: "26px"}),
-      txt("      ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
-    ],
-    a = e.map((t) => (txt("  " + S(t) + "  ", P(t), {fontWeight: "700", fontSize: "24px"})));
-  (c.push(
-    a[0],
-    txt("  ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
-    a[1],
-    txt("  ║  ", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
-    a[2],
-    txt("  ║\n\n", "#94a3b8", {fontWeight: "700", fontSize: "20px"}),
-    txt("        " + o + "\n", i, {fontWeight: "700", fontSize: "20px"}),
-    txt("        PRICE: " + r + "  •  LEVEL: " + n + "\n", "#cbd5e1", {fontWeight: "600", fontSize: "16px"}),
-    txt("╚════════════════════════════════╝", "#facc15", {fontWeight: "700", fontSize: "20px"}),
-  ),
-    (function (t, e) {
-      try {
-        api.setClientOption(t, "middleTextUpper", e);
-      } catch (t) {
-        f("fruitRoll.middleTextUpper", t);
-      }
-    })(t, c));
+function w(t, e, o, r, n) {
+  const slots = (Array.isArray(e) ? e : []).slice(0, 3).map((fruit) => "[ " + S(fruit) + " ]");
+  while (slots.length < 3) slots.push("[ ??? ]");
+  const text = [
+    "===== FRUIT MACHINE =====",
+    slots.join("   "),
+    String(o || ""),
+    "PRICE: " + String(r) + "  LEVEL: " + String(n),
+  ].join("\n");
+  try {
+    // A plain string avoids intermittent client failures on the rich, Unicode
+    // frame; a failed frame update must never strand the player in the roll.
+    api.setClientOption(t, "middleTextUpper", text);
+  } catch (err) {
+    f("fruitRoll.middleTextUpper", err);
+  }
 }
 function $(t) {
   return t[Math.floor(Math.random() * t.length)];
@@ -1060,7 +1050,8 @@ function E(t, o, r) {
      afficherait « ROLLING... » a vie. Au bout de ~15 s, on rembourse et on
      efface, quoi qu'il soit arrive. */
   e(() => {
-    M.get(t) === c && refundRoll(t);
+    if (M.get(t) === c) refundRoll(t);
+    else if (!M.has(t)) A(t);
   }, 300);
   const a = (function () {
     const t = [];
@@ -1073,7 +1064,7 @@ function E(t, o, r) {
   let l = 0,
     s = -1;
   (D(t, "reel", 0.7, 1),
-    w(t, ["???", "???", "???"], "ROLLING...", r.price, r.level, "#facc15"),
+    w(t, ["???", "???", "???"], "ROLLING...", r.price, r.level),
     e(function i() {
       if (M.get(t) !== c) return;
       try {
@@ -1083,7 +1074,7 @@ function E(t, o, r) {
       if (u >= 1)
         return (
           D(t, "lowDrum", 0.8, 0.9),
-          w(t, [o, o, o], "LOCKING IN...", r.price, r.level, P(o, "#86efac")),
+          w(t, [o, o, o], "LOCKING IN...", r.price, r.level),
           void e(
             () =>
               (function (t, o, r, i) {
@@ -1114,7 +1105,7 @@ function E(t, o, r) {
                   );
                 (D(t, "cashRegister", 0.9, 1),
                   D(t, "exp_levelup", 0.75, 1),
-                  w(t, [r, r, r], "JACKPOT", i.price, i.level, P(r, "#86efac")));
+                  w(t, [r, r, r], "JACKPOT", i.price, i.level));
                 try {
                   /* Le retour de giveItem doit etre POSITIF. Sinon on verifie
                      l'inventaire : un echec (sac plein, retour inattendu) ne
