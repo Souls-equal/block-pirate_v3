@@ -8,7 +8,8 @@
     "build:blocks": "node tools/build-blocks.mjs",
     "build:world": "node tools/build-world.mjs",
     "build": "npm run build:blocks && npm run build:world && npm run build:src",
-    "check": "node tools/check-imports.mjs && node tools/check-handlers.mjs && node tools/check-blocks.mjs && node tools/check-tutorial.mjs && node tools/check-analytics.mjs && node tools/check-icons.mjs && node tools/check-rules.mjs && node tools/build-sources.mjs --check",
+    "check": "node tools/check-imports.mjs && node tools/check-handlers.mjs && node tools/check-blocks.mjs && node tools/check-tutorial.mjs && node tools/check-analytics.mjs && node tools/check-icons.mjs && node tools/check-rules.mjs && node tools/build-sources.mjs --check && node test/combat-stat-simulation.mjs",
+    "test:combat-sim": "node test/combat-stat-simulation.mjs",
     "build:src": "node tools/build-sources.mjs",
     "sync": "node tools/build-sources.mjs"
   },
