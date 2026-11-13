@@ -37,6 +37,7 @@ import { eachItemSlot } from "./customItem";
 import { cancelConfirm, confirmAction, deleteStat, getTotalMoney, isMobilePlayer, payMoney, useItemControls } from "../utils/data";
 import { updateSidebarLight } from "../core/UI";
 import { C, nfmt, say, txt, bold, ic } from "../core/theme";
+import { trackAnalyticsEvent } from "../utils/analytics";
 
 const FS_DB_KEY = "fs";
 
@@ -828,7 +829,10 @@ export function giveFightingStyleItems(playerId, styleName) {
 export function equipFightingStyle(playerId, styleName, silent = false) {
     const style = FIGHTING_STYLES[styleName];
     if (!style) return false;
+    const previousStyle = getFightingStyle(playerId);
     activeStyles.set(playerId, styleName);
+    if (previousStyle !== styleName)
+        trackAnalyticsEvent(playerId, "style", styleName, null, false);
     try {
         api.setPlayerDbValue(playerId, FS_DB_KEY, styleName);
     } catch (e) {}

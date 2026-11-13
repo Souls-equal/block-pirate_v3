@@ -3,6 +3,7 @@
 import { addStat, confirmAction, getStat, reconcileSP, setStat } from "../utils/data";
 import { getMaxAirJumps, setStaminaBonus } from "./stamina";
 import { C, say, txt, bold, ic } from "../core/theme";
+import { trackAnalyticsEvent } from "../utils/analytics";
 
 /* BASE VALUES */
 const BASE_HP = 100;
@@ -332,6 +333,7 @@ export function handleShopBuy(playerId, categoryKey, itemKey, item, input) {
             txt(", you have " + getStat(playerId, "sp", 0) + ".", C.INFO),
         ]);
     } else {
+        trackAnalyticsEvent(playerId, "upgrade", stat, amt, false);
         say(playerId, [
             ic("fa-solid fa-circle-check", C.SUCCESS),
             txt(" " + STAT_CONFIG[stat].name + " ", C.INFO),

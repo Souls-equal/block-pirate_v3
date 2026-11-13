@@ -278,6 +278,95 @@ on ne leur redemande pas de choisir.
 
 ---
 
+## Analytics Bloxd : sessions, progression et heatmaps
+
+L'API `api.registerAnalyticsEvent(...)` enregistre des événements consultables dans
+les analytics du **World Studio** ; `api.registerAnalyticsPlayerPosition(...)`
+alimente une heatmap et la lecture des déplacements. Ces deux API sont réservées
+aux **mondes custom** : ici, leur appel est protégé et une erreur éventuelle ne
+peut pas casser le jeu.
+
+### Données qu'on suit dans Block Pirate
+
+L'instrumentation se concentre sur les questions qui peuvent réellement guider
+les décisions de jeu :
+
+| Événement / mesure | À quoi ça répond |
+|---|---|
+| Début et fin de session (`match_started`, `session_ended`) | Combien de temps les joueurs restent-ils ? Reviennent-ils ? |
+| Team et mer choisies | Où les nouveaux joueurs commencent-ils, et quelle faction/mer préfèrent-ils ? |
+| Progression (`level_up`, quête terminée) | La progression est-elle trop lente ou trop rapide ? Quelles îles/quetes bloquent ? |
+| Fruit et style équipés | Quels pouvoirs sont choisis, et lesquels sont ignorés ? |
+| Améliorations de stats | Quelles statistiques les joueurs investissent-ils ? |
+| Monnaie gagnée/dépensée | L'économie est-elle équilibrée ? Les gains dépassent-ils les dépenses ? |
+| Morts et kills PvP | Où le PvP est-il concentré, et le taux de morts est-il excessif ? |
+| Boss vaincu | Quels combats de boss aboutissent, et où ont lieu les victoires ? |
+| Positions au fil du temps | Heatmap d'exploration : zones fréquentées, oubliées ou difficiles à atteindre. |
+
+Aucun texte de chat, pseudo, nom d'équipage, inventaire complet ni donnée libre
+n'est envoyé comme valeur analytique. L'identité du joueur est celle que l'API
+Bloxd rattache automatiquement au `playerId`.
+
+### Comment l'API est appelée
+
+```js
+api.registerAnalyticsEvent(
+    playerId,             // joueur concerne
+    "quest",              // type stable (max. 64 caracteres)
+    "starter_island",     // valeur/detail (max. 128 caracteres)
+    "sea1",               // categorie : lobby, mer ou variante
+    gameStartTimeMs,       // debut de session, epoch en millisecondes
+    [120, -5, 99],         // position [x,y,z], ou null
+    250                    // mesure numerique, ou null
+);
+
+api.registerAnalyticsPlayerPosition(
+    playerId,
+    "sea1",
+    gameStartTimeMs,
+    [120, -5, 99]
+);
+```
+
+La valeur speciale `eventType: "match"`, `eventValue: "match_started"` marque
+le début d'une session pour les calculs de moyennes et de temps relatif. Chaque
+autre événement et chaque position reçoivent le même `gameStartTimeMs`, qui doit
+être dans les **30 derniers jours**. Le module `src/utils/analytics.js` le crée
+au join, ferme la session au leave, garde un `gameCategoryId` stable (`lobby`,
+`sea1`, etc.) et centralise les appels.
+
+### Limites de Bloxd et garde-fous du projet
+
+Les limites sont **par joueur** : 20 événements/minute et 120 positions/minute.
+Par jeu et par jour : 20 catégories, 20 types d'événements par catégorie, 50
+valeurs par type, et 100 000 blocs distincts de positions (y compris les
+positions attachées aux événements). Les dépassements sont abandonnés jusqu'à
+minuit UTC. Dans ce projet :
+
+* 12 types d'événements fixes, et au plus 20 catégories (`lobby` + `sea1` à
+  `sea19`) ; les variations inconnues sont rabattues sur `sea1` ;
+* le code limite ses événements à **18 par joueur/minute**, laissant une marge ;
+* les gains et dépenses de pièces sont **agrégés sur 30 secondes**, pas envoyés
+  pièce par pièce ou mob par mob ;
+* la heatmap envoie une position arrondie au bloc **une fois par minute** (au
+  lieu d'une fois par seconde) pour ménager le quota global de 100 000 blocs ;
+* les événements de quêtes, fruits, équipes et styles utilisent des valeurs
+  contrôlées ; un garde-fou en mémoire refuse une 51e valeur distincte pour un
+  type/jour UTC pendant l'exécution. Après un redémarrage, l'API Bloxd reste la
+  limite finale ; les 41 fruits actuels sont sous le plafond de 50.
+
+Dans World Studio, consulte les événements par type/catégorie, compare les
+fruits, styles, investissements et récompenses, puis ouvre la heatmap pour les
+positions et morts PvP. Ces données sont des **signaux d'équilibrage**, pas une
+preuve à elles seules : compare des périodes et des populations comparables
+(nouveaux joueurs contre vétérans, ou mer contre mer).
+
+`npm run check` vérifie aussi le contrat analytics (session, catégorie, durée,
+positions, agrégation monétaire et limite locale). Les appels ne sont pas
+simulés dans le jeu pendant le test.
+
+---
+
 ## Le tutoriel du nouveau joueur (`src/gameplay/tutorial.js`)
 
 Un joueur qui arrive pour la première fois décroche : il ne sait pas quoi faire, ni pourquoi

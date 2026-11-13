@@ -7,6 +7,7 @@ import { clearQuestMemory as J, onQuestKill as L, restorePlayerQuest as T } from
 import { attackNPC as U, forgetNPC as B, isProtectedNPC as F, npcNearPoint as npcUnderFinger } from "./gameplay/NPCs";
 import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/spawning";
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
+import { analyticsJoin, analyticsLeave, analyticsTick, setAnalyticsCategoryProvider, trackAnalyticsEvent } from "./utils/analytics";
 import { handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
 import { getFightingStyle as fsStyle, ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
@@ -28,7 +29,7 @@ import { handleAdminShop as jt, adminJoin as Rt, adminLeave as Wt, checkBanOnJoi
 import { saberClick as spClick, saberClose as spClose, saberJoin as spJoin, saberKilledMob as spKill, saberLeave as spLeave, saberLockedItem as spLocked, saberPreventDespawn as spDespawn, spawnMobLeader as spLeader } from "./gameplay/saber";
 import { C as PAL, installTheme as installTheme, bold, ic, shout, txt } from "./core/theme";
 import { notePurchase as tutPurchase, skipTutorial as tutSkip, startTutorial as tutStart, startTutorialLoop as startTutorialLoop, tutorialJoin as tutorialJoin, tutorialLeave as tutorialLeave, tutorialObjective as tutorialObjective, tutorialShield as tutorialShield } from "./gameplay/tutorial";
-import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
+import { variationJoin as variationJoin, variationLeave as variationLeave, startVariationLoop as startVariationLoop, launch as bpLaunch, chooseTeam as bpChooseTeam, continueJourney as bpContinue, enterSea as bpEnterSea, currentVariation as bpCurrentVariation, idInSafeZone as idInSafeZone, safeZoneBlocked as safeZoneBlocked } from "./gameplay/variations";
 
 /* PONT VERS LES CODE BLOCKS
    En Bloxd, une fonction n'est visible depuis un autre Code Block que si elle
@@ -68,6 +69,8 @@ skipTutorial = (playerId) => tutSkip(playerId);
 /* Palette unique + emojis remplaces par des icones Bloxd : on branche le
    normalisateur de textes avant tout le reste. */
 installTheme();
+/* Analytics : category stable (lobby/seaN), jamais un nom de joueur. */
+setAnalyticsCategoryProvider(bpCurrentVariation);
 
 /* Les capacites (fruit, armes d'habilete) passent par combat.damage() et non
    par le handler du moteur : sans ce branchement un marine pouvait toucher un
@@ -419,6 +422,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     applyButtons(t);
 }, onPlayerJoin = t => {St(t) //sphere
     if (qt(t)) return;
+    Gt("analytics.join", () => analyticsJoin(t));
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
        être sautés à cause d'une erreur survenue plus tôt dans le join. */
@@ -447,6 +451,9 @@ onPlayerSelectInventorySlot = (t, slot) => {
        fois que le joueur est a sa place (spawn du lobby ou de la mer). */
     Gt("tutorial", () => tutorialJoin(t));
 }, onPlayerLeave = t => {
+    /* Ferme la session et vide le petit agregat de monnaie avant que la
+       variation ne change sous le joueur. */
+    Gt("analytics.leave", () => analyticsLeave(t));
     /* L'appareil et les essais de donne d'item de dash ne survivent pas a la
        session : le prochain join relit api.isMobile. */
     try { clearPlayerDevice(t), delete lastButtons[t]; } catch (e) {}
@@ -709,7 +716,12 @@ onPlayerStartChargingItem = (t, itemName) => {
         try {
             isPlayer = gt().indexOf(bKiller) !== -1;
         } catch (e) {}
-        isPlayer && (Gt("pvpDeath", () => pvDeath(t, bKiller)), bKill(bKiller, t));
+        if (isPlayer) {
+            Gt("analytics.pvpDeath", () => trackAnalyticsEvent(t, "combat", "pvp_death", null, true));
+            Gt("analytics.pvpKill", () => trackAnalyticsEvent(bKiller, "combat", "pvp_kill", null, true));
+            Gt("pvpDeath", () => pvDeath(t, bKiller));
+            bKill(bKiller, t);
+        }
     });
     try {
         lt(t);
@@ -842,7 +854,7 @@ doPeriodicSave = () => {
         txt(".", PAL.MONEY),
     ]);
 }, tick = t => {Mt(t);//sphere
-    ht(), W(), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
+    ht(), W(), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();
     });
 }, R(() => {

@@ -27,6 +27,7 @@
 import { setInterval } from "../utils/timer";
 import { C, say, txt, bold, ic } from "../core/theme";
 import { forgetChatChannel } from "../core/team";
+import { trackAnalyticsEvent } from "../utils/analytics";
 
 /* ---------------------------------------------------------------- reglages */
 
@@ -329,11 +330,17 @@ export function enterSea(playerId, seaNumber, pos) {
     const sea = seaByNumber(n);
     if (!sea) return false;
     /* Sans variations : une seule mer, on y TELEPORTE (aucun matchmaking). */
-    if (!variationsOn) return teleport(playerId, pos || teamSpawn(sea, teamOf(playerId)));
+    if (!variationsOn) {
+        const ok = teleport(playerId, pos || teamSpawn(sea, teamOf(playerId)));
+        if (ok) trackAnalyticsEvent(playerId, "travel", "sea_entered", n, false);
+        return ok;
+    }
     if (!variationsSupported()) return false;
     put(playerId, "vsea", n);
     setPending(playerId, pos || unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
-    return moveToVariation(playerId, sea.id);
+    const ok = moveToVariation(playerId, sea.id);
+    if (ok) trackAnalyticsEvent(playerId, "travel", "sea_entered", n, false);
+    return ok;
 }
 
 function getDb(playerId, key) {
@@ -371,12 +378,14 @@ export function chooseTeam(playerId, teamId) {
     const n = firstTime ? 1 : playerSea(playerId);
     const sea = seaByNumber(n) || SEAS[1];
     const teamLabel = team === "PIRATES" ? "Pirates" : team === "MARINES" ? "Marines" : "No Team";
-    applyTeam(playerId, team);
+    if (applyTeam(playerId, team))
+        trackAnalyticsEvent(playerId, "team", team.toLowerCase(), null, false);
 
     /* Sans variations : la team se choisit sur place, on teleporte au spawn de
        la team dans le monde (les coordonnees sont les memes). */
     if (!variationsOn) {
         const ok = teleport(playerId, teamSpawn(sea, team));
+        if (ok) trackAnalyticsEvent(playerId, "travel", "journey_started", n, false);
         tell(playerId, [
             ic("fa-solid fa-map-marker-check", C.MARINE),
             txt(ok ? " You joined the " : " Could not move you to the ", C.INFO),
@@ -388,6 +397,7 @@ export function chooseTeam(playerId, teamId) {
     put(playerId, "vsea", n);
     setPending(playerId, teamSpawn(sea, team));
     const ok = moveToVariation(playerId, sea.id);
+    if (ok) trackAnalyticsEvent(playerId, "travel", "journey_started", n, false);
     tell(playerId, [
         ic("fa-solid fa-map-marker-check", C.MARINE),
         txt(ok ? " Sailing to " : " Could not board ", C.INFO),
@@ -404,6 +414,7 @@ export function continueJourney(playerId) {
     /* Sans variations : on remet le joueur a sa place dans le monde. */
     if (!variationsOn) {
         const ok = teleport(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
+        if (ok) trackAnalyticsEvent(playerId, "travel", "journey_resumed", n, false);
         tell(playerId, [
             ic("Boat", C.MARINE),
             txt(ok ? " Welcome back." : " Could not move you.", C.INFO),
@@ -412,6 +423,7 @@ export function continueJourney(playerId) {
     }
     setPending(playerId, unpackPos(getDb(playerId, "vp" + n)) || teamSpawn(sea, teamOf(playerId)));
     const ok = moveToVariation(playerId, sea.id);
+    if (ok) trackAnalyticsEvent(playerId, "travel", "journey_resumed", n, false);
     tell(playerId, [
         ic("Boat", C.MARINE),
         txt(ok ? " Welcome back to " : " Could not board ", C.INFO),

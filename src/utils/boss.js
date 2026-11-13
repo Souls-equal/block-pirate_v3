@@ -3,6 +3,7 @@ import { setTimeout, setInterval, sleep, run, nowMs } from "./timer";
 import { say, txt } from "../core/theme";
 import { markBossMob } from "../gameplay/loot";
 import { aliveNow, applyNameTag, dist2, nameTagInfo, posOf } from "./lifeform";
+import { trackAnalyticsEvent } from "./analytics";
 
 // config
 
@@ -351,6 +352,7 @@ function* summonGuards() {
 function onBossDeath(playerId) {
   if (!boss || boss.dead) return;
   boss.dead = true;
+  if (playerId) trackAnalyticsEvent(playerId, "boss", CFG.NAME.toLowerCase(), null, true);
   const p = posOf(boss.id);
   dropHaki(p);
   chat(CFG.NAME + " has fallen", "#ffd166", playerId);
