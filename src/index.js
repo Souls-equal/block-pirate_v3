@@ -9,7 +9,7 @@ import { ensureMobData as E, forgetMob as O, killdMob as j } from "./gameplay/sp
 import { setInterval as R, setTimeout as sTimeout, step as W } from "./utils/timer";
 import { analyticsJoin, analyticsLeave, analyticsTick, setAnalyticsCategoryProvider, trackAnalyticsEvent } from "./utils/analytics";
 import { getStatLevel as getCombatStatLevel, handleShopBuy as q, initStats as Q, initUpgradeShop as x } from "./gameplay/stats";
-import { applyDamageBonus as applyFlatDamageBonus, applyDefenseReduction as applyFlatDefense, getDamageBonusForPoints as getFlatDamageBonus, getDefenseReductionForPoints as getFlatDefenseReduction } from "./gameplay/combat-stats";
+import { applyDamageBonus as applyFlatDamageBonus, applyDefenseReduction as applyFlatDefense, getDamageBonusForPoints as getFlatDamageBonus, getPvPDamageBonusForPoints as getPvPFlatDamageBonus, getDefenseReductionForPoints as getFlatDefenseReduction, getPvPDefenseReductionForPoints as getPvPFlatDefenseReduction } from "./gameplay/combat-stats";
 import { getFightingStyle as fsStyle, ensureVoidNet as ensureNet, handleFightingStyleClick as fsClick, removeFightingStyleItems as dropFightingStyleItems, removeVoidNet as dropNet, handleFightingStyleM1 as fsM1, isFightingStyleItemName as fsItemName, isHoldingFightingStyleItem as fsHolding, isHoldingVoidNet as fsHoldingNet, onPlayerLeaveFightingStyle as fsLeave, restoreFightingStyle as fsRestore, useFightingStyleAbility as styleAbility, VOID_NET as VOID_NET_Name } from "./gameplay/fightingStyles";
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
@@ -671,8 +671,8 @@ onPlayerStartChargingItem = (t, itemName) => {
         }
     }
     if (res !== "preventDamage" && typeof i === "number" && i > 0) {
-        const bonus = getFlatDamageBonus(getCombatStatLevel(r, "d"));
-        const reduction = getFlatDefenseReduction(getCombatStatLevel(a, "df"));
+        const bonus = getPvPFlatDamageBonus(getCombatStatLevel(r, "d"));
+        const reduction = getPvPFlatDefenseReduction(getCombatStatLevel(a, "df"));
         return applyFlatDefense(applyFlatDamageBonus(i, bonus), reduction);
     }
     return res;
