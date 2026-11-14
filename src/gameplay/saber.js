@@ -52,6 +52,7 @@ import { aliveNow, applyNameTag, dist3, getAlivePlayerIds, isMobEntityType, name
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
 import { heldItemName, scanAllItems, writeItem } from "./customItem";
 import { markBossMob } from "./loot";
+import { blockKillCredit } from "../utils/killAttribution";
 import { armBossGate, disarmBossGate, setupBossMob } from "../utils/boss";
 
 /* ── 1. CONSTANTES ET POINTS DU MONDE ─────────────────────────────────────
@@ -301,6 +302,14 @@ function despawnIfAlive(id) {
     /* Le garde-fou de degats suit le mob : plus de mob, plus de palier. */
     disarmBossGate(id);
     try { if (aliveNow(id)) api.despawnMob(id); } catch (e) {}
+}
+
+function dismissSaberWithoutCredit(id) {
+    if (!id) return;
+    /* La fin du duel (joueur mort / parti) est un despawn, pas un kill joueur :
+       verrouiller avant le despawn évite que le dernier coup reçu paie XP/or. */
+    blockKillCredit(id);
+    despawnIfAlive(id);
 }
 
 
@@ -1670,7 +1679,7 @@ function thinkSaber() {
     if (!saber) { stopSaber(); return; }
     if (!aliveNow(saber.id)) { saberFallen(); return; }
     const p = safePosition(saber.id);
-    if (!p) { despawnIfAlive(saber.id); stopSaber(); return; }
+    if (!p) { dismissSaberWithoutCredit(saber.id); stopSaber(); return; }
 
     advanceWaves(saber.waves, saber.id);
     tickSaberDash(p);
@@ -2143,7 +2152,7 @@ function endSaberFight(reason) {
     const fighter = saber ? saber.fighter : null;
     const id = saber ? saber.id : null;
     stopSaber();
-    despawnIfAlive(id);
+    dismissSaberWithoutCredit(id);
     if (fighter && reason) say(fighter, line("fa-solid fa-circle-info", C.INFO, reason));
 }
 
