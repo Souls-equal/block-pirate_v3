@@ -2764,9 +2764,10 @@ spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
 > proche dans ses 40 blocs (`LEADER.AGGRO`), reprise dès que la cible meurt ou sort de portée — donc
 > il attaque même si on l'invoque à côté de personne et qu'un joueur arrive ensuite.
 
-Un second appel est refusé tant que le premier est vivant. Le **Gold Grit** ne tombe que tant que la
-quête le demande (étapes 5 et 6) : relancer le boss après avoir été payé ne fabrique pas de l'or à
-l'infini.
+Un cooldown de **30 secondes démarre dès chaque apparition réussie**. À son expiration, un nouveau
+Mob Leader peut apparaître même si le précédent est encore vivant ou a quitté l'île; chaque instance
+reste suivie séparément. Le **Gold Grit** ne tombe que tant que la quête le demande (étapes 5 et 6) :
+relancer le boss après avoir été payé ne fabrique pas de l'or à l'infini.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`
 (`20 + 200^1.6 × 8` = **38 456 PV**, `3 + 200^1.3 × 0.8` = **787 dégâts par coup**). Les deux valeurs
@@ -2782,8 +2783,8 @@ corps) : une capacité à 90 quand le poing en fait 787 ne se sent pas.
 | **Gold Shot** | 5 → 26 blocs | une onde d'or lancée en ligne (× 0,45) |
 | **Ruée** | 4 → 20 blocs | il fonce et percute (× 0,55) |
 
-Les quatre se préparent **au sol**, jamais dans le chat. Un second appel est refusé tant que le
-premier est vivant, et le monde ne peut pas le despawner en plein combat.
+Les quatre se préparent **au sol**, jamais dans le chat. Les instances restent suivies jusqu'à leur
+mort, et le monde ne peut pas les despawner en plein combat.
 
 ### Le Saber Expert
 

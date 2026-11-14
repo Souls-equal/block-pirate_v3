@@ -296,7 +296,7 @@ export function spawnBoss(position, playerId) {
     settings: { name: CFG.NAME },
   });
   /* Pas de one shot : paliers a 1/2, 1/3, 1/4 et 1/5 (voir bossDamageGate). */
-  armBossGate(id, CFG.HP);
+  armBossGate(id, CFG.HP, CFG.NAME);
 
 
   sound("bearRoar1", 1, 0.55);
@@ -436,11 +436,11 @@ const GATE = {
 const GATES = {};
 
 /* Arme le garde-fou sur un boss qui vient d'apparaitre. */
-export function armBossGate(mobId, maxHp) {
+export function armBossGate(mobId, maxHp, bossName) {
   if (!mobId || !(maxHp > 0)) return false;
   const tiers = [];
   for (let i = 0; i < GATE.FRACTIONS.length; i++) tiers.push(false);
-  GATES[mobId] = { max: maxHp, tiers: tiers, until: 0 };
+  GATES[mobId] = { max: maxHp, tiers: tiers, until: 0, name: bossName || "The boss" };
   return true;
 }
 
@@ -452,12 +452,8 @@ export function disarmBossGate(mobId) {
 }
 
 function bossNameOf(mobId) {
-  let name = null;
-  try { name = api.getMobSetting(mobId, "name", false); } catch (e) { name = null; }
-  if (typeof name !== "string" || !name) {
-    try { name = api.getEntityName(mobId); } catch (e2) { name = null; }
-  }
-  return typeof name === "string" && name ? name : "The boss";
+  const gate = GATES[mobId];
+  return gate && gate.name ? gate.name : "The boss";
 }
 
 /* Les joueurs assez proches pour voir le palier tomber. */

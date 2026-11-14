@@ -18,11 +18,10 @@ export function getDefenseReductionForPoints(points) {
     return 1.95 * Math.pow(p, 1.4);
 }
 
-// PvP uses a gentler flat curve than PvE so equal-level hits stay meaningful,
-// but Defense keeps scaling as players invest more points.
+// PvP Defense mirrors the PvP Damage curve exactly, as flat reduction per hit.
 export function getPvPDefenseReductionForPoints(points) {
     const p = Math.max(0, Number(points) || 0);
-    return 0.4 * Math.sqrt(p);
+    return getPvPDamageBonusForPoints(p);
 }
 
 export function applyDamageBonus(baseDamage, bonus) {
