@@ -190,6 +190,55 @@ const PVP_ARM_MAX_MS = 3000;
 const PVP_PENDING = {}; /* victimId -> { killerId, at } */
 const PVP_SHIELD = {};  /* victimId -> { killerId: expiresAt } */
 const PVP_NOTICE = {};  /* "killer|victim" -> dernier message */
+const SPAWN_PROTECTION_MS = 10000;
+const SPAWN_PROTECTION_PENDING_MS = 2 * 60 * 1000;
+const SPAWN_PROTECTION_ARM_DELAY_MS = 250;
+const SPAWN_PROTECTION_ARM_MAX_MS = 3000;
+const SPAWN_PROTECTION = {};         /* playerId -> expiresAt */
+const SPAWN_PROTECTION_PENDING = {}; /* playerId -> death timestamp */
+
+export function startSpawnProtection(playerId) {
+    if (!playerId) return false;
+    SPAWN_PROTECTION[playerId] = Date.now() + SPAWN_PROTECTION_MS;
+    delete SPAWN_PROTECTION_PENDING[playerId];
+    return true;
+}
+
+export function noteSpawnProtectionPending(playerId) {
+    if (!playerId) return false;
+    if (!SPAWN_PROTECTION_PENDING[playerId]) SPAWN_PROTECTION_PENDING[playerId] = Date.now();
+    return true;
+}
+
+export function isSpawnProtected(playerId) {
+    if (!playerId) return false;
+    const until = SPAWN_PROTECTION[playerId];
+    if (!until) return false;
+    if (Date.now() >= until) {
+        delete SPAWN_PROTECTION[playerId];
+        return false;
+    }
+    return true;
+}
+
+export function tickSpawnProtection() {
+    const now = Date.now();
+    for (const playerId in SPAWN_PROTECTION) {
+        if (now >= SPAWN_PROTECTION[playerId]) delete SPAWN_PROTECTION[playerId];
+    }
+    for (const playerId in SPAWN_PROTECTION_PENDING) {
+        const elapsed = now - SPAWN_PROTECTION_PENDING[playerId];
+        if (elapsed > SPAWN_PROTECTION_PENDING_MS) {
+            delete SPAWN_PROTECTION_PENDING[playerId];
+            continue;
+        }
+        if (elapsed < SPAWN_PROTECTION_ARM_DELAY_MS) continue;
+        const hp = pvpHealth(playerId);
+        if (hp !== null && hp <= 0) continue;
+        if (hp === null && elapsed < SPAWN_PROTECTION_ARM_MAX_MS) continue;
+        startSpawnProtection(playerId);
+    }
+}
 
 /* Messages PvP : icone de tete + registre, comme le reste du chat. */
 function pvpSay(playerId, icon, color, parts) {
@@ -335,6 +384,8 @@ export function clearPvPFor(playerId) {
     if (!playerId) return;
     delete PVP_PENDING[playerId];
     delete PVP_SHIELD[playerId];
+    delete SPAWN_PROTECTION[playerId];
+    delete SPAWN_PROTECTION_PENDING[playerId];
     const prefix = playerId + "|";
     for (const key in PVP_NOTICE) {
         if (key.indexOf(prefix) === 0 || key.indexOf("|" + playerId) !== -1) delete PVP_NOTICE[key];
@@ -384,6 +435,7 @@ export function tickPvPShield() {
 export function damage(target, rawAmount, caster, itemName) {
     try {
         if (!target || !caster || target === caster) return false;
+        if (isSpawnProtected(target)) return false;
         /* Zone neutre du lobby : ni le lanceur ni la cible ne peuvent etre
            touches (capacites, invocations, degats de zone...). */
         if (blockedByZone(caster, target)) return false;

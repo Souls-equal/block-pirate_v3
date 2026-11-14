@@ -15,7 +15,7 @@ import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
 import { isBossMob as isBossMob } from "./gameplay/loot";
-import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
+import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, startSpawnProtection as startSpawnShield, noteSpawnProtectionPending as noteSpawnShieldPending, isSpawnProtected as isSpawnShielded, tickSpawnProtection as tickSpawnShield, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
 import { DASH_ITEM as DASH_ITEM_Name, clearActionButton as clearActionBtn, handleDashButton as dashButtonPressed, handleDashItemClick as dashItemClick, setupDashButton as setupDashBtn, isDashing as isDash, removeDashItem as dropDash, setStaminaUpdateHook as rt, staminaJoin as at, staminaLeave as it, tickStamina as et, tryDash as ot } from "./gameplay/stamina";
 import { creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMobSeen as nt, pruneDamagers as pt, recordDamager as ft, releaseKill as ut, setKillCreditHook as ct, setMobSeenHook as yt } from "./utils/killAttribution";
@@ -423,6 +423,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     applyButtons(t);
 }, onPlayerJoin = t => {St(t) //sphere
     if (qt(t)) return;
+    startSpawnShield(t);
     Gt("analytics.join", () => analyticsJoin(t));
     /* Chaque étape est isolée : si l'une échoue, les suivantes s'appliquent
        quand même. La sidebar, le nametag et le leaderboard ne doivent JAMAIS
@@ -477,6 +478,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     bt(t), dt(t), Jt(t);
     for (const r of Xt.keys()) if (r.startsWith(String(t) + ":")) Xt.delete(r);
 }, onRespawnRequest = t => {
+    startSpawnShield(t);
     /* Protection PvP : 5 min contre le joueur qui vient de la tuer. */
     Gt("pvpShield", () => pvShield(t)), Gt("hakiRespawn", () => Lt(t)), Gt("restoreFruit", () => g(t)),
     Gt("restoreStyle", () => fsRestore(t)), Gt("abilities", () => P(t)),
@@ -635,12 +637,14 @@ onPlayerStartChargingItem = (t, itemName) => {
     }
     return !m || 1 === m.type || heldItem || api.isPlayerCrouching(t) ? void 0 : (D(t) || fsHolding(t)) ? "preventAction" : void 0;
 }, onMobDamagingPlayer = (t, r, a) => {
+    if (isSpawnShielded(r)) return "preventDamage";
     if (A(r)) return "preventDamage";
     if (idInSafeZone(r)) return "preventDamage";
     if (typeof a === "number" && a > 0) {
         return applyFlatDefense(a, getFlatDefenseReduction(getCombatStatLevel(r, "df")));
     }
 }, onPlayerDamagingOtherPlayer = (r, a, i, e) => {
+    if (isSpawnShielded(a)) return "preventDamage";
     if (A(a)) return "preventDamage";
     /* Protection PvP : le tueur ne peut pas toucher sa victime juste apres son
        respawn ; si c'est la victime qui attaque, pvpGuard retire la protection. */
@@ -704,6 +708,7 @@ onPlayerStartChargingItem = (t, itemName) => {
     }
 }, onAttemptKillPlayer = (t, r) => {
     if (A(t)) return bt(t), "preventDeath";
+    noteSpawnShieldPending(t);
     k(t), df(t), Pt(t);
     /* Bounty : le moteur fournit le tueur (r), sinon on reprend le dernier
        attaquant — a lire AVANT de l'oublier. Le tueur doit etre un joueur en
@@ -742,6 +747,7 @@ onPlayerStartChargingItem = (t, itemName) => {
     }
     dt(t);
 }, onPlayerKilledOtherPlayer = (t, r, a, i) => {
+    if (t && r && t !== r) noteSpawnShieldPending(r);
     /* Selon le chemin de mort, le moteur peut passer par ici plutot que par
        onAttemptKillPlayer : on memorise le tueur dans les deux cas, sinon la
        protection PvP ne serait jamais armee. */
@@ -866,7 +872,7 @@ doPeriodicSave = () => {
         txt(".", PAL.MONEY),
     ]);
 }, tick = t => {Mt(t);//sphere
-    ht(), W(), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
+    ht(), W(), Gt("spawnProtection", () => tickSpawnShield()), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();
     });
 }, R(() => {
@@ -887,7 +893,7 @@ doPeriodicSave = () => {
                 icon: "Iceball",
                 displayName: "Fruit Malediction (Drowning)"
             }), !n(t)) continue;
-            if (api.getHealth(t) > 0) {
+            if (api.getHealth(t) > 0 && !isSpawnShielded(t)) {
                 const r = Number(api.getClientOption(t, "maxHealth")) || 100, a = Math.max(1, Math.round(r / 10));
                 api.applyHealthChange(t, -a, {
                     lifeformId: t,
