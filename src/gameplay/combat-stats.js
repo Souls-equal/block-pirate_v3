@@ -18,11 +18,11 @@ export function getDefenseReductionForPoints(points) {
     return 1.95 * Math.pow(p, 1.4);
 }
 
-// PvP uses a gentler flat curve and a low ceiling: the full mob-tuned curve
-// can otherwise erase ordinary player hits at equal levels.
+// PvP uses a gentler flat curve than PvE so equal-level hits stay meaningful,
+// but Defense keeps scaling as players invest more points.
 export function getPvPDefenseReductionForPoints(points) {
     const p = Math.max(0, Number(points) || 0);
-    return Math.min(8, 0.4 * Math.sqrt(p));
+    return 0.4 * Math.sqrt(p);
 }
 
 export function applyDamageBonus(baseDamage, bonus) {
