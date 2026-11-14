@@ -1145,9 +1145,7 @@ function stopLeader(id) {
     if (leaderTimer) { leaderTimer.stop(); leaderTimer = null; }
 }
 
-let leaderRespawnTimer = null;
 let leaderRespawnAt = 0;
-let leaderRespawnPosition = null;
 
 function leaderRespawnEffectActive() {
     const ids = getAlivePlayerIds();
@@ -1175,36 +1173,17 @@ function refreshLeaderRespawnEffects(duration) {
     for (let i = 0; i < ids.length; i++) applyLeaderRespawnEffect(ids[i], duration);
 }
 
-function finishLeaderRespawnCooldown() {
-    if (leaderRespawnAt <= 0 || nowMs() < leaderRespawnAt || leaderRespawnEffectActive()) return;
-    const respawnAt = leaderRespawnPosition;
-    if (!respawnAt) {
-        if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
-        return;
-    }
-    /* L'intervalle garde la tentative active si le moteur refuse ce spawn;
-       seule une invocation reussie redemarre les 30 secondes. */
-    try { spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]); } catch (err) {}
-}
-
-function scheduleLeaderRespawn(position) {
-    if (!position || position.length < 3) return false;
-    leaderRespawnPosition = [Number(position[0]), Number(position[1]), Number(position[2])];
-    if (leaderRespawnTimer) leaderRespawnTimer.stop();
+function startLeaderRespawnCooldown() {
     leaderRespawnAt = nowMs() + LEADER.RESPAWN_MS;
     refreshLeaderRespawnEffects(LEADER.RESPAWN_MS);
-    leaderRespawnTimer = every(finishLeaderRespawnCooldown, 20);
-    return true;
 }
 
 function cancelLeaderRespawn() {
-    if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
     const ids = getAlivePlayerIds();
     for (let i = 0; i < ids.length; i++) {
         try { api.removeEffect(ids[i], LEADER.RESPAWN_EFFECT); } catch (e) {}
     }
     leaderRespawnAt = 0;
-    leaderRespawnPosition = null;
 }
 
 
@@ -1419,7 +1398,7 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (playerId) say(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
         return null;
     }
-    scheduleLeaderRespawn(spot);
+    startLeaderRespawnCooldown();
     /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
        kill, donc son nom ne sera plus lisible a ce moment-la. */
     markBossMob(id, LEADER.NAME);
