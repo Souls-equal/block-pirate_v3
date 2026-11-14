@@ -46,7 +46,7 @@
 
 import { C, say, txt, bold, ic } from "../core/theme";
 import { deleteStat, getStat, setStat } from "../utils/data";
-import { nowMs, setInterval as every } from "../utils/timer";
+import { nowMs, setInterval as every, setTimeout as after } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { aliveNow, applyNameTag, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safePosition } from "../utils/lifeform";
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
@@ -1117,6 +1117,7 @@ const LEADER = {
        plus des degats normaux : rester colle a un mob de niveau 200 devient
        vraiment puni. Rayon et delais se retouchent ici. */
     RING: { RADIUS: 6.5, WARN: 1400, SCALE: 1 },
+    RESPAWN_MS: 30000,
 };
 
 
@@ -1141,12 +1142,56 @@ function stopLeader() {
     leader = null;
 }
 
+let leaderRespawnTimer = null;
+let leaderRespawnAt = 0;
+let leaderRespawnPosition = null;
+
+function scheduleLeaderRespawn(position) {
+    if (!position || position.length < 3) return false;
+    leaderRespawnPosition = [Number(position[0]), Number(position[1]), Number(position[2])];
+    if (leaderRespawnTimer) leaderRespawnTimer.stop();
+    leaderRespawnAt = nowMs() + LEADER.RESPAWN_MS;
+    leaderRespawnTimer = after(() => {
+        leaderRespawnTimer = null;
+        const respawnAt = leaderRespawnPosition;
+        leaderRespawnPosition = null;
+        leaderRespawnAt = 0;
+        if (leader && aliveNow(leader.id)) return;
+        if (leader) stopLeader();
+        if (!respawnAt) return;
+        try {
+            const id = spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]);
+            if (!id && !(leader && aliveNow(leader.id))) scheduleLeaderRespawn(respawnAt);
+        } catch (err) {
+            scheduleLeaderRespawn(respawnAt);
+        }
+    }, Math.ceil(LEADER.RESPAWN_MS / 50));
+    return true;
+}
+
+function cancelLeaderRespawn() {
+    if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
+    leaderRespawnAt = 0;
+    leaderRespawnPosition = null;
+}
+
 
 function thinkLeader() {
     if (!leader) { stopLeader(); return; }
-    if (!aliveNow(leader.id)) { stopLeader(); return; }
+    if (!aliveNow(leader.id)) {
+        const respawnAt = leader.spawnPos || safePosition(leader.id);
+        stopLeader();
+        scheduleLeaderRespawn(respawnAt);
+        return;
+    }
     const p = safePosition(leader.id);
-    if (!p) { despawnIfAlive(leader.id); stopLeader(); return; }
+    if (!p) {
+        const respawnAt = leader.spawnPos;
+        despawnIfAlive(leader.id);
+        stopLeader();
+        scheduleLeaderRespawn(respawnAt);
+        return;
+    }
 
     advanceWaves(leader.waves, leader.id);
     advanceLeaderRing(leader.id, p);
@@ -1317,6 +1362,19 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (playerId) say(playerId, line("fa-solid fa-circle-info", C.INFO, "The Mob Leader is already on the loose."));
         return null;
     }
+    if (leader) {
+        const lostPosition = leader.spawnPos || safePosition(leader.id);
+        stopLeader();
+        if (!leaderRespawnAt) scheduleLeaderRespawn(lostPosition);
+    }
+    const cooldownLeft = leaderRespawnAt - nowMs();
+    if (cooldownLeft > 0) {
+        if (playerId) {
+            const seconds = Math.ceil(cooldownLeft / 1000);
+            say(playerId, line("fa-solid fa-hourglass", C.INFO, "The Mob Leader is resting. Respawns in " + seconds + "s."));
+        }
+        return null;
+    }
 
     const spot = clearSpot([px, py, pz]);
     let id = null;
@@ -1358,6 +1416,7 @@ export function spawnMobLeader(x, y, z, playerId) {
 
     leader = {
         id: id,
+        spawnPos: [spot[0], spot[1], spot[2]],
         cds: { rush: 0, volley: 0, shake: 0, ring: 0 },
         rushUntil: 0,
         rushHit: {},
@@ -1382,8 +1441,10 @@ function killLeader(playerId, mobId) {
     if (!mobId || !leader || mobId !== leader.id) return false;
 
     const p = safePosition(mobId);
+    const respawnPosition = leader.spawnPos || p;
     stopLeader();
     despawnIfAlive(mobId);
+    scheduleLeaderRespawn(respawnPosition);
 
     /* L'OR NE TOMBE QU'UNE FOIS, a l'etape chasse. Un second Mob Leader lance
        par le Code Block et tue a l'etape "or" ne lache donc plus rien : le
@@ -2153,6 +2214,7 @@ export function saberLeave(playerId) {
 export function saberClose() {
     stopSaber();
     stopLeader();
+    cancelLeaderRespawn();
     stopHousekeeping();
     closeStruct("door");
     closeStruct("curtain");
