@@ -2765,9 +2765,10 @@ spawnMobLeader(x, y, z, playerId)  // et il vise ce joueur
 > il attaque même si on l'invoque à côté de personne et qu'un joueur arrive ensuite.
 
 Un cooldown de **30 secondes démarre dès chaque apparition réussie**; il n'invoque pas lui-même un
-nouveau boss à son expiration. Le prochain appel du Code Block peut alors faire apparaître un autre
-Mob Leader même si le précédent est encore vivant ou a quitté l'île; chaque instance reste suivie
-séparément. Le **Gold Grit** ne tombe que tant que la quête le demande (étapes 5 et 6) :
+nouveau boss à son expiration. Son effet est appliqué uniquement au `playerId` fourni à l'appel, jamais
+à tous les joueurs. Le prochain appel du Code Block peut alors faire apparaître un autre Mob Leader,
+même si le précédent est encore vivant ou a quitté l'île; chaque instance reste suivie séparément.
+Le **Gold Grit** ne tombe que tant que la quête le demande (étapes 5 et 6) :
 relancer le boss après avoir été payé ne fabrique pas de l'or à l'infini.
 
 Ses PV et ses dégâts sont **ceux d'un mob de niveau 200** : mêmes formules que `gameplay/spawning.js`

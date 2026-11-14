@@ -1146,16 +1146,16 @@ function stopLeader(id) {
 }
 
 let leaderRespawnAt = 0;
+let leaderRespawnPlayerId = null;
 
 function leaderRespawnEffectActive() {
-    const ids = getAlivePlayerIds();
-    for (let i = 0; i < ids.length; i++) {
-        try {
-            const effects = api.getEffects(ids[i]);
-            if (effects && effects.includes(LEADER.RESPAWN_EFFECT)) return true;
-        } catch (e) {}
+    if (!leaderRespawnPlayerId) return false;
+    try {
+        const effects = api.getEffects(leaderRespawnPlayerId);
+        return !!(effects && effects.includes(LEADER.RESPAWN_EFFECT));
+    } catch (e) {
+        return false;
     }
-    return false;
 }
 
 function applyLeaderRespawnEffect(playerId, duration) {
@@ -1168,22 +1168,18 @@ function applyLeaderRespawnEffect(playerId, duration) {
     } catch (e) {}
 }
 
-function refreshLeaderRespawnEffects(duration) {
-    const ids = getAlivePlayerIds();
-    for (let i = 0; i < ids.length; i++) applyLeaderRespawnEffect(ids[i], duration);
-}
-
-function startLeaderRespawnCooldown() {
+function startLeaderRespawnCooldown(playerId) {
     leaderRespawnAt = nowMs() + LEADER.RESPAWN_MS;
-    refreshLeaderRespawnEffects(LEADER.RESPAWN_MS);
+    leaderRespawnPlayerId = playerId || null;
+    if (leaderRespawnPlayerId) applyLeaderRespawnEffect(leaderRespawnPlayerId, LEADER.RESPAWN_MS);
 }
 
 function cancelLeaderRespawn() {
-    const ids = getAlivePlayerIds();
-    for (let i = 0; i < ids.length; i++) {
-        try { api.removeEffect(ids[i], LEADER.RESPAWN_EFFECT); } catch (e) {}
+    if (leaderRespawnPlayerId) {
+        try { api.removeEffect(leaderRespawnPlayerId, LEADER.RESPAWN_EFFECT); } catch (e) {}
     }
     leaderRespawnAt = 0;
+    leaderRespawnPlayerId = null;
 }
 
 
@@ -1372,7 +1368,7 @@ function leaderVolley(p, tp) {
 
 /* Lance par un Code Block :
        spawnMobLeader(x, y, z)              -> a l'endroit voulu
-       spawnMobLeader(x, y, z, playerId)    -> et il vise ce joueur
+       spawnMobLeader(x, y, z, playerId)    -> vise ce joueur et lui seul recoit l'effet
    Retourne l'id du mob, ou null. */
 export function spawnMobLeader(x, y, z, playerId) {
     const px = Number(x), py = Number(y), pz = Number(z);
@@ -1398,7 +1394,7 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (playerId) say(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
         return null;
     }
-    startLeaderRespawnCooldown();
+    startLeaderRespawnCooldown(playerId);
     /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
        kill, donc son nom ne sera plus lisible a ce moment-la. */
     markBossMob(id, LEADER.NAME);
@@ -2193,8 +2189,6 @@ export function saberPreventDespawn(mobId) {
 
 export function saberJoin(playerId) {
     if (!playerId) return false;
-    const respawnCooldownLeft = leaderRespawnAt - nowMs();
-    if (respawnCooldownLeft > 0) applyLeaderRespawnEffect(playerId, respawnCooldownLeft);
     startHousekeeping();
     /* Les deux cles des versions precedentes sont effacees : `sq` (etape) et
        `sqB` (plaques) ne servent plus a rien, tout tient maintenant dans `s`. */
