@@ -46,7 +46,7 @@ export const STAT_CONFIG = {
     d:  { name: "Damage",  color: C.DANGER,  icon: "Diamond Sword",  imageColour: "white",   perPoint: "Adds flat damage per hit; PvP has a lower level-scaled bonus." },
     s:  { name: "Stamina", color: C.MARINE,  icon: "Updraft",        imageColour: "white",   perPoint: "+10 max stamina, so more dashes and air jumps." },
     r:  { name: "Regen",   color: C.XP,      icon: "Health Regen",   imageColour: C.SUCCESS, perPoint: "Heal more, and sooner after a hit." },
-    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "Flat reduction per hit; PvP scales more gently than against mobs." },
+    df: { name: "Defense", color: C.MONEY,   icon: "Iron Chestplate", imageColour: "white",  perPoint: "Flat reduction per hit; PvP uses the same scaling as Damage." },
 };
 
 const STAT_ORDER = ["h", "d", "s", "r", "df"];

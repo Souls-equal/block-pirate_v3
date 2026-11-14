@@ -1132,15 +1132,17 @@ function leaderDmg() { return Math.round(3 + Math.pow(LEADER.LEVEL, 1.3) * 0.8);
 function leaderHit(key) { return Math.round(leaderDmg() * (LEADER.HIT[key] || 0.5)); }
 
 
-let leader = null; // { id, handle, cds, rushUntil, rushHit, waves }
-
-
+const leaders = Object.create(null);
+let leader = null; // contexte temporaire d'une instance pendant son tick
 let leaderTimer = null;
 
+function stopLeader(id) {
+    if (id) delete leaders[id];
+    else for (const key in leaders) delete leaders[key];
+    if (!id || (leader && leader.id === id)) leader = null;
 
-function stopLeader() {
+    for (const key in leaders) return;
     if (leaderTimer) { leaderTimer.stop(); leaderTimer = null; }
-    leader = null;
 }
 
 let leaderRespawnTimer = null;
@@ -1176,18 +1178,13 @@ function refreshLeaderRespawnEffects(duration) {
 function finishLeaderRespawnCooldown() {
     if (leaderRespawnAt <= 0 || nowMs() < leaderRespawnAt || leaderRespawnEffectActive()) return;
     const respawnAt = leaderRespawnPosition;
-    if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
-    leaderRespawnAt = 0;
-    leaderRespawnPosition = null;
-    if (leader && aliveNow(leader.id)) return;
-    if (leader) stopLeader();
-    if (!respawnAt) return;
-    try {
-        const id = spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]);
-        if (!id && !(leader && aliveNow(leader.id))) scheduleLeaderRespawn(respawnAt);
-    } catch (err) {
-        scheduleLeaderRespawn(respawnAt);
+    if (!respawnAt) {
+        if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
+        return;
     }
+    /* L'intervalle garde la tentative active si le moteur refuse ce spawn;
+       seule une invocation reussie redemarre les 30 secondes. */
+    try { spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]); } catch (err) {}
 }
 
 function scheduleLeaderRespawn(position) {
@@ -1212,19 +1209,27 @@ function cancelLeaderRespawn() {
 
 
 function thinkLeader() {
-    if (!leader) { stopLeader(); return; }
+    const ids = Object.keys(leaders);
+    for (let i = 0; i < ids.length; i++) {
+        const state = leaders[ids[i]];
+        if (!state) continue;
+        const previous = leader;
+        leader = state;
+        try { thinkLeaderInstance(); } catch (e) {}
+        leader = previous && leaders[previous.id] ? previous : null;
+    }
+}
+
+function thinkLeaderInstance() {
+    if (!leader) return;
     if (!aliveNow(leader.id)) {
-        const respawnAt = leader.spawnPos || safePosition(leader.id);
-        stopLeader();
-        scheduleLeaderRespawn(respawnAt);
+        stopLeader(leader.id);
         return;
     }
     const p = safePosition(leader.id);
     if (!p) {
-        const respawnAt = leader.spawnPos;
         despawnIfAlive(leader.id);
-        stopLeader();
-        scheduleLeaderRespawn(respawnAt);
+        stopLeader(leader.id);
         return;
     }
 
@@ -1393,15 +1398,6 @@ function leaderVolley(p, tp) {
 export function spawnMobLeader(x, y, z, playerId) {
     const px = Number(x), py = Number(y), pz = Number(z);
     if (!isFinite(px) || !isFinite(py) || !isFinite(pz)) return null;
-    if (leader && aliveNow(leader.id)) {
-        if (playerId) say(playerId, line("fa-solid fa-circle-info", C.INFO, "The Mob Leader is already on the loose."));
-        return null;
-    }
-    if (leader) {
-        const lostPosition = leader.spawnPos || safePosition(leader.id);
-        stopLeader();
-        if (!leaderRespawnAt) scheduleLeaderRespawn(lostPosition);
-    }
     const cooldownLeft = leaderRespawnAt - nowMs();
     if (cooldownLeft > 0 || leaderRespawnEffectActive()) {
         if (playerId) {
@@ -1423,12 +1419,13 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (playerId) say(playerId, line("fa-solid fa-xmark", C.DANGER, "The Mob Leader could not be summoned."));
         return null;
     }
+    scheduleLeaderRespawn(spot);
     /* Boss de rang 3 pour le butin : le mob est despawn avant le credit de son
        kill, donc son nom ne sera plus lisible a ce moment-la. */
     markBossMob(id, LEADER.NAME);
     const hp = leaderHp();
     /* Pas de one shot : paliers a 1/2, 1/3, 1/4 et 1/5 de sa vie. */
-    armBossGate(id, hp);
+    armBossGate(id, hp, LEADER.NAME);
     setupBossMob(id, {
         hp: hp,
         dmg: leaderDmg(),
@@ -1460,26 +1457,26 @@ export function spawnMobLeader(x, y, z, playerId) {
         shake: null,
         aiTarget: firstTarget || null,
     };
+    leaders[id] = leader;
     if (!leaderTimer) leaderTimer = every(thinkLeader, 4);
     return id;
 }
 
 /* Id du Mob Leader en course, ou null : c'est tout ce dont l'exterieur a
    besoin (despawn, nettoyage de fin de monde). */
-function leaderMobId() {
-    return leader ? leader.id : null;
+function leaderMobId(mobId) {
+    return mobId && leaders[mobId] ? mobId : null;
 }
 
 /* BRANCHE DE MORT : appelee par onPlayerKilledMob (via saberKilledMob).
-   Renvoie true si le mob etait bien le Mob Leader. */
+   Renvoie true si le mob etait bien un Mob Leader suivi. */
 function killLeader(playerId, mobId) {
-    if (!mobId || !leader || mobId !== leader.id) return false;
+    const deadLeader = mobId ? leaders[mobId] : null;
+    if (!deadLeader) return false;
 
     const p = safePosition(mobId);
-    const respawnPosition = leader.spawnPos || p;
-    stopLeader();
+    stopLeader(mobId);
     despawnIfAlive(mobId);
-    scheduleLeaderRespawn(respawnPosition);
 
     /* L'OR NE TOMBE QU'UNE FOIS, a l'etape chasse. Un second Mob Leader lance
        par le Code Block et tue a l'etape "or" ne lache donc plus rien : le
@@ -1632,7 +1629,7 @@ function startSaberFight(playerId) {
     markBossMob(id, SABER.NAME);
     const hp = saberHp();
     /* Pas de one shot : meme garde-fou que sur le Mob Leader et Garp. */
-    armBossGate(id, hp);
+    armBossGate(id, hp, SABER.NAME);
     setupBossMob(id, {
         hp: hp,
         dmg: saberDmg(),
@@ -2211,7 +2208,7 @@ export function saberKilledMob(playerId, mobId) {
 export function saberPreventDespawn(mobId) {
     if (!mobId) return null;
     if (saberMobId() === mobId) return "preventDespawn";
-    if (leaderMobId() === mobId) return "preventDespawn";
+    if (leaderMobId(mobId) === mobId) return "preventDespawn";
     return null;
 }
 

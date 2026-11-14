@@ -494,7 +494,7 @@ export function handleChat(playerId, message, channel) {
 
     message = normalizeCaps(message);
 
-    const name = api.getEntityName(playerId);
+    const name = safeName(playerId);
     const team = getTeamData(getPlayerTeam(playerId));
     const rank = getRankDataForPlayer(playerId);
 
