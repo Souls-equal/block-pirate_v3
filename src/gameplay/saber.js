@@ -46,7 +46,7 @@
 
 import { C, say, txt, bold, ic } from "../core/theme";
 import { deleteStat, getStat, setStat } from "../utils/data";
-import { nowMs, setInterval as every, setTimeout as after } from "../utils/timer";
+import { nowMs, setInterval as every } from "../utils/timer";
 import { damage, eff, hitArea, hitSeg, impulse, setVel } from "../utils/combat";
 import { aliveNow, applyNameTag, dist3, getAlivePlayerIds, isMobEntityType, nameTagInfo, safePosition } from "../utils/lifeform";
 import { TEX, at as soundAt, boom, point, rgba, ring, segDist } from "../utils/fx";
@@ -1118,6 +1118,7 @@ const LEADER = {
        vraiment puni. Rayon et delais se retouchent ici. */
     RING: { RADIUS: 6.5, WARN: 1400, SCALE: 1 },
     RESPAWN_MS: 30000,
+    RESPAWN_EFFECT: "Mob Leader Cooldown",
 };
 
 
@@ -1146,31 +1147,65 @@ let leaderRespawnTimer = null;
 let leaderRespawnAt = 0;
 let leaderRespawnPosition = null;
 
+function leaderRespawnEffectActive() {
+    const ids = getAlivePlayerIds();
+    for (let i = 0; i < ids.length; i++) {
+        try {
+            const effects = api.getEffects(ids[i]);
+            if (effects && effects.includes(LEADER.RESPAWN_EFFECT)) return true;
+        } catch (e) {}
+    }
+    return false;
+}
+
+function applyLeaderRespawnEffect(playerId, duration) {
+    if (!playerId || duration <= 0) return;
+    try {
+        api.applyEffect(playerId, LEADER.RESPAWN_EFFECT, duration, {
+            displayName: "Mob Leader Cooldown",
+            icon: "Updraft",
+        });
+    } catch (e) {}
+}
+
+function refreshLeaderRespawnEffects(duration) {
+    const ids = getAlivePlayerIds();
+    for (let i = 0; i < ids.length; i++) applyLeaderRespawnEffect(ids[i], duration);
+}
+
+function finishLeaderRespawnCooldown() {
+    if (leaderRespawnAt <= 0 || nowMs() < leaderRespawnAt || leaderRespawnEffectActive()) return;
+    const respawnAt = leaderRespawnPosition;
+    if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
+    leaderRespawnAt = 0;
+    leaderRespawnPosition = null;
+    if (leader && aliveNow(leader.id)) return;
+    if (leader) stopLeader();
+    if (!respawnAt) return;
+    try {
+        const id = spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]);
+        if (!id && !(leader && aliveNow(leader.id))) scheduleLeaderRespawn(respawnAt);
+    } catch (err) {
+        scheduleLeaderRespawn(respawnAt);
+    }
+}
+
 function scheduleLeaderRespawn(position) {
     if (!position || position.length < 3) return false;
     leaderRespawnPosition = [Number(position[0]), Number(position[1]), Number(position[2])];
     if (leaderRespawnTimer) leaderRespawnTimer.stop();
     leaderRespawnAt = nowMs() + LEADER.RESPAWN_MS;
-    leaderRespawnTimer = after(() => {
-        leaderRespawnTimer = null;
-        const respawnAt = leaderRespawnPosition;
-        leaderRespawnPosition = null;
-        leaderRespawnAt = 0;
-        if (leader && aliveNow(leader.id)) return;
-        if (leader) stopLeader();
-        if (!respawnAt) return;
-        try {
-            const id = spawnMobLeader(respawnAt[0], respawnAt[1], respawnAt[2]);
-            if (!id && !(leader && aliveNow(leader.id))) scheduleLeaderRespawn(respawnAt);
-        } catch (err) {
-            scheduleLeaderRespawn(respawnAt);
-        }
-    }, Math.ceil(LEADER.RESPAWN_MS / 50));
+    refreshLeaderRespawnEffects(LEADER.RESPAWN_MS);
+    leaderRespawnTimer = every(finishLeaderRespawnCooldown, 20);
     return true;
 }
 
 function cancelLeaderRespawn() {
     if (leaderRespawnTimer) { leaderRespawnTimer.stop(); leaderRespawnTimer = null; }
+    const ids = getAlivePlayerIds();
+    for (let i = 0; i < ids.length; i++) {
+        try { api.removeEffect(ids[i], LEADER.RESPAWN_EFFECT); } catch (e) {}
+    }
     leaderRespawnAt = 0;
     leaderRespawnPosition = null;
 }
@@ -1368,9 +1403,9 @@ export function spawnMobLeader(x, y, z, playerId) {
         if (!leaderRespawnAt) scheduleLeaderRespawn(lostPosition);
     }
     const cooldownLeft = leaderRespawnAt - nowMs();
-    if (cooldownLeft > 0) {
+    if (cooldownLeft > 0 || leaderRespawnEffectActive()) {
         if (playerId) {
-            const seconds = Math.ceil(cooldownLeft / 1000);
+            const seconds = Math.max(1, Math.ceil(Math.max(0, cooldownLeft) / 1000));
             say(playerId, line("fa-solid fa-hourglass", C.INFO, "The Mob Leader is resting. Respawns in " + seconds + "s."));
         }
         return null;
@@ -2182,6 +2217,8 @@ export function saberPreventDespawn(mobId) {
 
 export function saberJoin(playerId) {
     if (!playerId) return false;
+    const respawnCooldownLeft = leaderRespawnAt - nowMs();
+    if (respawnCooldownLeft > 0) applyLeaderRespawnEffect(playerId, respawnCooldownLeft);
     startHousekeeping();
     /* Les deux cles des versions precedentes sont effacees : `sq` (etape) et
        `sqB` (plaques) ne servent plus a rien, tout tient maintenant dans `s`. */

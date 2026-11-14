@@ -99,8 +99,11 @@ function simulateEqualLevelDuel(level) {
 const duel = simulateEqualLevelDuel(165);
 assert.ok(duel.hits <= 30, "equal-level PvP should finish promptly under the requested stat allocation");
 console.log(`165 vs 165 PvP: decisive in ${duel.hits} hits / ${duel.elapsed.toFixed(1)}s; ${duel.hit} damage per hit`);
-assert.ok(getPvPDefenseReductionForPoints(492) <= 8, "PvP Defense reduction has a flat ceiling");
-assert.ok(applyDefenseReduction(20, getPvPDefenseReductionForPoints(492)) >= 12,
+assert.ok(getPvPDefenseReductionForPoints(1000) > getPvPDefenseReductionForPoints(492),
+    "PvP Defense reduction must keep increasing as more points are invested");
+assert.ok(getPvPDefenseReductionForPoints(1000) > 8,
+    "PvP Defense reduction must not stop at the previous 8-point cap");
+assert.ok(applyDefenseReduction(20, getPvPDefenseReductionForPoints(492)) >= 10,
     "even a defense-heavy build should take meaningful damage from a 20-damage hit");
 
 const battles = [simulate(10, 15), simulate(1500, 1505)];
