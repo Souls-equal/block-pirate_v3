@@ -22,7 +22,6 @@ import { creditKill as CtKill, forgetDamager as lt, getLastDamager as st, noteMo
 import { facingInfo as facingInfoOf, forgetAliveId as dt, getAlivePlayerIds as gt, isMobEntityType as isMobType, refreshAliveCache as ht, targetBlock as aimBlockOf } from "./utils/lifeform";
 import { cancelKill as bt, flushKill as Pt, pruneKills as kt } from "./utils/killfeed";
 import { tickPath as It, onPlayerJoinPath as vt, onPlayerClickPath as wt } from "./build/path";
-import { tick1 as Mt, onPlayerJoin1 as St, onPlayerClick1 as Nt } from "./build/sphere";
 import { isHakiPod as hkPod, onPlayerClickArmamentHaki as Kt, onPlayerJoinArmamentHaki as Ht, onPlayerLeaveArmamentHaki as Jt, onPlayerRespawnArmamentHaki as Lt } from "./utils/haki";
 import { onCloseBoss as Bt, onPlayerKilledMobBoss as Ft, onPlayerDamagingMobBoss as Et, onWorldAttemptDespawnMobBoss as Ot } from "./utils/boss";
 import { bossDamageGate as bpBossGate } from "./utils/boss";
@@ -421,7 +420,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
     applyButtons(t);
 }, onInventoryUpdated = t => {
     applyButtons(t);
-}, onPlayerJoin = t => {St(t) //sphere
+}, onPlayerJoin = t => {
     if (qt(t)) return;
     startSpawnShield(t);
     Gt("analytics.join", () => analyticsJoin(t));
@@ -495,7 +494,7 @@ onPlayerSelectInventorySlot = (t, slot) => {
             Gt("abilities", () => P(t)), Gt("sidebar", () => K(t));
         }, 5);
     } catch (t) {}
-}, onPlayerClick = (t, r, a, i, e, o, m) => { Nt(t, r, a, i, e, o, m)
+}, onPlayerClick = (t, r, a, i, e, o, m) => {
     /* TACTILE : pas de visee d'entite, `targetEId` arrive nul et AUCUN PNJ ne
        repondait sur mobile (recruteurs compris). On prend donc le PNJ sous le
        doigt quand la cible ne peut pas etre lui :
@@ -871,7 +870,7 @@ doPeriodicSave = () => {
         bold([ "discord.", "gg", "/", w ].join(""), PAL.MARINE),
         txt(".", PAL.MONEY),
     ]);
-}, tick = t => {Mt(t);//sphere
+}, tick = t => {
     ht(), W(), Gt("spawnProtection", () => tickSpawnShield()), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();
     });
