@@ -14,6 +14,7 @@ import { getFightingStyle as fsStyle, ensureVoidNet as ensureNet, handleFighting
 import { assignRank as G, clearRankCache as Y } from "./core/ranks";
 import { clearConfirm as bpClearConfirm, clearDevice as clearPlayerDevice, isMobilePlayer as isMobilePlayer, reconcileSP as _, setControlsHook as bpSetControlsHook, setDevice as setPlayerDevice, setPurchaseHook as bpSetPurchaseHook, useItemControls as useItemControls } from "./utils/data";
 import { heldItemName as heldName, itemJoin as z } from "./gameplay/customItem";
+import { clearSwordAbilities as clearSwordAbilities, tickSwordAbilities as tickSwordAbilities, useCustomSwordAbility as useCustomSwordAbility } from "./gameplay/swordAbilities";
 import { isBossMob as isBossMob } from "./gameplay/loot";
 import { pickTarget as bpPickTarget, setBossGuard as setBossGuard, setMobDamageHook as bpSetMobDamageHook, clearPlayerEffects as V, notePvPDeath as pvDeath, grantPvPShield as pvShield, pvpGuard as pvGuard, tickPvPShield as pvTick, clearPvPFor as pvClear, startSpawnProtection as startSpawnShield, noteSpawnProtectionPending as noteSpawnShieldPending, isSpawnProtected as isSpawnShielded, tickSpawnProtection as tickSpawnShield, setTeamGuard as setTeamGuard, setZoneGuard as setZoneGuard, setTutorialGuard as bpSetTutorialGuard, withEffectSource as bpWithEffectSource } from "./utils/combat";
 import { codeJoin as X, handleShopCode as Z, setupCodeShop as $ } from "./gameplay/codes";
@@ -468,7 +469,8 @@ onPlayerSelectInventorySlot = (t, slot) => {
     Gt("leave.fruitCallbacks", () => s(t)), Gt("leave.haki", () => V(t)),
     Gt("leave.items", () => it(t)), Gt("leave.admin", () => Wt(t)),
     Gt("leave.pvp", () => pvClear(t)), Gt("leave.settings", () => bpSettingsLeave(t)),
-    Gt("leave.saber", () => spLeave(t)), Gt("leave.tutorial", () => tutorialLeave(t));
+    Gt("leave.saber", () => spLeave(t)), Gt("leave.tutorial", () => tutorialLeave(t)),
+    Gt("leave.swords", () => clearSwordAbilities(t));
     try {
         lt(t);
     } catch (t) {
@@ -604,6 +606,10 @@ onPlayerStartChargingItem = (t, itemName) => {
     if (isCommandItemName(itemName)) return "preventCharge";
 }, onPlayerAltAction = (t, r, a, i, e, o) => {
     if (o && isNPCEntity(o)) return Zt(t, o);
+    /* Les sabres gardent leur coup natif au clic gauche; leur capacité est
+       déclenchée ici au clic droit (sneak + clic droit = dash pour les lames
+       qui le permettent). */
+    if (useCustomSwordAbility(t)) return "preventAction";
     let m = null;
     try {
         m = api.getPlayerPhysicsState(t);
@@ -871,7 +877,7 @@ doPeriodicSave = () => {
         txt(".", PAL.MONEY),
     ]);
 }, tick = t => {
-    ht(), W(), Gt("spawnProtection", () => tickSpawnShield()), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
+    ht(), W(), Gt("spawnProtection", () => tickSpawnShield()), Gt("analytics.tick", () => analyticsTick()), Gt("stamina", () => et()), Gt("swordAbilities", () => tickSwordAbilities()), Gt("pvp", () => pvTick()), Gt("settingsVar", () => bpSettingsSync(t)), Gt("prune", () => {
         kt(), pt();
     });
 }, R(() => {

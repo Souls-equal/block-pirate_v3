@@ -94,6 +94,14 @@ export const ITEM_LOOKS = {
     "Stone Spear": { displayName: "Advanced Spear", description: "A long spear for a fighter with no side to swear to." },
     "Wood Spear": { displayName: "Basic Spear", description: "The first spear every Marine is handed." },
     "M1911": { displayName: "Flintlock", description: "A slow hand cannon that hits hard from a distance." },
+    "Iron Sword": { displayName: "Iaido Katana", description: "A swift katana. Right-click to send a cutting wave." },
+    "Gold Sword": { displayName: "Sunsteel Sabre", description: "A blazing sabre that launches a wide, bright slash." },
+    "Diamond Sword": { displayName: "Tempest Blade", description: "A heavy blade that sends a forceful slash downrange." },
+    "Knight Sword": { displayName: "Knight's Edge", description: "Sneak and right-click to dash forward with this knightly blade." },
+    "Moonstone Sword": { displayName: "Moonveil Katana", description: "A long-reaching moonlit slash; holding it grants a speed boost." },
+    "Astral Sword": { displayName: "Astral Katana", description: "A swift astral blade that lets its wielder move faster." },
+    "Sanguine Sword": { displayName: "Bloodmoon Sabre", description: "A crimson blade with a close, powerful slash." },
+    "Nova Blade": { displayName: "Nova Katana", description: "A radiant katana that fires a long-range energy slash." },
 };
 
 /* Le seul item dont le NOM depend de la team : la premiere arme, que le
